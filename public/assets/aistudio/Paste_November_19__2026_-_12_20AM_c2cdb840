@@ -1,0 +1,425 @@
+BIBIFOLD — Especificación Maestra del Proyecto (Project.md)
+Versión: 1.0.0 — Documento fundacional de arquitectura, diseño visual, pedagogía y desarrollo
+Institución: Universidad de Pamplona — Facultad de Ingenierías y Arquitectura (Semillero de Investigación, Feria de Inteligencia Artificial)
+Hardware objetivo de referencia: Portátil de consumo (Lenovo IdeaPad Slim 3, AMD Ryzen 7 5700U 8C/16T, GPU integrada Radeon Vega 8, 12 GB RAM DDR4 compartida)
+Licencia prevista: MIT (software abierto y recurso educativo replicable)
+1. Visión, Propósito y Principios de Diseño
+BIBIFOLD es un curso-laboratorio web interactivo en 3D para el aprendizaje de las matemáticas esenciales de Ingeniería de Sistemas y Ciencias de la Computación. Combina visualización tridimensional de estética artesanal (crayones digitalizados, grafito y papel de cuaderno vivo), un sistema de disección conceptual sincronizada (Modo Anatomía en tres planos) e inteligencia artificial local en el navegador (Edge AI) tanto para adaptar dinámicamente el nivel pedagógico como para experimentar en tiempo real con los algoritmos matemáticos que sostienen la IA moderna.
+1.1 Qué ES BIBIFOLD
+Un cuaderno de ingeniería vivo en 3D: cada concepto matemático se manipula, se dobla, se corta y se desmonta por capas directamente en pantalla.
+Un sistema dirigido por un único modelo de estado (Single Source of Truth): las fórmulas simbólicas, los gráficos 3D, las lecturas numéricas, los bloques de código y la telemetría del motor adaptativo leen y escriben exactamente el mismo estado matemático en cada fotograma.
+Un entorno 100 % local, privado y ligero: corre en navegadores modernos sobre WebGL 2 y Web Workers, sin servidores externos de pago ni modelos pesados que ahoguen la memoria compartida.
+1.2 Qué NO ES BIBIFOLD (Antipatrones prohibidos en el desarrollo)
+No es un chatbot ni un asistente con avatar caricaturesco. La ayuda pedagógica ocurre mediante andamiaje visual directo (encendido y apagado progresivo de capas anatómicas y trazos guía).
+No es una estética genérica "neón oscuro de IA". Se prohíben fondos negros con resplandor azul-magenta tipo cyberpunk, tarjetas de cristal genéricas (glassmorphism sin propósito) y animaciones decorativas que distraigan del fenómeno matemático.
+No es un curso enciclopédico de matemáticas puras. Se excluye la manipulación algebraica mecánica sin conexión computacional (por ejemplo, integrales por sustituciones oscuras a mano) y se prioriza lo que gobierna gráficos 3D, algoritmos, redes, simulación, métodos numéricos y aprendizaje automático.
+No depende de sensores ruidosos en feria. No usa reconocimiento de voz, poses acrobáticas ni tarjetas QR; prioriza interacción precisa y táctil con ratón, teclado, pantalla táctil y soporte opcional de mando analógico (Gamepad API) para barrido continuo de parámetros.
+2. Dirección Artística: "Crayones Digitalizados / Hand-Crafted Studio"
+La identidad visual de BIBIFOLD busca evocar el momento en que las matemáticas se entienden de verdad: un cuaderno de bocetos de ingeniería dibujado con crayones de cera, lápiz de grafito y notas al margen, cuyas figuras cobran vida y profundidad tridimensional.
+2.1 Filosofía Visual y Temas
+El sistema soporta dos sustratos táctiles diseñados primero para claridad diurna y luego para recintos con baja luz (como un stand en feria):
+Tema Primario — Papel Algodón Cálido (Default):
+Sustrato base: #F6F1E6 (papel de acuarela/cuaderno sin blanquear) con textura sutil de celulosa y diente de papel en espacio de pantalla.
+Superficie de tarjetas/paneles: #EFE8D8 con bordes dibujados con Rough.js en grafito suave #3B3732.
+Cuadrícula de cuaderno de ingeniería: líneas de guía muy tenues en #DDD4C2 (opacidad $0.35$).
+Tema Secundario — Pizarra de Carbón y Pastel (Modo Feria / Baja Luz):
+Sustrato base: #1E2226 (pizarra mate con grano mineral sutil, nunca negro puro #000000).
+Trazos en tiza y pastel de cera luminoso manteniendo exactamente la misma codificación semántica de color.
+2.2 Paleta de Crayones Semántica (Constante en todo el curso)
+El color nunca es decorativo: cada pigmento significa una familia matemática fija en los seis bloques del curso para reducir la carga cognitiva.
+Pigmento (Nombre del crayón)
+HEX (Papel)
+HEX (Pizarra)
+Significado semántico obligatorio
+Grafito Carbón
+#24211E
+#F0EBE1
+Ejes coordenados, notación algebraica base, contornos y líneas de construcción
+Crayón Azul Cobalto
+#26547C
+#63A4D8
+Vector base $\hat{i}$, superficies escalares $z = f(x, y)$, datos de clase A
+Crayón Bermellón / Terracota
+#D1493B
+#F27466
+Vector base $\hat{j}$, gradiente $-\nabla f$, singularidades ($\det(A) = 0$), error numérico
+Crayón Ocre Mostaza
+#D4931E
+#F2BD4B
+Vector base $\hat{k}$, autovectores, curvas de nivel, pivotes y puntos críticos
+Crayón Verde Salvia
+#2F7A57
+#66C494
+Convergencia, soluciones óptimas, volumen conservado, plano computacional (código/memoria)
+Crayón Ciruela Pastel
+#7A4B82
+#BA87C4
+Variedades plegadas (manifolds), activaciones no lineales, datos de clase B
+Lápiz Gris Suave
+#7D756A
+#969188
+Proyecciones auxiliares, vectores fantasma, historial de iteraciones previas
+2.3 Receta Técnica del Renderizado 3D NPR (Digitized Crayon Pipeline)
+Para lograr un acabado de crayón sobre papel en Three.js manteniendo $60\text{ FPS}$ en la GPU integrada Radeon Vega 8, no se usan shaders PBR pesados ni postprocesado costoso. Se construye un pipeline ligero de renderizado no fotorrealista (NPR):
+Textura de Diente de Papel (Paper Tooth Grain):
+Se genera proceduralmente al arrancar (una sola vez en un <canvas> de $256 \times 256\text{ px}$ repetible sin costuras) un mapa de ruido de grano de papel + fibras direccionales. Costo en VRAM: $< 256\text{ KB}$.
+Material de Crayón de Cera (CrayonSurfaceMaterial en GLSL):
+Iluminación cuantizada cálida-fría: en lugar de sombras grises realistas, el producto punto $\vec{N} \cdot \vec{L}$ se cuantiza en 3 bandas suaves desplazando las sombras hacia un tono sepia/azul-grafito y las luces hacia el color del papel.
+Mordida de cera (Wax Tooth Masking): el fragment shader muestrea la textura de grano en espacio de pantalla (gl_FragCoord.xy / uGrainScale) y modula la cobertura del pigmento según la intensidad lumínica y el ángulo de visión (efecto Fresnel suave). En zonas claras o cerca del borde del trazo, el papel crudo se deja ver entre el pigmento, exactamente como un crayón sobre cartulina rugosa.
+Achurado artesanal (Procedural Hatching): en planos de corte anatómicos (por ejemplo, el corte de una derivada parcial o la región de error de una integral), el shader traza líneas diagonales paralelas a $45^\circ$ moduladas con ruido ligero de frecuencia baja para simular rayado a mano.
+Contornos y Vectores con Line-Boil Artesanal (CrayonLineMaterial):
+Los ejes, vectores, aristas de mallas y curvas de nivel se renderizan con tubos instanciados o Line2 con grosor variable.
+Efecto Boiled-Line a $6\text{ FPS}$ sobre física a $60\text{ FPS}$: el vertex shader aplica un desplazamiento microscópico perpendicular a la vista usando ruido de valor cuantizado en el tiempo con floor(uTime * 6.0). Esto reproduce la vibración sutil de la animación dibujada a mano (estilo hand-crafted stop-motion) mientras las rotaciones de cámara y simulaciones matemáticas corren a $60\text{ FPS}$ continuos.
+Regla de accesibilidad: cuando prefers-reduced-motion: reduce está activo (o el usuario pulsa "Trazos firmes"), el desplazamiento temporal se fija en $0$ conservando la textura estática del crayón.
+Capa UI 2D Artesanal (Rough.js + KaTeX):
+Marcos de controles, flechas de anotación, divisores y diagramas auxiliares 2D se dibujan con Rough.js ($< 9\text{ KB}$ comprimido) sobre SVG cacheados por semilla determinista (para evitar parpadeos al redimensionar).
+Toda la tipografía funcional permanece en HTML real (nunca rasterizada en canvas) para garantizar nitidez, selección de texto y accesibilidad.
+2.4 Tipografía
+Títulos de módulos y etiquetas de cuaderno: Fraunces (serif editorial con personalidad orgánica) o Newsreader.
+Interfaz, descripciones y controles: Plus Jakarta Sans (alta legibilidad técnica).
+Anotaciones al margen (pistas breves sobre gráficos): Caveat o Patrick Hand (uso moderado, solo notas cortas).
+Ecuaciones y plano computacional: KaTeX + JetBrains Mono (ligaduras desactivadas en expresiones matemáticas para evitar ambigüedad visual).
+3. Arquitectura Pedagógica: Modo Anatomía y Patrones de Explorable Explanations
+BIBIFOLD fusiona dos tradiciones de explicación visual rigurosa:
+Patrones de Explorable Explanations (Bret Victor / Nicky Case / Bartosz Ciechanowski): manipulación directa sobre los objetos en vez de formularios lejanos, "subir y bajar por la escalera de la abstracción" (ver un caso concreto, luego una familia de casos y luego el sistema global), y predicción antes de revelar el resultado.
+Principios de disección técnica (Anatomy Craft Rules): todo concepto complejo se construye como un mecanismo físico/geométrico explorable donde las piezas se separan, las etiquetas derivan del mismo modelo matemático y las simplificaciones se declaran explícitamente.
+3.1 El Modo Anatomía: Disección Sincronizada en Tres Planos
+Cada escena de BIBIFOLD incluye un conmutador maestro de Vista Integral / Vista Anatomía (Explosionada) que abre tres planos vinculados bidireccionalmente:
+Plano 1 — Anatomía Simbólica (Ecuación Viva):
+La fórmula renderizada con KaTeX se compone de tokens interactivos codificados con el color del crayón correspondiente.
+Al pasar el cursor o seleccionar un token (por ejemplo, el coeficiente $a_{12}$ de una matriz $A$, el vector $\nabla f$ o la tasa de aprendizaje $\alpha$), el resto de la ecuación se atenúa al $30\%$ y en el lienzo 3D se aísla únicamente el elemento geométrico gobernado por ese símbolo.
+Arrastrar horizontalmente un número en la fórmula (scrubbing) modifica el valor de forma continua en la escena 3D.
+Plano 2 — Anatomía Geométrica 3D (Capas Desmontables):
+Cada gráfico está compuesto por entre 4 y 6 órganos visuales independientes (capas conmutables con toggles táctiles dibujados a crayón):
+Capa Sustrato: ejes, retícula y dominio de entrada.
+Capa Estructura: malla principal, superficie $z = f(x, y)$ o nube de puntos.
+Capa Operador: vectores base transformados, planos de corte de derivadas parciales o campos vectoriales.
+Capa Invariante / Crítica: autovectores, curvas de nivel, puntos de silla o fronteras de decisión.
+Capa Error / Residuo: cuñas de error de truncamiento, distancia al óptimo o colapso de volumen.
+Al activar Explosión de Capas, las capas se separan verticalmente mediante resortes amortiguados para inspeccionar su composición interna sin oclusión.
+Plano 3 — Anatomía Computacional (Puente a Sistemas):
+Un panel lateral colapsable traduce la escena activa en tiempo real a su realidad en Ingeniería de Sistemas:
+Representación en memoria: matrices Float32Array, tensores, listas de adyacencia o grafos dirigidos acíclicos (DAG) con los valores exactos del estado actual.
+Costo computacional: complejidad temporal y espacial viva (por ejemplo, $\mathcal{O}(n^3)$ en multiplicación matricial ingenua frente a $\mathcal{O}(E \log V)$ en Dijkstra).
+Aplicación real en CS: en qué subsistema concreto vive ese objeto (pipeline de cámara WebGL, capa lineal + activación en PyTorch, paso de backpropagation o precisión IEEE 754).
+3.2 Ciclo de Cuatro Fases de Cada Lección
+Explorar (Intuición libre): El estudiante manipula el objeto 3D dibujado a crayón durante $30$ a $60$ segundos sin presión de puntaje.
+Disecar (Modo Anatomía): Se abren las capas simbólica, geométrica y computacional para nombrar cada pieza y aislar su efecto.
+Predecir y Resolver (Reto de Ingeniería): El sistema genera un reto procedural calibrado por la IA adaptativa (por ejemplo, "estabiliza la transformación sin colapsar el determinante" o "calibra Momentum para escapar del mínimo local").
+Contrastar (Espejo de Sistemas): Al resolverlo, el sistema compara el desempeño del estudiante con el algoritmo de referencia (o muestra el fragmento de código/shader equivalente).
+4. Ecosistema de Agent Skills para el Desarrollo de BIBIFOLD
+Para construir BIBIFOLD de forma acelerada, consistente y libre de interfaces genéricas (anti-slop), el desarrollo asistido por agentes de programación (Claude Code, Cursor, Antigravity, Codex o Gemini CLI) se apoyará en un conjunto curado de Agent Skills externas verificadas más tres skills locales propias del repositorio.
+4.1 Skills Externas Recomendadas (Instalación mediante npx skills)
+Skill / Repositorio
+Comando de instalación
+Rol exacto dentro de BIBIFOLD
+wheresryan22/anatomy
+npx skills add wheresryan22/anatomy
+Referencia directa para las ilustraciones interactivas 2D/isométricas del Modo Anatomía (componentes SVG + WebGL con estado compartido, auditoría visual, modo claro prioritario y degradación elegante sin WebGL).
+CloudAI-X/threejs-skills
+npx skills add cloudai-x/threejs-skills
+Biblioteca de 14 skills especializadas en Three.js moderno (threejs-fundamentals, threejs-geometry, threejs-shaders, threejs-interaction, threejs-performance). Evita APIs obsoletas y asegura optimización de draw calls y memoria en la Vega 8.
+anthropics/skills (frontend-design + canvas-design + algorithmic-art)
+npx skills add anthropics/skills --skill frontend-design --skill canvas-design --skill algorithmic-art
+frontend-design guía la UI artesanal sin patrones genéricos; canvas-design apoya el diseño del póster académico de la feria; algorithmic-art aporta reglas de aleatoriedad por semilla (seeded randomness) y campos de flujo procedurales.
+cathrynlavery/diagram-design
+npx skills add cathrynlavery/diagram-design
+Generación de diagramas técnicos nítidos de arquitectura, grafos de dependencia y mapas conceptuales para la documentación y el póster.
+github/awesome-copilot (excalidraw-diagram-generator)
+npx skills add github/awesome-copilot --skill excalidraw-diagram-generator
+Creación de diagramas estilo boceto manual (Excalidraw) coherentes con la estética artesanal para la documentación del repositorio y anexos.
+pbakaus/impeccable
+npx skills add pbakaus/impeccable
+Auditoría de jerarquía visual, contraste, espaciado y tokens de diseño reutilizables en la interfaz de BIBIFOLD.
+iart-ai/explainer-video-skills
+npx skills add iart-ai/explainer-video-skills
+Útil en la fase final (Sprint 5) para producir el guion y las secuencias tipo whiteboard draw-on del video demostrativo de 3 minutos para la Feria de IA.
+4.2 Skills Locales Propias del Proyecto (Crear en .agents/skills/ y .claude/skills/)
+Para garantizar que todo el equipo y cualquier agente de código respeten las reglas de BIBIFOLD sin desviarse, el repositorio incluirá tres archivos SKILL.md propios:
+.agents/skills/bibifold-crayon-npr/SKILL.md:
+Reglas inmutables del shader de crayón de cera, paleta HEX semántica, line-boil cuantizado a $6\text{ FPS}$, integración de Rough.js, prohibición de brillos neón y presupuesto de GPU para Vega 8.
+.agents/skills/bibifold-anatomy-module/SKILL.md:
+Plantilla paso a paso para crear un nuevo módulo matemático que herede de MathModuleBase, exija al menos 4 capas anatómicas desmontables, sincronice tokens de KaTeX con uniforms GLSL, incluya el panel computacional y disponga de pruebas unitarias de exactitud matemática.
+.agents/skills/bibifold-edge-ai/SKILL.md:
+Estándares para el motor BKT + Bandits Contextuales, contrato de telemetría anonimizada en localStorage/IndexedDB, y reglas de aislamiento de cómputo pesado en Web Workers para no bloquear el hilo principal de renderizado.
+5. Malla Curricular Completa para Ingeniería de Sistemas (6 Bloques)
+El currículo completo se modela como un Grafo Dirigido Acíclico (DAG) de Conocimiento. Para la primera entrega (6 meses / Feria de IA) se implementan de forma integral los Bloques Piloto 1 y 2, mientras que los bloques 3 a 6 quedan formalmente especificados como extensiones enchufables sobre la misma arquitectura.
+5.1 Resumen de los 6 Bloques Curriculares
+#
+Bloque Curricular
+Alcance en MVP (6 meses)
+Temas clave relevantes para CS
+Órganos principales en el Modo Anatomía
+1
+Álgebra Lineal Computacional
+MVP Piloto 1 (Completo)
+Vectores, producto punto/cruz, transformaciones $2\times 2$ y $3\times 3$, determinante y rango, autovectores, descomposición SVD ($U \Sigma V^T$) y plegado de variedades neuronales
+Columnas de matriz ligadas a ejes $\hat{i}', \hat{j}', \hat{k}'$, cubo unitario de volumen, ejes invariantes, etapas separadas de SVD, plano de separación lineal tras no linealidad
+2
+Cálculo Multivariable y Optimización
+MVP Piloto 2 (Completo)
+Superficies $z = f(x, y)$, derivadas parciales, gradiente $\nabla f$, curvatura (Hessiana), regla de la cadena en DAG (AutoDiff / backprop), descenso del gradiente (SGD, Momentum, Adam) y regresión simbólica
+Planos de corte $X/Y$, plano tangente, mapa de curvas de nivel, vector gradiente vs. vector de inercia, grafo 3D de propagación hacia adelante/atrás
+3
+Cálculo Diferencial e Integral Aplicado
+Extensión Fase 2
+Límites asintóticos, linealización local, series de Taylor (cómo la CPU calcula $\sin x, e^x$), cuadratura numérica (Riemann, trapecio, Simpson, Monte Carlo)
+Secante colapsando en tangente, capas apiladas de polinomios de Taylor, cuñas rojas de error de truncamiento
+4
+Métodos Numéricos y Computación Científica
+Extensión Fase 2
+Punto flotante IEEE 754, cancelación catastrófica, raíces (Bisección, Newton-Raphson), splines/Bézier, FFT (análisis espectral) y Euler vs. RK4
+Cuencas de atracción fractales, espectro de armónicos 3D desplegados en profundidad, separación error de truncamiento vs. redondeo
+5
+Matemáticas Discretas, Grafos y Complejidad
+Extensión Fase 2
+Lógica booleana, árboles de recursión, aritmética modular $\mathbb{Z}_n$ (criptografía), grafos (Dijkstra, A*, flujo máximo) y crecimiento asintótico $\mathcal{O}, \Omega, \Theta$
+Capas de grafo (topología, matriz de adyacencia viva, frontera de prioridad, árbol mínimo), pila de llamadas 3D, relojes modulares
+6
+Probabilidad y Teoría de la Información
+Extensión Fase 2
+Teorema de Bayes, distribuciones multivariables y covarianza, cadenas de Markov, entropía de Shannon, divergencia KL y entropía cruzada
+Volúmenes superpuestos (priori, verosimilitud, posterior), elipsoide de covarianza deformable, barras de sorpresa $-\log_2(p)$
+5.2 Diseño Minucioso de los Dos Módulos Piloto (MVP)
+Módulo Piloto 1: Álgebra Lineal Computacional (LinearAlgebraModule)
+Compuesto por 4 escenas interactivas progresivas con Modo Anatomía completo:
+Escena 1.1 — Span e Independencia Lineal:
+Visual 3D a crayón: Dos o tres vectores gruesos de cera ($\hat{v}_1$ cobalto, $\hat{v}_2$ bermellón, $\hat{v}_3$ ocre) sobre una retícula de cuaderno. El estudiante arrastra escalares $c_1, c_2, c_3$ en la ecuación $\vec{p} = c_1\vec{v}_1 + c_2\vec{v}_2 + c_3\vec{v}_3$ o manipula directamente las puntas en 3D.
+Momento de revelación: Si dos vectores se vuelven colineales, el volumen alcanzable se aplasta visualmente en una hoja rayada en diagonal, haciendo tangible la pérdida de rango.
+Puente CS: Combinación de canales RGB, espacios de características (feature spaces) y bases de cámaras 3D.
+Escena 1.2 — Transformaciones, Determinante y Descomposición SVD:
+Visual 3D a crayón: Una cuadrícula 3D de cuaderno y un cubo unitario relleno con achurado verde salvia se deforman suavemente mediante interpolación $M(t) = (1-t)I + tA$.
+Anatomía SVD: Un deslizador temporal descompone $A = U \Sigma V^T$ en tres actos visibles: primero rota el espacio ($V^T$), luego estira/aplasta sobre los ejes ortogonales ($\Sigma$) y finalmente aplica la rotación de salida ($U$). Cuando $\det(A) < 0$, el cubo se voltea mostrando el reverso rayado en bermellón (inversión de orientación).
+Puente CS: Matrices Model-View-Projection en WebGL y compresión de imágenes por truncamiento de valores singulares.
+Escena 1.3 — Autovectores y Direcciones Invariantes:
+Visual 3D a crayón: Al deformar continuamente la retícula con una matriz $A$, una corona de rayos de lápiz rota de dirección excepto a lo largo de los autovectores reales, que se iluminan en crayón ocre al coincidir $A\vec{v} = \lambda \vec{v}$.
+Reto: El estudiante orienta sondas direccionales hasta alinearlas con las líneas que solo se estiran o contraen sin girar, midiendo visualmente $\lambda$.
+Puente CS: Análisis de Componentes Principales (PCA), PageRank y estabilidad de sistemas dinámicos.
+Escena 1.4 — Plegado de Variedades Neuronales (Neural Manifold Folding):
+Integración IA directa: Dos nubes de puntos dibujadas como trazos de crayón cobalto y ciruela aparecen entrelazadas (anillos concéntricos o doble espiral) de modo que ningún plano recto puede separarlas.
+Mecánica: El estudiante aplica en secuencia una transformación afín $W\vec{x} + \vec{b}$ y luego una función de activación no lineal ($\tanh$, $\text{ReLU}$ o $\sigma$) observando cómo el papel 3D se dobla y levanta hasta que un plano de grafito separa limpiamente ambas clases.
+Puente CS: Por qué las redes neuronales profundas necesitan activaciones no lineales para clasificar datos no separables linealmente.
+Módulo Piloto 2: Cálculo Multivariable y Optimización (MultivariableCalcModule)
+Compuesto por 4 escenas interactivas progresivas con Modo Anatomía completo:
+Escena 2.1 — Anatomía de la Derivada Parcial y Plano Tangente:
+Visual 3D a crayón: Una superficie topográfica $z = f(x, y)$ sombreada con crayón azul cobalto y curvas de nivel ocres proyectadas en el piso del cuaderno.
+Modo Anatomía: Al encender las capas de corte, dos láminas translúcidas con achurado bermellón y ocre atraviesan la superficie fijando $y = y_0$ y $x = x_0$, dejando expuestas las curvas 2D cuyas pendientes son $\frac{\partial f}{\partial x}$ y $\frac{\partial f}{\partial y}$, las cuales construyen el plano tangente en $(x_0, y_0)$.
+Escena 2.2 — Grafo Computacional y Diferenciación Automática (AutoDiff):
+Integración IA directa: Junto a la superficie 3D flota un diagrama interactivo estilo anatomy / Rough.js del grafo computacional de la función (nodos de suma, producto, seno y potencia).
+Mecánica: Un pulso verde (forward pass) evalúa los valores intermedios; un pulso bermellón (backward pass) propaga las derivadas locales por la regla de la cadena hasta los parámetros de entrada. El estudiante puede inspeccionar en vivo dónde se multiplica un gradiente cercano a cero (desvanecimiento) o excesivo (explosión).
+Escena 2.3 — Carrera de Optimizadores sobre Paisajes de Pérdida:
+Integración IA directa: Sobre terrenos clásicos de optimización (valle curvo de Rosenbrock, paisaje multimodal de Rastrigin o punto de silla $z = x^2 - y^2$), el estudiante suelta simultáneamente tres sondas marcadas con estelas de crayón: SGD (cobalto), Momentum (ocre) y Adam (verde salvia).
+Anatomía del paso: En modo paso a paso, sobre la sonda se dibujan por separado el vector $-\alpha \nabla f$ y el vector de inercia, mostrando por qué un $\alpha$ alto hace rebotar y divergir la sonda o cómo Momentum logra cruzar un punto de silla.
+Escena 2.4 — Laboratorio de Regresión Simbólica Evolutiva (Humano vs. IA en Web Workers):
+Integración IA directa: Aparece una superficie objetivo dibujada en trazo fantasma de lápiz sin revelar su ecuación. El estudiante combina bloques simbólicos ($\sin$, $\cos$, $x^2$, $xy$, $e^{-r^2}$) para ajustar su propia malla mientras, en un Web Worker paralelo que aprovecha los hilos del Ryzen 7 5700U, un motor ligero de programación genética evoluciona una población de fórmulas candidatas generación tras generación mostrando el error cuadrático medio (MSE) y el árbol de la mejor fórmula descubierta por la IA.
+6. Motor de Inteligencia Artificial Local (Edge AI) y Adaptación Pedagógica
+Toda la IA de BIBIFOLD es determinista/estadística ligera o evolutiva, corre $100\%$ en el navegador y guarda el progreso localmente (IndexedDB / localStorage) sin enviar datos a servidores.
+6.1 Rastreo Bayesiano del Conocimiento (BKT) por Microhabilidad
+El grafo curricular divide los dos módulos piloto en microhabilidades granulares (por ejemplo: lin_span_rank, lin_det_collapse, lin_eigen_dir, lin_manifold_nonlin, calc_partial_slice, calc_chain_autodiff, calc_lr_stability, calc_saddle_escape).
+Para cada microhabilidad $k$, el motor mantiene la probabilidad de dominio $P(L_t)$ caracterizada por cuatro parámetros calibrables: conocimiento inicial $P(L_0)$, tasa de aprendizaje $P(T)$, probabilidad de acierto por azar $P(G)$ y probabilidad de desliz $P(S)$. Tras observar un resultado correcto ($O_t = 1$) o incorrecto ($O_t = 0$) en un reto:
+$$P(L_t \mid O_t = 1) = \frac{P(L_t)\bigl(1 - P(S)\bigr)}{P(L_t)\bigl(1 - P(S)\bigr) + \bigl(1 - P(L_t)\bigr)P(G)}$$$$P(L_t \mid O_t = 0) = \frac{P(L_t)P(S)}{P(L_t)P(S) + \bigl(1 - P(L_t)\bigr)\bigl(1 - P(G)\bigr)}$$$$P(L_{t+1}) = P(L_t \mid O_t) + \bigl(1 - P(L_t \mid O_t)\bigr)P(T)$$
+6.2 Telemetría Espacial y Bandits Contextuales (Andamiaje Anatómico)
+A diferencia de un cuestionario binario, BIBIFOLD captura un vector de contexto $\mathbf{x}_t \in \mathbb{R}^5$ en cada intento:
+$P(L_t)$ actual de la microhabilidad (proveniente de BKT).
+Error geométrico normalizado $e_t \in [0, 1]$ (distancia angular, error de volumen o MSE).
+Índice de exploración errática (cambios bruscos de signo en los parámetros indicando ensayo y error al azar).
+Tiempo normalizado de resolución.
+Número de capas del Modo Anatomía abiertas voluntariamente.
+Un agente ligero de Bandit Contextual (LinUCB discreto sobre 4 brazos pedagógicos) selecciona para el siguiente reto la política óptima entre:
+Brazo 0 (Refuerzo Anatómico Guiado): simplifica coeficientes a enteros pequeños y enciende automáticamente la capa anatómica clave asociada al error detectado.
+Brazo 1 (Práctica Estándar Calibrada): complejidad moderada con capas anatómicas disponibles bajo demanda.
+Brazo 2 (Retiro de Andamiaje / Fading): oculta las guías auxiliares para consolidar la intuición abstracta.
+Brazo 3 (Desafío de Transferencia): genera casos frontera (matrices casi singulares, valles mal condicionados o puntos de silla).
+La recompensa pedagógica $r_t$ premia el progreso dentro de la "zona de desarrollo próximo" (resolver el reto con error bajo sin que sea trivialmente instantáneo ni genere abandono por frustración).
+7. Arquitectura Técnica, Stack y Presupuesto de Hardware
+7.1 Stack Tecnológico Seleccionado
+Empaquetador y lenguaje: Vite 6 + TypeScript (modo estricto). Compilación instantánea, tree-shaking agresivo y verificación de tipos para ecuaciones y shaders.
+Motor 3D: Three.js (WebGL 2 explícito, sin dependencias de frameworks pesados innecesarios en el bucle de renderizado; opcionalmente capa UI ligera en Preact o React 19 estrictamente aislada del bucle requestAnimationFrame de Three.js para evitar re-renders a $60\text{ FPS}$).
+Estética Hand-Crafted 2D: Rough.js (bordes, diagramas y anotaciones SVG cacheadas) + KaTeX (renderizado matemático síncrono de altísima velocidad).
+Cómputo paralelo local: Web Workers nativos para la regresión simbólica evolutiva y generación procedural pesada, comunicándose mediante TypedArray transferibles.
+Pruebas y calidad: Vitest (pruebas unitarias de álgebra, derivadas numéricas, BKT y Bandits) + Playwright (captura automatizada de pantallas de auditoría visual y medición de FPS).
+Despliegue: Sitio estático en GitHub Pages o Vercel sobre HTTPS, con opción de compilación offline-first (fuentes y scripts empaquetados localmente para que el stand en la Feria de IA funcione sin conexión a internet).
+7.2 Presupuesto Estricto de Rendimiento (Lenovo Slim 3 — Ryzen 7 5700U / Vega 8 / 12 GB RAM)
+Recurso
+Límite objetivo (Presupuesto)
+Estrategia obligatoria de cumplimiento
+Tasa de cuadros (FPS)
+$\ge 55\text{ FPS}$ estables en $1080\text{p}$
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); prohibido MSAA excesivo + postprocesado multipaso simultáneo.
+Draw calls por escena
+$\le 60$ llamadas por fotograma
+Uso obligatorio de InstancedMesh para partículas, vectores de campo y nodos de retícula.
+Memoria RAM de pestaña
+$\le 280\text{ MB}$ sostenidos
+Eliminación explícita (.dispose()) de geometrías, materiales y texturas al cambiar de escena; cero fugas en el bucle de animación.
+Resolución de mallas 3D
+$64 \times 64$ a $96 \times 96$ vértices por superficie
+Detalle visual entregado por el fragment shader de crayón/achurado, no por subdivisión geométrica excesiva.
+Hilos de CPU (Web Workers)
+Máximo $4$ workers concurrentes
+Deja holgura en los 16 hilos del Ryzen 7 5700U para el navegador, el sistema operativo y la captura de video demo.
+Peso inicial de descarga
+$\le 2.5\text{ MB}$ comprimido
+Sin archivos .glb pesados ni modelos LLM; toda la geometría y texturas de papel se sintetizan proceduralmente.
+7.3 Estructura de Carpetas del Repositorio
+bibifold/
+├── Project.md                       # Esta especificación maestra
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── .agents/
+│   └── skills/                      # Skills locales del proyecto
+│       ├── bibifold-crayon-npr/SKILL.md
+│       ├── bibifold-anatomy-module/SKILL.md
+│       └── bibifold-edge-ai/SKILL.md
+├── public/
+│   └── fonts/                       # Fuentes locales (modo 100 % offline para la feria)
+├── src/
+│   ├── main.ts                      # Arranque de la aplicación y gestión de temas
+│   ├── styles/
+│   │   ├── tokens.css               # Variables CSS de crayones, papel, pizarra y tipografía
+│   │   └── sketchbook.css           # Estilos de cuaderno, márgenes y accesibilidad
+│   ├── core/
+│   │   ├── types.ts                 # Contratos TS (MathModule, AnatomyLayer, TelemetryEvent)
+│   │   ├── StateStore.ts            # Único estado reactivo (Single Source of Truth)
+│   │   ├── SceneHost.ts             # Gestor de Three.js, cámara orbital, resize y dispose
+│   │   ├── ModuleRegistry.ts        # Registro extensible de los 6 bloques curriculares
+│   │   ├── MathModuleBase.ts        # Clase abstracta base para cualquier módulo
+│   │   └── PerfMonitor.ts           # Telemetría técnica (FPS, frame time, draw calls, heap)
+│   ├── rendering/
+│   │   ├── PaperGrainGenerator.ts   # Textura procedural seamless de diente de papel (256x256)
+│   │   ├── CrayonMaterials.ts       # ShaderMaterials GLSL (cera, achurado, line-boil 6 FPS)
+│   │   ├── CrayonPrimitives.ts      # Flechas vectoriales, retículas, planos de corte, cubos
+│   │   └── shaders/
+│   │       ├── crayonSurface.vert.glsl
+│   │       ├── crayonSurface.frag.glsl
+│   │       ├── crayonLine.vert.glsl
+│   │       └── crayonLine.frag.glsl
+│   ├── ai/
+│   │   ├── bktEngine.ts             # Rastreo Bayesiano del Conocimiento por microhabilidad
+│   │   ├── contextualBandit.ts      # Política LinUCB ligera para dificultad y andamiaje
+│   │   ├── autoDiff.ts              # Motor de diferenciación automática en grafo (DAG)
+│   │   ├── optimizers.ts            # Implementaciones reales de SGD, Momentum y Adam
+│   │   ├── challengeGenerator.ts    # Generador procedural determinista (PRNG mulberry32)
+│   │   └── workers/
+│   │       └── symbolicReg.worker.ts # Programación genética / regresión simbólica paralela
+│   ├── modules/
+│   │   ├── linear-algebra/
+│   │   │   ├── LinearAlgebraModule.ts
+│   │   │   └── scenes/
+│   │   │       ├── SpanScene.ts
+│   │   │       ├── SvdDeterminantScene.ts
+│   │   │       ├── EigenvectorScene.ts
+│   │   │       └── ManifoldFoldingScene.ts
+│   │   └── multivariable-calc/
+│   │       ├── MultivariableCalcModule.ts
+│   │       └── scenes/
+│   │           ├── PartialDerivativesScene.ts
+│   │           ├── AutoDiffGraphScene.ts
+│   │           ├── OptimizersRaceScene.ts
+│   │           └── SymbolicRegressionScene.ts
+│   ├── ui/
+│   │   ├── RoughFrame.ts            # Contenedor reutilizable con bordes SVG de Rough.js
+│   │   ├── AnatomyToolbar.ts        # Conmutadores de capas, vista explosionada y tema
+│   │   ├── SymbolicEquationBar.ts   # Fórmulas KaTeX con tokens seleccionables y scrubbing
+│   │   ├── ComputationalInspector.ts # Plano 3: memoria, complejidad y uso en CS
+│   │   ├── AdaptiveHud.ts           # Barra sutil de dominio BKT y modo reto
+│   │   └── KnowledgeGraphMap.ts     # Mapa navegable de los 6 bloques curriculares
+│   └── storage/
+│       └── localTelemetry.ts        # Persistencia anonimizada y exportación CSV/JSON (FPI-07)
+└── tests/
+    ├── math/                        # Tests de precisión numérica (determinantes, AutoDiff, SVD)
+    ├── ai/                          # Tests de convergencia BKT, LinUCB y PRNG determinista
+    └── visual/                      # Scripts Playwright de auditoría de escenas y FPS
+
+7.4 Contratos Troncales en TypeScript (src/core/types.ts)
+export type CrayonToken =
+  | 'graphite'
+  | 'cobalt'
+  | 'vermilion'
+  | 'ochre'
+  | 'sage'
+  | 'plum'
+  | 'pencil';
+
+export interface AnatomyLayerSpec {
+  id: string;
+  label: string;
+  crayon: CrayonToken;
+  visible: boolean;
+  explodeOffsetY: number;     // Desplazamiento vertical en Vista Explosionada
+  explanation: string;        // Explicación breve (máx. 2 líneas) al aislar la capa
+}
+
+export interface SymbolicParameter {
+  id: string;
+  latexSymbol: string;        // Ej: "a_{12}" o "\\alpha"
+  crayon: CrayonToken;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  linkedLayerId: string;      // Capa 3D que se resalta al interactuar con este símbolo
+}
+
+export interface ComputationalBridge {
+  memoryLayout: string;       // Ej: "Float32Array(9) — Column-Major WebGL"
+  complexity: string;         // Ej: "O(n^3) multiplicación estándar"
+  csApplication: string;      // Uso real en sistemas / gráficos / IA
+  codeSnippet: string;        // Equivalente conciso en TypeScript o GLSL
+}
+
+export interface TelemetryEvent {
+  timestamp: number;
+  skillId: string;
+  errorMetric: number;        // 0 = exacto, 1 = máximo error normalizado
+  erraticIndex: number;       // Oscilación en controles (detección de ensayo/error)
+  durationMs: number;
+  layersOpened: string[];
+  solved: boolean;
+}
+
+8. Protocolo de Verificación, Auditoría Visual y Accesibilidad
+Inspirado en las listas de verificación rigurosas de wheresryan22/anatomy y en las exigencias experimentales del FPI-07, ninguna escena se considera terminada sin superar cinco compuertas:
+Verificación Matemática (Tests Automatizados):
+Toda escena incluye pruebas unitarias en Vitest que comparan los gradientes de autoDiff.ts contra diferencias finitas centrales ($\text{error} < 10^{-6}$), verifican determinantes y autovalores conocidos y comprueban la monotonía de actualización del motor BKT.
+Auditoría Visual Artesanal:
+Ninguna etiqueta de texto puede solaparse con los ejes ni salirse del encuadre en resoluciones de $1366 \times 768$ y $1920 \times 1080$.
+Verificación obligatoria en ambos sustratos (Papel Algodón Cálido y Pizarra de Carbón) asegurando contraste mínimo WCAG AA ($4.5:1$ en texto).
+Comprobar que al reiniciar una escena a mitad de una animación, los tokens simbólicos, el plano computacional y la geometría 3D queden 100 % sincronizados.
+Auditoría de Rendimiento en Hardware Objetivo:
+Captura del panel de rendimiento en Chrome sobre la Lenovo Slim 3 (Ryzen 7 5700U / Vega 8) verificando $\ge 55\text{ FPS}$, $\le 60$ draw calls y ausencia de memory leaks tras 20 cambios de escena consecutivos.
+Accesibilidad y Degradación Elegante:
+Navegación completa por teclado (foco visible, ajustes numéricos con flechas).
+Respeto automático de prefers-reduced-motion (congela el line-boil de crayón y desactiva transiciones elásticas).
+Si WebGL 2 no está disponible en un navegador secundario, la interfaz muestra una tarjeta estática en SVG (Rough.js) junto con la anatomía simbólica y computacional del tema.
+Instrumentación para Evaluación de Investigación (FPI-07):
+Un botón de exportación en modo investigador descarga un archivo JSON/CSV anonimizado con la evolución de $P(L_t)$, decisiones del Bandit Contextual, tiempos y tasas de error para el análisis estadístico (prueba $t$ pareada / Wilcoxon) junto con los resultados de pre-prueba, pos-prueba y escala SUS.
+9. Hoja de Ruta de Desarrollo (Alineada a 6 Meses)
+Sprint 0 — Fundación, Skills y Sistema de Diseño Artesanal (Semanas 1–2)
+Inicializar repositorio Vite + TypeScript + Vitest + Playwright.
+Instalar skills externas (threejs-skills, anatomy, frontend-design) y redactar las 3 skills locales en .agents/skills/.
+Construir tokens.css (temas Papel y Pizarra), PaperGrainGenerator.ts, RoughFrame.ts y el prototipo de CrayonMaterials.ts (shader de cera + achurado + line-boil a $6\text{ FPS}$).
+Entregable verificable: Escena de prueba con cubo y vectores dibujados a crayón corriendo a $60\text{ FPS}$ estables en la Vega 8 con conmutador Papel/Pizarra.
+Sprint 1 — Núcleo del Modo Anatomía y Contrato Extensible (Semanas 3–5)
+Implementar StateStore.ts, SceneHost.ts, MathModuleBase.ts, ModuleRegistry.ts y PerfMonitor.ts.
+Construir la barra de ecuaciones vivas (SymbolicEquationBar.ts con KaTeX + scrubbing), AnatomyToolbar.ts (capas + explosión por resorte) y ComputationalInspector.ts.
+Construir KnowledgeGraphMap.ts mostrando los 6 bloques curriculares (Bloques 1 y 2 activos, Bloques 3–6 con ficha curricular y estado "Extensible").
+Entregable verificable: Cualquier parámetro arrastrado en una fórmula KaTeX actualiza en vivo un objeto 3D a crayón y su vista de memoria en el panel computacional.
+Sprint 2 — Motor Adaptativo Local (BKT + Bandits Contextuales) (Semanas 6–7)
+Implementar bktEngine.ts, contextualBandit.ts, challengeGenerator.ts (PRNG mulberry32) y localTelemetry.ts.
+Crear suite de tests simulando perfiles de estudiantes (principiante, ensayo/error, avanzado) para validar convergencia de $P(L_t)$ y selección de brazos de andamiaje.
+Entregable verificable: HUD sutil de progreso por microhabilidades con exportación JSON/CSV funcional.
+Sprint 3 — Módulo Piloto 1: Álgebra Lineal Computacional (Semanas 8–10)
+Implementar las 4 escenas completas: SpanScene, SvdDeterminantScene, EigenvectorScene y ManifoldFoldingScene.
+Integrar retos adaptativos calibrados por BKT/Bandit y capas anatómicas explosionables en cada escena.
+Entregable verificable: Módulo 1 jugable de principio a fin con pruebas unitarias matemáticas aprobadas.
+Sprint 4 — Módulo Piloto 2: Cálculo Multivariable y Optimización (Semanas 11–13)
+Implementar autoDiff.ts, optimizers.ts y symbolicReg.worker.ts.
+Implementar las 4 escenas completas: PartialDerivativesScene, AutoDiffGraphScene, OptimizersRaceScene y SymbolicRegressionScene.
+Entregable verificable: Módulo 2 jugable con carrera de optimizadores y regresión simbólica corriendo en Web Workers sin caídas de FPS.
+Sprint 5 — Optimización, Feria de IA, Evaluación y Artículo (Semanas 14–24)
+Perfilado exhaustivo en Lenovo Slim 3 (Ryzen 7 5700U / Vega 8), empaquetado offline-first y despliegue HTTPS en GitHub Pages / Vercel.
+Diseño del póster académico ($60 \times 90\text{ cm}$ con estética de cuaderno y código QR al despliegue) y grabación del video demostrativo ($\le 3\text{ min}$).
+Ejecución de pruebas con ~30 estudiantes de Ingeniería de Sistemas (pre-prueba, sesión BIBIFOLD, pos-prueba, encuesta SUS).
+Análisis estadístico de resultados, informe final del semillero y manuscrito para la revista institucional. haz el curso, no satures el diseño, no hagas tantas cajas o div boxes, tampoco uses pills, ni colores neon

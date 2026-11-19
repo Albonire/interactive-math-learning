@@ -1,0 +1,366 @@
+@import "tailwindcss";
+@import "katex/dist/katex.min.css";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  /* Sustrato Papel Algodón Blanco Luminoso (Sketchbook) */
+  --bg-paper: #FCFBF8;
+  --bg-paper-wash: rgba(252, 251, 248, 0.88);
+  --bg-surface: #F4F1EA;
+  --bg-surface-muted: #EAE5DA;
+  --grid-line: rgba(132, 126, 116, 0.22);
+  --margin-rule: rgba(217, 59, 43, 0.22);
+  --hairline: rgba(24, 25, 29, 0.18);
+  --hairline-strong: rgba(24, 25, 29, 0.38);
+  --crayon-edge-stroke: rgba(34, 36, 42, 0.36);
+
+  /* Paleta Semántica de Crayones de Cera (Gráficas 3D — Papel Blanco) */
+  --crayon-graphite: #18191D;
+  --crayon-cobalt: #1B5694;
+  --crayon-vermilion: #D93B2B;
+  --crayon-ochre: #C9820B;
+  --crayon-ochre-vivid: #DF9612;
+  --crayon-sage: #1F7A4D;
+  --crayon-plum: #7C3F8C;
+  --crayon-pencil: #6E7078;
+
+  /* Paleta Unificada de Baja Saturación para la Interfaz (UI Editorial) */
+  --ui-accent: #35536E;
+  --ui-success: #3F6652;
+  --ui-warning: #A2473D;
+
+  /* Texto en grafito nítido */
+  --text-primary: #18191D;
+  --text-secondary: #3E4149;
+  --text-muted: #656973;
+
+  /* Tipografía artesanal de crayón (2+1: Caveat Brush + Patrick Hand + JetBrains Mono) */
+  --font-display: 'Caveat Brush', 'Patrick Hand', cursive;
+  --font-sans: 'Patrick Hand', cursive, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+.dark {
+  /* Sustrato Pizarra Profunda de Grafito y Tiza Pastel */
+  --bg-paper: #101318;
+  --bg-paper-wash: rgba(16, 19, 24, 0.88);
+  --bg-surface: #161A21;
+  --bg-surface-muted: #1E242E;
+  --grid-line: rgba(226, 232, 242, 0.085);
+  --margin-rule: rgba(210, 139, 130, 0.22);
+  --hairline: rgba(235, 239, 245, 0.15);
+  --hairline-strong: rgba(235, 239, 245, 0.30);
+  --crayon-edge-stroke: rgba(235, 239, 245, 0.26);
+
+  /* Paleta Semántica de Tiza Pastel y Crayón Luminoso (Gráficas 3D — Pizarra Oscura) */
+  --crayon-graphite: #F5F3EE;
+  --crayon-cobalt: #6DB8F5;
+  --crayon-vermilion: #FF7E6E;
+  --crayon-ochre: #FFD05B;
+  --crayon-ochre-vivid: #FFD05B;
+  --crayon-sage: #63DBA0;
+  --crayon-plum: #D49CE2;
+  --crayon-pencil: #98A1AE;
+
+  /* Paleta Unificada de Baja Saturación para la Interfaz (Pizarra Editorial) */
+  --ui-accent: #8DAEC9;
+  --ui-success: #84B39B;
+  --ui-warning: #D28B82;
+
+  /* Texto con compensación óptica en pizarra profunda */
+  --text-primary: #F5F3EE;
+  --text-secondary: #D4D8DF;
+  --text-muted: #98A1AE;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-paper);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.dark body,
+.dark #root {
+  letter-spacing: 0.015em;
+}
+
+/*
+ * Cuadrícula artesanal dibujada a mano (SVG 216x216 sin costuras, trazos orgánicos de grafito/tiza
+ * con micro-ondulación y presión variable — sin líneas rectas sintéticas de CSS linear-gradient)
+ * combinada con grano sutil de papel algodón blanco o pizarra oscura.
+ */
+.notebook-paper-bg {
+  background-color: var(--bg-paper);
+  background-image:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.45) 0%, transparent 56%, rgba(160, 152, 138, 0.09) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='216' height='216' viewBox='0 0 216 216'%3E%3Cg fill='none' stroke='%2378746B' stroke-linecap='round'%3E%3Cpath d='M0 18 Q54 16.8 108 18.9 T216 18' stroke-width='0.95' stroke-opacity='0.24' stroke-dasharray='62 1.8 48 1.4 58 2 43'/%3E%3Cpath d='M0 54 Q48 55.3 108 53.1 T216 54' stroke-width='0.85' stroke-opacity='0.20' stroke-dasharray='50 2.2 66 1.6 52 1.8 42'/%3E%3Cpath d='M0 90 Q60 88.9 108 91.1 T216 90' stroke-width='1.05' stroke-opacity='0.26' stroke-dasharray='72 1.5 54 2 60 1.4 25'/%3E%3Cpath d='M0 126 Q52 127.4 108 125.1 T216 126' stroke-width='0.88' stroke-opacity='0.21' stroke-dasharray='46 2 62 1.8 56 1.5 46'/%3E%3Cpath d='M0 162 Q58 160.9 108 163.0 T216 162' stroke-width='0.96' stroke-opacity='0.24' stroke-dasharray='68 1.8 50 1.6 52 2.1 40'/%3E%3Cpath d='M0 198 Q46 199.2 108 197.0 T216 198' stroke-width='0.85' stroke-opacity='0.19' stroke-dasharray='54 2 60 1.4 48 1.9 48'/%3E%3Cpath d='M18 0 Q19.2 54 17.1 108 T18 216' stroke-width='0.95' stroke-opacity='0.24' stroke-dasharray='58 1.6 52 2 64 1.5 37'/%3E%3Cpath d='M54 0 Q52.8 48 54.9 108 T54 216' stroke-width='0.85' stroke-opacity='0.20' stroke-dasharray='66 2.1 48 1.5 58 1.8 39'/%3E%3Cpath d='M90 0 Q91.1 58 88.9 108 T90 216' stroke-width='1.05' stroke-opacity='0.26' stroke-dasharray='52 1.5 70 1.9 50 1.6 39'/%3E%3Cpath d='M126 0 Q124.7 50 126.9 108 T126 216' stroke-width='0.88' stroke-opacity='0.21' stroke-dasharray='60 1.9 54 1.6 56 2 40'/%3E%3Cpath d='M162 0 Q163.1 60 161.0 108 T162 216' stroke-width='0.96' stroke-opacity='0.24' stroke-dasharray='48 1.7 64 2 52 1.5 47'/%3E%3Cpath d='M198 0 Q196.8 52 199.0 108 T198 216' stroke-width='0.85' stroke-opacity='0.19' stroke-dasharray='64 2 46 1.5 60 1.8 41'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 216px 216px, 240px 240px;
+}
+
+.dark .notebook-paper-bg {
+  background-color: var(--bg-paper);
+  background-image:
+    radial-gradient(ellipse at 50% 44%, rgba(180, 198, 224, 0.045) 0%, transparent 56%, rgba(4, 5, 8, 0.45) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='216' height='216' viewBox='0 0 216 216'%3E%3Cg fill='none' stroke='%23DCE3EE' stroke-linecap='round'%3E%3Cpath d='M0 18 Q54 16.8 108 18.9 T216 18' stroke-width='0.95' stroke-opacity='0.11' stroke-dasharray='62 1.8 48 1.4 58 2 43'/%3E%3Cpath d='M0 54 Q48 55.3 108 53.1 T216 54' stroke-width='0.85' stroke-opacity='0.085' stroke-dasharray='50 2.2 66 1.6 52 1.8 42'/%3E%3Cpath d='M0 90 Q60 88.9 108 91.1 T216 90' stroke-width='1.05' stroke-opacity='0.12' stroke-dasharray='72 1.5 54 2 60 1.4 25'/%3E%3Cpath d='M0 126 Q52 127.4 108 125.1 T216 126' stroke-width='0.88' stroke-opacity='0.09' stroke-dasharray='46 2 62 1.8 56 1.5 46'/%3E%3Cpath d='M0 162 Q58 160.9 108 163.0 T216 162' stroke-width='0.96' stroke-opacity='0.11' stroke-dasharray='68 1.8 50 1.6 52 2.1 40'/%3E%3Cpath d='M0 198 Q46 199.2 108 197.0 T216 198' stroke-width='0.85' stroke-opacity='0.08' stroke-dasharray='54 2 60 1.4 48 1.9 48'/%3E%3Cpath d='M18 0 Q19.2 54 17.1 108 T18 216' stroke-width='0.95' stroke-opacity='0.11' stroke-dasharray='58 1.6 52 2 64 1.5 37'/%3E%3Cpath d='M54 0 Q52.8 48 54.9 108 T54 216' stroke-width='0.85' stroke-opacity='0.085' stroke-dasharray='66 2.1 48 1.5 58 1.8 39'/%3E%3Cpath d='M90 0 Q91.1 58 88.9 108 T90 216' stroke-width='1.05' stroke-opacity='0.12' stroke-dasharray='52 1.5 70 1.9 50 1.6 39'/%3E%3Cpath d='M126 0 Q124.7 50 126.9 108 T126 216' stroke-width='0.88' stroke-opacity='0.09' stroke-dasharray='60 1.9 54 1.6 56 2 40'/%3E%3Cpath d='M162 0 Q163.1 60 161.0 108 T162 216' stroke-width='0.96' stroke-opacity='0.11' stroke-dasharray='48 1.7 64 2 52 1.5 47'/%3E%3Cpath d='M198 0 Q196.8 52 199.0 108 T198 216' stroke-width='0.85' stroke-opacity='0.08' stroke-dasharray='64 2 46 1.5 60 1.8 41'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.76' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.065'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 216px 216px, 240px 240px;
+}
+
+/* Modo Eco: conserva la cuadrícula dibujada a mano con menor intensidad de grano SVG */
+.eco-mode .notebook-paper-bg {
+  background-image:
+    radial-gradient(ellipse at 50% 42%, rgba(255, 255, 255, 0.32) 0%, transparent 56%, rgba(160, 152, 138, 0.06) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='216' height='216' viewBox='0 0 216 216'%3E%3Cg fill='none' stroke='%2378746B' stroke-linecap='round'%3E%3Cpath d='M0 18 Q54 16.8 108 18.9 T216 18' stroke-width='0.9' stroke-opacity='0.20'/%3E%3Cpath d='M0 54 Q48 55.3 108 53.1 T216 54' stroke-width='0.8' stroke-opacity='0.16'/%3E%3Cpath d='M0 90 Q60 88.9 108 91.1 T216 90' stroke-width='0.95' stroke-opacity='0.22'/%3E%3Cpath d='M0 126 Q52 127.4 108 125.1 T216 126' stroke-width='0.82' stroke-opacity='0.17'/%3E%3Cpath d='M0 162 Q58 160.9 108 163.0 T216 162' stroke-width='0.9' stroke-opacity='0.20'/%3E%3Cpath d='M0 198 Q46 199.2 108 197.0 T216 198' stroke-width='0.8' stroke-opacity='0.16'/%3E%3Cpath d='M18 0 Q19.2 54 17.1 108 T18 216' stroke-width='0.9' stroke-opacity='0.20'/%3E%3Cpath d='M54 0 Q52.8 48 54.9 108 T54 216' stroke-width='0.8' stroke-opacity='0.16'/%3E%3Cpath d='M90 0 Q91.1 58 88.9 108 T90 216' stroke-width='0.95' stroke-opacity='0.22'/%3E%3Cpath d='M126 0 Q124.7 50 126.9 108 T126 216' stroke-width='0.82' stroke-opacity='0.17'/%3E%3Cpath d='M162 0 Q163.1 60 161.0 108 T162 216' stroke-width='0.9' stroke-opacity='0.20'/%3E%3Cpath d='M198 0 Q196.8 52 199.0 108 T198 216' stroke-width='0.8' stroke-opacity='0.16'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.78' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.026'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 216px 216px, 220px 220px;
+}
+
+.dark.eco-mode .notebook-paper-bg,
+.dark .eco-mode .notebook-paper-bg {
+  background-image:
+    radial-gradient(ellipse at 50% 44%, rgba(180, 198, 224, 0.03) 0%, transparent 56%, rgba(4, 5, 8, 0.34) 100%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='216' height='216' viewBox='0 0 216 216'%3E%3Cg fill='none' stroke='%23DCE3EE' stroke-linecap='round'%3E%3Cpath d='M0 18 Q54 16.8 108 18.9 T216 18' stroke-width='0.9' stroke-opacity='0.095'/%3E%3Cpath d='M0 54 Q48 55.3 108 53.1 T216 54' stroke-width='0.8' stroke-opacity='0.075'/%3E%3Cpath d='M0 90 Q60 88.9 108 91.1 T216 90' stroke-width='0.95' stroke-opacity='0.105'/%3E%3Cpath d='M0 126 Q52 127.4 108 125.1 T216 126' stroke-width='0.82' stroke-opacity='0.08'/%3E%3Cpath d='M0 162 Q58 160.9 108 163.0 T216 162' stroke-width='0.9' stroke-opacity='0.095'/%3E%3Cpath d='M0 198 Q46 199.2 108 197.0 T216 198' stroke-width='0.8' stroke-opacity='0.075'/%3E%3Cpath d='M18 0 Q19.2 54 17.1 108 T18 216' stroke-width='0.9' stroke-opacity='0.095'/%3E%3Cpath d='M54 0 Q52.8 48 54.9 108 T54 216' stroke-width='0.8' stroke-opacity='0.075'/%3E%3Cpath d='M90 0 Q91.1 58 88.9 108 T90 216' stroke-width='0.95' stroke-opacity='0.105'/%3E%3Cpath d='M126 0 Q124.7 50 126.9 108 T126 216' stroke-width='0.82' stroke-opacity='0.08'/%3E%3Cpath d='M162 0 Q163.1 60 161.0 108 T162 216' stroke-width='0.9' stroke-opacity='0.095'/%3E%3Cpath d='M198 0 Q196.8 52 199.0 108 T198 216' stroke-width='0.8' stroke-opacity='0.075'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.72' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.038'/%3E%3C/svg%3E");
+  background-size: 100% 100%, 216px 216px, 220px 220px;
+}
+
+/*
+ * Superficie artesanal de contenedores principales (.crayon-surface):
+ * Aplica el filtro SVG #crayon-stroke al borde y sustrato de papel mediante ::before
+ * para simular el trazo irregular y rugoso del crayón sin deformar la tipografía ni recortar hijos.
+ */
+@layer components {
+  .crayon-surface {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .crayon-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--bg-surface);
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, transparent 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+    border: 1.5px solid var(--crayon-edge-stroke);
+    filter: url(#crayon-stroke);
+  }
+
+  .dark .crayon-surface::before {
+    background-color: var(--bg-surface);
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.055'/%3E%3C/svg%3E");
+  }
+
+  .eco-mode .crayon-surface::before {
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, transparent 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  }
+
+  .dark.eco-mode .crayon-surface::before,
+  .dark .eco-mode .crayon-surface::before {
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.015) 0%, transparent 100%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.74' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.032'/%3E%3C/svg%3E");
+  }
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.015em;
+  text-wrap: balance;
+}
+
+.font-hand {
+  font-family: var(--font-sans);
+  letter-spacing: 0.012em;
+}
+
+/* Textura sutil de borde de crayón seco sobre títulos y sellos grandes */
+.crayon-ink {
+  filter: url(#crayon-text-tooth);
+}
+
+.crayon-stroke-svg {
+  filter: url(#crayon-stroke-tooth);
+}
+
+/* Aparición tipo trazo a mano para etiquetas de diagramas 2D tras dibujarse sus líneas */
+@keyframes crayonSketchLabelIn {
+  from {
+    opacity: 0;
+    scale: 0.92;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+.crayon-label-reveal {
+  animation: crayonSketchLabelIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Resplandor artesanal tipo crayón de cera al alcanzar la zona óptima en un Reto */
+@keyframes crayonOptimalGlowBreathe {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.crayon-optimal-halo {
+  animation: crayonOptimalGlowBreathe 2.4s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.eco-mode .crayon-optimal-halo {
+  animation: none;
+  opacity: 0.92;
+}
+
+.crayon-param-optimal-wash {
+  position: relative;
+  border-radius: 6px;
+}
+
+.crayon-param-optimal-wash::after {
+  content: '';
+  position: absolute;
+  inset: -4px -7px;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 10px;
+  background: radial-gradient(
+    ellipse at 50% 62%,
+    rgba(31, 122, 77, 0.16) 0%,
+    rgba(223, 150, 18, 0.08) 54%,
+    transparent 82%
+  );
+  opacity: var(--optimal-wash, 0);
+  transition: opacity 220ms ease-out;
+}
+
+.dark .crayon-param-optimal-wash::after {
+  background: radial-gradient(
+    ellipse at 50% 62%,
+    rgba(99, 219, 160, 0.22) 0%,
+    rgba(255, 208, 91, 0.1) 56%,
+    transparent 84%
+  );
+}
+
+/* Animación de sello artesanal de crayón (rotación sutil + presión sobre el papel) */
+@keyframes crayonStampPress {
+  0% {
+    opacity: 0;
+    transform: scale(1.28) rotate(-18deg);
+  }
+  58% {
+    opacity: 1;
+    transform: scale(0.95) rotate(-5.5deg);
+  }
+  82% {
+    opacity: 1;
+    transform: scale(1.02) rotate(-7.8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-7deg);
+  }
+}
+
+.crayon-stamp-enter {
+  animation: crayonStampPress 540ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Entrada suave de opacidad y escala para SketchAnimationWrapper al aparecer por primera vez */
+@keyframes sketchWrapperEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.sketch-wrapper-enter {
+  animation: sketchWrapperEntrance 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.font-mono-math {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "liga" 0, "calt" 0;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Foco accesible visible en tinta editorial de baja saturación */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px dashed var(--ui-accent);
+  outline-offset: 2px;
+}
+
+/* KaTeX integrado armónicamente con el trazo manual */
+.katex {
+  font-size: 1.08em;
+  color: inherit;
+}
+
+/* Scrollbar discreta para panel deslizable y mapa */
+.notebook-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.notebook-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notebook-scroll::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
