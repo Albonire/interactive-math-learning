@@ -141,7 +141,7 @@ export function LessonIntroPlayer({
         {beat.parts && beat.parts.length > 0 && (
           <div
             data-testid="intro-parts-legend"
-            className="pointer-events-auto max-w-[330px] max-h-full overflow-y-auto notebook-scroll py-3.5 px-4 crayon-surface rounded-[4px] space-y-2.5 crayon-label-reveal"
+            className="pointer-events-auto max-w-[330px] max-h-full overflow-y-auto notebook-scroll py-3.5 px-4 crayon-ink-panel space-y-2.5 crayon-label-reveal"
           >
             <p className="font-display text-[18px] text-[var(--text-primary)] leading-none">
               Qué ves en la gráfica
@@ -172,7 +172,7 @@ export function LessonIntroPlayer({
         {beat.formula && (
           <div
             data-testid="intro-formula-card"
-            className="pointer-events-auto max-w-[360px] max-h-full overflow-y-auto notebook-scroll py-4 px-5 crayon-surface rounded-[4px] space-y-3 crayon-label-reveal"
+            className="pointer-events-auto max-w-[360px] max-h-full overflow-y-auto notebook-scroll py-4 px-5 crayon-ink-panel space-y-3 crayon-label-reveal"
           >
             <div className="text-[20px] text-[var(--text-primary)] pb-2 border-b border-dashed border-[var(--hairline)]">
               <KatexInline latex={beat.formula.latex} />

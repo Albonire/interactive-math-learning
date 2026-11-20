@@ -18,7 +18,33 @@ export interface CrayonVectorHandle {
 }
 
 /**
- * Composite wax crayon vector arrow (wrapped base collar + tapered wax stick + sharpened tip + optional 3D hand-lettered label)
+ * Builds a crisp hand-inked edge outline (charcoal in Paper, chalk in Chalkboard)
+ * for any BufferGeometry via EdgesGeometry.
+ */
+export function createCrayonInkEdges(
+  geometry: THREE.BufferGeometry,
+  theme: ThemeMode,
+  options?: {
+    crayon?: CrayonToken;
+    opacity?: number;
+    thresholdAngle?: number;
+    boilAmp?: number;
+  }
+): THREE.LineSegments {
+  const edgesGeo = new THREE.EdgesGeometry(geometry, options?.thresholdAngle ?? 20);
+  const edgesMat = createCrayonLineMaterial(
+    options?.crayon ?? 'graphite',
+    theme,
+    options?.opacity ?? 0.88,
+    options?.boilAmp ?? 0.004
+  );
+  const lines = new THREE.LineSegments(edgesGeo, edgesMat);
+  lines.renderOrder = 2;
+  return lines;
+}
+
+/**
+ * Composite wax crayon vector arrow with crisp hand-inked arrowhead & collar accent rings
  */
 export function createCrayonVector(
   crayon: CrayonToken,
@@ -31,13 +57,13 @@ export function createCrayonVector(
     crayon,
     theme,
     boilAmplitude: 0.006,
-    outlineStrength: 0.72,
+    outlineStrength: 0.92,
   });
   const collarMat = createCrayonSurfaceMaterial({
     crayon: 'graphite',
     theme,
     boilAmplitude: 0.004,
-    outlineStrength: 0.55,
+    outlineStrength: 0.78,
   });
 
   // Slightly faceted 9-sided shaft looks more like a sculpted hand-held wax stick than sterile smooth cylinder
@@ -48,6 +74,21 @@ export function createCrayonVector(
   const tipGeo = new THREE.ConeGeometry(radius * 2.35, 0.27, 10);
   tipGeo.translate(0, 0.135, 0);
   const tip = new THREE.Mesh(tipGeo, mat);
+
+  // Crisp hand-inked accent ring around the cone base so every vector head pops cleanly
+  const rimPts: THREE.Vector3[] = [];
+  const rimSegs = 14;
+  const rimR = radius * 2.4;
+  for (let i = 0; i < rimSegs; i++) {
+    const a = (i / rimSegs) * Math.PI * 2;
+    rimPts.push(new THREE.Vector3(Math.cos(a) * rimR, 0.004, Math.sin(a) * rimR));
+  }
+  const tipRimGeo = new THREE.BufferGeometry().setFromPoints(rimPts);
+  const tipRim = new THREE.LineLoop(
+    tipRimGeo,
+    createCrayonLineMaterial('graphite', theme, 0.84, 0.003)
+  );
+  tip.add(tipRim);
 
   const collarGeo = new THREE.CylinderGeometry(radius * 1.48, radius * 1.48, 0.065, 10);
   const collar = new THREE.Mesh(collarGeo, collarMat);
@@ -205,6 +246,16 @@ export function createNotebookSubstrate(
   const gridMat = createCrayonLineMaterial('pencil', theme, 0.44, 0.003);
   group.add(new THREE.LineSegments(gridGeo, gridMat));
 
+  // Crisp hand-inked outer notebook frame border around the substrate grid
+  const borderVerts: number[] = [];
+  pushWobbledSegment(borderVerts, -half, yOffset + 0.005, -half, half, yOffset + 0.005, -half, 211, 0.02);
+  pushWobbledSegment(borderVerts, half, yOffset + 0.005, -half, half, yOffset + 0.005, half, 223, 0.02);
+  pushWobbledSegment(borderVerts, half, yOffset + 0.005, half, -half, yOffset + 0.005, half, 239, 0.02);
+  pushWobbledSegment(borderVerts, -half, yOffset + 0.005, half, -half, yOffset + 0.005, -half, 251, 0.02);
+  const borderGeo = new THREE.BufferGeometry();
+  borderGeo.setAttribute('position', new THREE.Float32BufferAttribute(borderVerts, 3));
+  group.add(new THREE.LineSegments(borderGeo, createCrayonLineMaterial('graphite', theme, 0.62, 0.003)));
+
   // Main X, Y, Z axes drawn with double hand-wobbled graphite crayon passes
   const axisLen = half + 0.38;
   const zAxisLen = Math.min(2.05, axisLen * 0.68);
@@ -218,7 +269,7 @@ export function createNotebookSubstrate(
 
   const axisGeo = new THREE.BufferGeometry();
   axisGeo.setAttribute('position', new THREE.Float32BufferAttribute(axisVerts, 3));
-  const axisMat = createCrayonLineMaterial('graphite', theme, 0.84, 0.0045);
+  const axisMat = createCrayonLineMaterial('graphite', theme, 0.88, 0.0045);
   group.add(new THREE.LineSegments(axisGeo, axisMat));
 
   // Hand-lettered 3D crayon axis labels
@@ -234,7 +285,7 @@ export function createNotebookSubstrate(
 }
 
 /**
- * Parametric heightfield mesh with crayon surface shading + subtle hand-drawn contour outline
+ * Parametric heightfield mesh with crayon surface shading + live-updating hand-inked outer perimeter contour
  */
 export function createHeightfieldMesh(
   crayon: CrayonToken,
@@ -245,12 +296,16 @@ export function createHeightfieldMesh(
     opacity?: number;
     hatchStrength?: number;
     wireframe?: boolean;
+    borderInk?: number;
+    inkBorderCrayon?: CrayonToken;
   }
 ): {
   mesh: THREE.Mesh;
   geometry: THREE.PlaneGeometry;
   material: THREE.ShaderMaterial;
+  borderLine: THREE.LineLoop | null;
   updateHeights: (fn: (x: number, y: number) => number) => void;
+  syncBorderFromGeometry: () => void;
 } {
   const segs = options?.segments ?? 44;
   const half = options?.domainHalf ?? 2.2;
@@ -267,13 +322,51 @@ export function createHeightfieldMesh(
     transparent: (options?.opacity ?? 0.94) < 0.99,
     depthWrite: (options?.opacity ?? 0.94) >= 0.9,
     boilAmplitude: 0.005,
-    outlineStrength: 0.58,
+    outlineStrength: 0.78,
+    borderInk: options?.wireframe ? 0.0 : (options?.borderInk ?? 0.75),
+    borderWidth: 0.022,
   });
   if (options?.wireframe) {
     mat.wireframe = true;
   }
 
   const mesh = new THREE.Mesh(geo, mat);
+
+  // Build live perimeter ink border loop tracing all 4 outer edges of the heightfield
+  const stride = segs + 1;
+  const perimeterIndices: number[] = [];
+  for (let i = 0; i <= segs; i++) perimeterIndices.push(i); // top edge
+  for (let j = 1; j <= segs; j++) perimeterIndices.push(j * stride + segs); // right edge
+  for (let i = segs - 1; i >= 0; i--) perimeterIndices.push(segs * stride + i); // bottom edge
+  for (let j = segs - 1; j >= 1; j--) perimeterIndices.push(j * stride); // left edge
+
+  const borderPositions = new Float32Array(perimeterIndices.length * 3);
+  const borderGeo = new THREE.BufferGeometry();
+  borderGeo.setAttribute('position', new THREE.BufferAttribute(borderPositions, 3));
+  const borderLine = new THREE.LineLoop(
+    borderGeo,
+    createCrayonLineMaterial(
+      options?.inkBorderCrayon ?? 'graphite',
+      theme,
+      options?.wireframe ? 0.62 : 0.88,
+      0.004
+    )
+  );
+  borderLine.renderOrder = 2;
+  mesh.add(borderLine);
+
+  const syncBorderFromGeometry = () => {
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    for (let k = 0; k < perimeterIndices.length; k++) {
+      const idx = perimeterIndices[k];
+      borderPositions[k * 3 + 0] = pos.getX(idx);
+      borderPositions[k * 3 + 1] = pos.getY(idx) + 0.012;
+      borderPositions[k * 3 + 2] = pos.getZ(idx);
+    }
+    (borderGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+  };
+
+  syncBorderFromGeometry();
 
   const updateHeights = (fn: (x: number, y: number) => number) => {
     const pos = geo.attributes.position as THREE.BufferAttribute;
@@ -285,9 +378,10 @@ export function createHeightfieldMesh(
     }
     pos.needsUpdate = true;
     geo.computeVertexNormals();
+    syncBorderFromGeometry();
   };
 
-  return { mesh, geometry: geo, material: mat, updateHeights };
+  return { mesh, geometry: geo, material: mat, borderLine, updateHeights, syncBorderFromGeometry };
 }
 
 /**

@@ -374,3 +374,106 @@ export function CrayonNote({ size = 16, className = '', ...rest }: IconProps) {
   );
 }
 
+export function CrayonSoundOn({ size = 16, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M4.6 9.6 L8.6 9.4 L13.4 5.8 C13.6 10.0, 13.5 14.1, 13.3 18.2 L8.5 14.7 L4.6 14.5 Z"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.20"
+        strokeWidth="2.0"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16.4 9.2 C17.9 10.7, 17.9 13.3, 16.4 14.8"
+        stroke="currentColor"
+        strokeWidth="2.0"
+        strokeLinecap="round"
+      />
+      <path
+        d="M19.1 6.8 C21.4 9.5, 21.4 14.5, 19.1 17.2"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function CrayonSoundOff({ size = 16, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M4.6 9.6 L8.6 9.4 L13.4 5.8 C13.6 10.0, 13.5 14.1, 13.3 18.2 L8.5 14.7 L4.6 14.5 Z"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.12"
+        strokeWidth="2.0"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16.4 9.1 L20.8 14.7 M20.7 9.0 L16.3 14.8"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function CrayonLayers({ size = 16, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M12.1 4.2 L20.1 8.1 L11.9 11.9 L3.9 8.0 Z"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.18"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.3 12.6 L11.9 16.2 L19.8 12.5"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.5 16.9 L12.0 20.4 L19.6 16.8"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

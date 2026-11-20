@@ -19,6 +19,8 @@ export interface CrayonSurfaceOptions {
   depthWrite?: boolean;
   boilAmplitude?: number;
   outlineStrength?: number;
+  borderInk?: number;
+  borderWidth?: number;
 }
 
 const SURFACE_VERT = /* glsl */ `
@@ -77,6 +79,7 @@ const SURFACE_FRAG = /* glsl */ `
   uniform vec3 uColor;
   uniform vec3 uPaperColor;
   uniform vec3 uShadowTint;
+  uniform vec3 uInkColor;
   uniform vec3 uLightDir;
   uniform sampler2D uPaperGrain;
   uniform float uGrainScale;
@@ -86,6 +89,8 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float uDimFactor;
   uniform float uIsDark;
   uniform float uOutlineStrength;
+  uniform float uBorderInk;
+  uniform float uBorderWidth;
   uniform float uDrawProgress;
   uniform float uSketchOpacity;
 
@@ -179,21 +184,35 @@ const SURFACE_FRAG = /* glsl */ `
       pigment = mix(pigment, hatchInk, hatchLine * uHatchStrength * 0.75);
     }
 
-    // Hand-drawn sketchy dark-wax / chalk silhouette rim outline (broken organically by paper tooth)
-    float rimEdge = smoothstep(0.36, 0.74, fresnel + (tooth - 0.5) * 0.24);
-    vec3 outlineColor = uIsDark > 0.5 ? mix(uColor * 1.40, vec3(0.96, 0.93, 0.87), 0.40) : mix(uColor * 0.36, uShadowTint, 0.60);
-    pigment = mix(pigment, outlineColor, rimEdge * uOutlineStrength * (0.68 + 0.32 * tooth));
+    // Hand-inked charcoal (paper) / chalk-accent (chalkboard) silhouette contour rim
+    float rimEdge = smoothstep(0.28, 0.65, fresnel + (tooth - 0.5) * 0.22);
+    vec3 inkTone = uIsDark > 0.5
+      ? mix(uColor * 1.48, uInkColor, 0.52)
+      : mix(uColor * 0.28, uInkColor, 0.68);
+    pigment = mix(pigment, inkTone, rimEdge * uOutlineStrength * (0.76 + 0.24 * tooth));
+
+    // Organic hand-inked UV perimeter border on planes, slices, tangent patches & heightfields
+    float borderAlphaBoost = 0.0;
+    if (uBorderInk > 0.01) {
+      float edgeDist = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      float organicWidth = uBorderWidth * (0.78 + 0.48 * tooth);
+      float borderMask = 1.0 - smoothstep(organicWidth * 0.35, organicWidth, edgeDist);
+      float borderStrength = borderMask * uBorderInk * (0.78 + 0.22 * crumble);
+      pigment = mix(pigment, inkTone, borderStrength * 0.92);
+      borderAlphaBoost = borderStrength * 0.55;
+    }
 
     // Emphasize active crayon-tip edge while drawing for the first time
     if (freshTipBoost > 0.001) {
-      vec3 tipTint = uIsDark > 0.5 ? mix(uColor * 1.38, vec3(0.98, 0.95, 0.88), 0.45) : mix(uColor * 0.52, uShadowTint, 0.48);
-      pigment = mix(pigment, tipTint, freshTipBoost * 0.72);
+      vec3 tipTint = uIsDark > 0.5 ? mix(uColor * 1.38, uInkColor, 0.48) : mix(uColor * 0.42, uInkColor, 0.58);
+      pigment = mix(pigment, tipTint, freshTipBoost * 0.76);
     }
 
     // Dimming when another symbolic parameter/layer is isolated + smooth entrance pigment lift
     float effectiveVis = uDimFactor * smoothstep(0.0, 0.9, uSketchOpacity);
     vec3 finalCol = mix(uPaperColor, pigment, effectiveVis);
-    float finalAlpha = uOpacity * (0.28 + 0.72 * uDimFactor) * uSketchOpacity;
+    float baseAlpha = clamp(uOpacity + borderAlphaBoost, 0.0, 1.0);
+    float finalAlpha = baseAlpha * (0.28 + 0.72 * uDimFactor) * uSketchOpacity;
 
     gl_FragColor = vec4(finalCol, finalAlpha);
   }
@@ -215,8 +234,8 @@ const LINE_VERT = /* glsl */ `
   void main() {
     vec3 pos = position * uSketchScale;
     // Slight static hand-drawn jitter so lines feel sketched by hand
-    float s1 = (hash31(floor(pos * 12.0)) - 0.5) * 0.012;
-    float s2 = (hash31(floor(pos * 12.0) + 17.3) - 0.5) * 0.012;
+    float s1 = (hash31(floor(pos * 12.0)) - 0.5) * 0.010;
+    float s2 = (hash31(floor(pos * 12.0) + 17.3) - 0.5) * 0.010;
     pos.x += s1;
     pos.z += s2;
 
@@ -258,9 +277,9 @@ const LINE_FRAG = /* glsl */ `
       if (frontier < 0.0) discard;
     }
 
-    float dryWax = smoothstep(0.16, 0.56, g.r * 0.65 + g.b * 0.35 + 0.14);
-    vec3 col = mix(uPaperColor, uColor, uDimFactor * (0.68 + 0.32 * dryWax));
-    float alpha = uOpacity * (0.24 + 0.76 * uDimFactor) * (0.55 + 0.45 * dryWax) * uSketchOpacity;
+    float dryWax = smoothstep(0.14, 0.52, g.r * 0.65 + g.b * 0.35 + 0.18);
+    vec3 col = mix(uPaperColor, uColor, uDimFactor * (0.76 + 0.24 * dryWax));
+    float alpha = uOpacity * (0.24 + 0.76 * uDimFactor) * (0.68 + 0.32 * dryWax) * uSketchOpacity;
     gl_FragColor = vec4(col, alpha);
   }
 `;
@@ -278,6 +297,7 @@ export function createCrayonSurfaceMaterial(opts: CrayonSurfaceOptions): THREE.S
       uColor: { value: new THREE.Color(getCrayonHex(opts.crayon, opts.theme)) },
       uPaperColor: { value: new THREE.Color(palette.paperBg) },
       uShadowTint: { value: new THREE.Color(palette.shadowTint) },
+      uInkColor: { value: new THREE.Color(getCrayonHex('graphite', opts.theme)) },
       uLightDir: { value: new THREE.Vector3(0.55, 0.85, 0.45).normalize() },
       uPaperGrain: { value: getPaperGrainTexture() },
       uGrainScale: { value: 155.0 },
@@ -286,7 +306,9 @@ export function createCrayonSurfaceMaterial(opts: CrayonSurfaceOptions): THREE.S
       uHatchScale: { value: opts.hatchScale ?? 5.5 },
       uDimFactor: { value: 1.0 },
       uIsDark: { value: opts.theme === 'chalkboard' ? 1.0 : 0.0 },
-      uOutlineStrength: { value: opts.outlineStrength ?? 0.62 },
+      uOutlineStrength: { value: opts.outlineStrength ?? 0.78 },
+      uBorderInk: { value: opts.borderInk ?? 0.0 },
+      uBorderWidth: { value: opts.borderWidth ?? 0.022 },
       uDrawProgress: { value: 1.0 },
     },
     vertexShader: SURFACE_VERT,
@@ -304,7 +326,7 @@ export function createCrayonLineMaterial(
   crayon: CrayonToken,
   theme: ThemeMode,
   opacity = 0.92,
-  boilAmp = 0.009
+  boilAmp = 0.007
 ): THREE.ShaderMaterial {
   const palette = THEME_PALETTES[theme];
   const mat = new THREE.ShaderMaterial({
@@ -346,6 +368,7 @@ export function syncCrayonMaterialsInObject(
   const isDark = theme === 'chalkboard' ? 1.0 : 0.0;
   const steadyVal = steadyStrokes ? 1.0 : 0.0;
   const labelReveal = computeLabelRevealFactor(globalDrawProgress);
+  const inkHex = getCrayonHex('graphite', theme);
 
   root.traverse((obj) => {
     const layerId: string | undefined = obj.userData.anatomyLayerId;
@@ -389,6 +412,7 @@ export function syncCrayonMaterialsInObject(
     }
     if (mat.uniforms.uPaperColor) mat.uniforms.uPaperColor.value.set(palette.paperBg);
     if (mat.uniforms.uShadowTint) mat.uniforms.uShadowTint.value.set(palette.shadowTint);
+    if (mat.uniforms.uInkColor) mat.uniforms.uInkColor.value.set(inkHex);
     if (mat.uniforms.uIsDark) mat.uniforms.uIsDark.value = isDark;
     if (mat.uniforms.uTime) mat.uniforms.uTime.value = elapsedSec;
     if (mat.uniforms.uSteady) mat.uniforms.uSteady.value = steadyVal;

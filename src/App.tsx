@@ -30,6 +30,11 @@ import {
 import { evaluateChallengeAttempt, generateChallengeForScene } from './ai/challengeGenerator';
 import { computeChallengeParamProximity } from './ai/challengeProximity';
 import {
+  CrayonAudioEngine,
+  loadInitialAudioEnabled,
+  saveAudioEnabled,
+} from './audio/crayonAudio';
+import {
   createDefaultPersistedData,
   loadPersistedAiData,
   savePersistedAiData,
@@ -92,6 +97,18 @@ export default function App() {
   const [sceneId, setSceneId] = useState<SceneId>('lin-span');
   const [theme, setTheme] = useState<ThemeMode>('paper');
   const [ecoMode, setEcoMode] = useState<boolean>(() => loadInitialEcoMode());
+  const [audioEnabled, setAudioEnabled] = useState<boolean>(() => loadInitialAudioEnabled());
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const audioEngineRef = useRef<CrayonAudioEngine | null>(null);
+  if (!audioEngineRef.current) {
+    audioEngineRef.current = new CrayonAudioEngine(audioEnabled, ecoMode, (stats) => {
+      const el = rootRef.current;
+      if (el) {
+        el.dataset.audioState = stats.state;
+        el.dataset.audioPlays = String(stats.strokePlays + stats.dustPlays);
+      }
+    });
+  }
   const [steadyStrokes] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -199,6 +216,26 @@ export default function App() {
     rootEl.classList.toggle('eco-mode', ecoMode);
     saveEcoMode(ecoMode);
   }, [ecoMode]);
+
+  // Initialize Web Audio engine on app mount (strictly honoring initial audioEnabled & ecoMode)
+  useEffect(() => {
+    const engine = audioEngineRef.current;
+    engine?.initialize();
+    if (rootRef.current && engine) {
+      const st = engine.getStats();
+      rootRef.current.dataset.audioState = st.state;
+      rootRef.current.dataset.audioPlays = String(st.strokePlays + st.dustPlays);
+    }
+    return () => {
+      engine?.dispose();
+    };
+  }, []);
+
+  // Keep optional Web Audio engine synchronized with user preference & ecoMode silencing
+  useEffect(() => {
+    saveAudioEnabled(audioEnabled);
+    audioEngineRef.current?.syncSettings(audioEnabled, ecoMode);
+  }, [audioEnabled, ecoMode]);
 
   // Initialize Three.js WebGL 2 SceneManager once on mount
   useEffect(() => {
@@ -533,8 +570,16 @@ export default function App() {
       if (pMeta) {
         const span = Math.max(1e-6, pMeta.max - pMeta.min);
         const normDelta = Math.abs(nextVal - oldVal) / span;
-        const dust = dustEnergyRef.current.recordDelta(normDelta, performance.now());
+        const nowMs = performance.now();
+
+        // Subtle dry wax-crayon stroke sound on parameter drag (auto-silenced if off or ecoMode)
+        if (normDelta > 1e-4) {
+          audioEngineRef.current?.playParameterStroke(normDelta, theme, nowMs);
+        }
+
+        const dust = dustEnergyRef.current.recordDelta(normDelta, nowMs);
         if (dust.shouldEmit && managerRef.current) {
+          audioEngineRef.current?.playCrayonDust(dust.intensity, theme, nowMs);
           const nextParams = { ...paramValuesRef.current, [id]: nextVal };
           const anchor = getWorldAnchorForParam(
             {
@@ -591,6 +636,9 @@ export default function App() {
   );
 
   const handleFocusToken = useCallback((param: SymbolicParameter | null) => {
+    if (param) {
+      audioEngineRef.current?.unlock();
+    }
     setFocusedParamId(param ? param.id : null);
   }, []);
 
@@ -960,12 +1008,14 @@ export default function App() {
 
   return (
     <div
+      ref={rootRef}
       className={`h-screen w-screen flex flex-col overflow-hidden bg-[var(--bg-paper)] text-[var(--text-primary)] ${
         ecoMode ? 'eco-mode' : ''
       }`}
       data-scene={sceneId}
       data-theme={theme}
       data-eco={ecoMode ? 'true' : 'false'}
+      data-audio={ecoMode ? 'eco-muted' : audioEnabled ? 'on' : 'off'}
       data-intro={introOpen ? 'true' : 'false'}
     >
       <CrayonSvgDefs ecoMode={ecoMode} />
@@ -978,6 +1028,7 @@ export default function App() {
           mapOpen={mapOpen}
           theme={theme}
           ecoMode={ecoMode}
+          audioEnabled={audioEnabled}
           onToggleMap={() => setMapOpen((v) => !v)}
           onOpenIntro={() => {
             setDrawerMode('closed');
@@ -990,11 +1041,22 @@ export default function App() {
           }
           onToggleTheme={() => setTheme((t) => (t === 'paper' ? 'chalkboard' : 'paper'))}
           onToggleEcoMode={() => setEcoMode((e) => !e)}
+          onToggleAudio={() => {
+            setAudioEnabled((prev) => {
+              const next = !prev;
+              audioEngineRef.current?.syncSettings(next, ecoMode);
+              if (next && !ecoMode) {
+                audioEngineRef.current?.unlock();
+                audioEngineRef.current?.playParameterStroke(0.24, theme, performance.now());
+              }
+              return next;
+            });
+          }}
         />
       )}
 
       {/* Protagonist 3D Hand-Painted Sketchbook Canvas (expands to 100% viewport during Intro) */}
-      <main className="relative flex-1 min-h-0 w-full overflow-hidden notebook-paper-bg">
+      <main className="relative flex-1 min-h-0 w-full overflow-hidden notebook-paper-bg crayon-ink-viewport">
         {/* Isolated WebGL canvas mount wrapped in SketchAnimationWrapper for smooth first-time entrance */}
         <SketchAnimationWrapper sceneKey={sceneId} className={webglLost ? 'hidden' : 'block'}>
           <div
@@ -1150,7 +1212,12 @@ export default function App() {
           onSelectScene={selectScene}
           onChangeParam={handleParamChange}
           onFocusToken={handleFocusToken}
-          onToggleExploded={() => setExploded((v) => !v)}
+          onToggleExploded={() => {
+            setFocusedParamId(null);
+            audioEngineRef.current?.unlock();
+            audioEngineRef.current?.playParameterStroke(0.18, theme, performance.now());
+            setExploded((v) => !v);
+          }}
           onToggleCollapsed={() => setAnatomyCollapsed((v) => !v)}
           onResetScene={handleResetScene}
           onChangeActivation={setActivation}

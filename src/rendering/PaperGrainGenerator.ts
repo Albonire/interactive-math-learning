@@ -120,8 +120,8 @@ function paintCrayonLabelCanvas(
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const fontSize = text.length > 5 ? 40 : 50;
-  ctx.font = `400 ${fontSize}px "Caveat Brush", "Patrick Hand", cursive`;
+  const fontSize = text.length > 5 ? 38 : 48;
+  ctx.font = `400 ${fontSize}px "Pangolin", "Patrick Hand", cursive`;
 
   // Subtle soft paper halo so crayon lettering never clashes with 3D strokes behind it
   ctx.lineJoin = 'round';

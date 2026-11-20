@@ -14,6 +14,7 @@ import {
 } from '../../math/linearAlgebra';
 import { createCrayonLineMaterial, createCrayonSurfaceMaterial } from '../CrayonMaterials';
 import {
+  createCrayonInkEdges,
   createCrayonVector,
   createHeightfieldMesh,
   createNotebookSubstrate,
@@ -67,7 +68,8 @@ export function createSpanScene(theme: ThemeMode): BibifoldSceneController {
   const edgePos = new Float32Array(edgePairs.length * 6);
   const edgeGeo = new THREE.BufferGeometry();
   edgeGeo.setAttribute('position', new THREE.BufferAttribute(edgePos, 3));
-  const edgeLines = new THREE.LineSegments(edgeGeo, createCrayonLineMaterial('sage', theme, 0.85, 0.006));
+  const edgeLines = new THREE.LineSegments(edgeGeo, createCrayonLineMaterial('graphite', theme, 0.92, 0.0045));
+  edgeLines.renderOrder = 2;
   structure.add(boxMesh, edgeLines);
 
   // Vectors v1 (cobalt), v2 (vermilion), v3 (ochre), resultant p (graphite) with 3D hand-lettered labels
@@ -77,7 +79,7 @@ export function createSpanScene(theme: ThemeMode): BibifoldSceneController {
   const vecP = createCrayonVector('graphite', theme, 0.038, 'p');
   operator.add(vec1.group, vec2.group, vec3.group, vecP.group);
 
-  // Collapse hatched sheet (visible when rank < 3)
+  // Collapse hatched sheet (visible when rank < 3) with crisp hand-inked perimeter frame
   const sheetGeo = new THREE.PlaneGeometry(3.8, 3.8);
   sheetGeo.rotateX(-Math.PI / 2);
   const sheetMat = createCrayonSurfaceMaterial({
@@ -89,8 +91,11 @@ export function createSpanScene(theme: ThemeMode): BibifoldSceneController {
     doubleSide: true,
     transparent: true,
     depthWrite: false,
+    borderInk: 0.95,
+    borderWidth: 0.026,
   });
   const collapseSheet = new THREE.Mesh(sheetGeo, sheetMat);
+  collapseSheet.add(createCrayonInkEdges(sheetGeo, theme, { crayon: 'vermilion', opacity: 0.92 }));
   collapseSheet.position.y = 0.03;
   error.add(collapseSheet);
 
@@ -149,7 +154,7 @@ export function createSpanScene(theme: ThemeMode): BibifoldSceneController {
     const collapsed = rank < 3 || detAbs < 0.14;
     collapseSheet.visible = collapsed;
     boxMat.userData.crayonToken = collapsed ? 'vermilion' : 'sage';
-    (edgeLines.material as THREE.ShaderMaterial).userData.crayonToken = collapsed ? 'vermilion' : 'sage';
+    (edgeLines.material as THREE.ShaderMaterial).userData.crayonToken = collapsed ? 'vermilion' : 'graphite';
   };
 
   return {
@@ -190,6 +195,23 @@ export function createSvdScene(theme: ThemeMode): BibifoldSceneController {
   });
   const cubeMesh = new THREE.Mesh(cubeGeo, cubeMat);
 
+  // 12 crisp hand-inked edges around the deformable unit cube (deforms in lockstep with M(t))
+  const cubeEdgePairs: Array<[Vec3, Vec3]> = [
+    [[0, 0, 0], [1, 0, 0]], [[0, 0, 0], [0, 1, 0]], [[0, 0, 0], [0, 0, 1]],
+    [[1, 0, 0], [1, 1, 0]], [[1, 0, 0], [1, 0, 1]],
+    [[0, 1, 0], [1, 1, 0]], [[0, 1, 0], [0, 1, 1]],
+    [[0, 0, 1], [1, 0, 1]], [[0, 0, 1], [0, 1, 1]],
+    [[1, 1, 0], [1, 1, 1]], [[1, 0, 1], [1, 1, 1]], [[0, 1, 1], [1, 1, 1]],
+  ];
+  const cubeEdgePos = new Float32Array(cubeEdgePairs.length * 6);
+  const cubeEdgeGeo = new THREE.BufferGeometry();
+  cubeEdgeGeo.setAttribute('position', new THREE.BufferAttribute(cubeEdgePos, 3));
+  const cubeEdgeLines = new THREE.LineSegments(
+    cubeEdgeGeo,
+    createCrayonLineMaterial('graphite', theme, 0.92, 0.004)
+  );
+  cubeEdgeLines.renderOrder = 2;
+
   // Deformed grid lines in XZ plane
   const gridSegs: Array<[Vec3, Vec3]> = [];
   for (let i = -2; i <= 2; i++) {
@@ -201,9 +223,9 @@ export function createSvdScene(theme: ThemeMode): BibifoldSceneController {
   deformedGridGeo.setAttribute('position', new THREE.BufferAttribute(deformedGridPos, 3));
   const deformedGrid = new THREE.LineSegments(
     deformedGridGeo,
-    createCrayonLineMaterial('cobalt', theme, 0.45, 0.005)
+    createCrayonLineMaterial('cobalt', theme, 0.56, 0.004)
   );
-  structure.add(cubeMesh, deformedGrid);
+  structure.add(cubeMesh, cubeEdgeLines, deformedGrid);
 
   // Basis arrows i', j', k' with 3D crayon labels
   const iVec = createCrayonVector('cobalt', theme, 0.048, "î'");
@@ -211,22 +233,38 @@ export function createSvdScene(theme: ThemeMode): BibifoldSceneController {
   const kVec = createCrayonVector('ochre', theme, 0.048, "k̂'");
   operator.add(iVec.group, jVec.group, kVec.group);
 
-  // SVD singular semi-axes + wireframe ellipsoid
+  // SVD singular semi-axes + wireframe ellipsoid + crisp inked equatorial ring
   const sphereGeo = new THREE.SphereGeometry(1, 18, 12);
   const sphereBase = new Float32Array(sphereGeo.attributes.position.array);
   const sphereMat = createCrayonSurfaceMaterial({
     crayon: 'ochre',
     theme,
-    opacity: 0.3,
+    opacity: 0.32,
     doubleSide: true,
     transparent: true,
     depthWrite: false,
   });
   sphereMat.wireframe = true;
   const svdEllipsoid = new THREE.Mesh(sphereGeo, sphereMat);
+
+  const ringSegs = 40;
+  const ringBase: Vec3[] = [];
+  for (let i = 0; i < ringSegs; i++) {
+    const ang = (i / ringSegs) * Math.PI * 2;
+    ringBase.push([Math.cos(ang), 0, Math.sin(ang)]);
+  }
+  const ringPos = new Float32Array(ringSegs * 3);
+  const ringGeo = new THREE.BufferGeometry();
+  ringGeo.setAttribute('position', new THREE.BufferAttribute(ringPos, 3));
+  const svdEquatorInk = new THREE.LineLoop(
+    ringGeo,
+    createCrayonLineMaterial('graphite', theme, 0.82, 0.004)
+  );
+  svdEquatorInk.renderOrder = 2;
+
   const s1Vec = createCrayonVector('ochre', theme, 0.034, 'σ₁');
   const s2Vec = createCrayonVector('ochre', theme, 0.034, 'σ₂');
-  error.add(svdEllipsoid, s1Vec.group, s2Vec.group);
+  error.add(svdEllipsoid, svdEquatorInk, s1Vec.group, s2Vec.group);
 
   const origin = new THREE.Vector3(0, 0, 0);
   const tmp = new THREE.Vector3();
@@ -255,8 +293,24 @@ export function createSvdScene(theme: ThemeMode): BibifoldSceneController {
     cubeGeo.computeVertexNormals();
 
     // Flip to vermilion if orientation reversed or singular
-    cubeMat.userData.crayonToken = det < 0 || Math.abs(det) < 0.08 ? 'vermilion' : 'sage';
+    const isFlippedOrSingular = det < 0 || Math.abs(det) < 0.08;
+    cubeMat.userData.crayonToken = isFlippedOrSingular ? 'vermilion' : 'sage';
     cubeMat.uniforms.uHatchStrength.value = det < 0 ? 0.95 : 0.45;
+    (cubeEdgeLines.material as THREE.ShaderMaterial).userData.crayonToken = isFlippedOrSingular
+      ? 'vermilion'
+      : 'graphite';
+
+    for (let e = 0; e < cubeEdgePairs.length; e++) {
+      const a = mat3MulVec(M, cubeEdgePairs[e][0]);
+      const b = mat3MulVec(M, cubeEdgePairs[e][1]);
+      cubeEdgePos[e * 6 + 0] = a[0];
+      cubeEdgePos[e * 6 + 1] = a[1];
+      cubeEdgePos[e * 6 + 2] = a[2];
+      cubeEdgePos[e * 6 + 3] = b[0];
+      cubeEdgePos[e * 6 + 4] = b[1];
+      cubeEdgePos[e * 6 + 5] = b[2];
+    }
+    (cubeEdgeGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
 
     // Deform grid
     for (let s = 0; s < gridSegs.length; s++) {
@@ -279,7 +333,7 @@ export function createSvdScene(theme: ThemeMode): BibifoldSceneController {
     jVec.setEndpoints(origin, tmp.set(col2[0], col2[1], col2[2]));
     kVec.setEndpoints(origin, tmp.set(col3[0], col3[1], col3[2]));
 
-    // Ellipsoid from unit sphere under M
+    // Ellipsoid from unit sphere under M + inked equator loop
     const spPos = sphereGeo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < spPos.count; i++) {
       const r = mat3MulVec(M, [sphereBase[i * 3], sphereBase[i * 3 + 1], sphereBase[i * 3 + 2]]);
@@ -287,6 +341,14 @@ export function createSvdScene(theme: ThemeMode): BibifoldSceneController {
     }
     spPos.needsUpdate = true;
     sphereGeo.computeVertexNormals();
+
+    for (let i = 0; i < ringSegs; i++) {
+      const r = mat3MulVec(M, ringBase[i]);
+      ringPos[i * 3 + 0] = r[0];
+      ringPos[i * 3 + 1] = r[1];
+      ringPos[i * 3 + 2] = r[2];
+    }
+    (ringGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
 
     // Principal singular axes
     const u0: Vec3 = [svd.U[0] * svd.S[0], svd.U[3] * svd.S[0], svd.U[6] * svd.S[0]];
@@ -318,20 +380,37 @@ export function createEigenScene(theme: ThemeMode): BibifoldSceneController {
 
   substrate.add(createNotebookSubstrate(theme, 5.2, 10, 0));
 
-  // Unit circle on XZ plane
+  // Unit circle on XZ plane with crisp hand-inked compass ticks
   const circlePts: THREE.Vector3[] = [];
   for (let i = 0; i <= 48; i++) {
     const a = (i / 48) * Math.PI * 2;
     circlePts.push(new THREE.Vector3(Math.cos(a), 0.02, Math.sin(a)));
   }
   const circleGeo = new THREE.BufferGeometry().setFromPoints(circlePts);
-  substrate.add(new THREE.Line(circleGeo, createCrayonLineMaterial('graphite', theme, 0.55, 0.004)));
+  substrate.add(new THREE.Line(circleGeo, createCrayonLineMaterial('graphite', theme, 0.85, 0.004)));
+
+  const tickVerts: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    tickVerts.push(c * 0.92, 0.024, s * 0.92, c * 1.08, 0.024, s * 1.08);
+  }
+  const tickGeo = new THREE.BufferGeometry();
+  tickGeo.setAttribute('position', new THREE.Float32BufferAttribute(tickVerts, 3));
+  substrate.add(new THREE.LineSegments(tickGeo, createCrayonLineMaterial('graphite', theme, 0.84, 0.003)));
 
   // Instanced crown of 24 transformed rays (1 draw call!)
   const rayCount = 24;
-  const rayGeo = new THREE.CylinderGeometry(0.014, 0.014, 1, 6);
+  const rayGeo = new THREE.CylinderGeometry(0.015, 0.015, 1, 6);
   rayGeo.translate(0, 0.5, 0);
-  const rayMat = createCrayonSurfaceMaterial({ crayon: 'pencil', theme, opacity: 0.72, transparent: true });
+  const rayMat = createCrayonSurfaceMaterial({
+    crayon: 'pencil',
+    theme,
+    opacity: 0.78,
+    transparent: true,
+    outlineStrength: 0.88,
+  });
   const crownInst = new THREE.InstancedMesh(rayGeo, rayMat, rayCount);
   crownInst.frustumCulled = false;
   structure.add(crownInst);
@@ -445,15 +524,15 @@ export function createManifoldScene(theme: ThemeMode): BibifoldSceneController {
   // Instanced class A (cobalt) and class B (plum) markers (2 draw calls total!)
   const countPerClass = 48;
   const markerGeo = new THREE.OctahedronGeometry(0.085, 1);
-  const matA = createCrayonSurfaceMaterial({ crayon: 'cobalt', theme });
-  const matB = createCrayonSurfaceMaterial({ crayon: 'plum', theme });
+  const matA = createCrayonSurfaceMaterial({ crayon: 'cobalt', theme, outlineStrength: 0.94 });
+  const matB = createCrayonSurfaceMaterial({ crayon: 'plum', theme, outlineStrength: 0.94 });
   const instA = new THREE.InstancedMesh(markerGeo, matA, countPerClass);
   const instB = new THREE.InstancedMesh(markerGeo, matB, countPerClass);
   instA.frustumCulled = false;
   instB.frustumCulled = false;
   operator.add(instA, instB);
 
-  // Linear separator plane (sage/graphite)
+  // Linear separator plane (sage/graphite) with crisp hand-inked outer border
   const sepGeo = new THREE.PlaneGeometry(4.4, 4.4);
   sepGeo.rotateX(-Math.PI / 2);
   const sepMat = createCrayonSurfaceMaterial({
@@ -464,8 +543,11 @@ export function createManifoldScene(theme: ThemeMode): BibifoldSceneController {
     doubleSide: true,
     transparent: true,
     depthWrite: false,
+    borderInk: 0.95,
+    borderWidth: 0.024,
   });
   const sepPlane = new THREE.Mesh(sepGeo, sepMat);
+  sepPlane.add(createCrayonInkEdges(sepGeo, theme, { crayon: 'graphite', opacity: 0.9 }));
   invariant.add(sepPlane);
 
   const dummy = new THREE.Object3D();

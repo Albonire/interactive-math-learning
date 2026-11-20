@@ -59,7 +59,7 @@ export function SlideDrawer({
   return (
     <aside
       aria-label={mode === 'computational' ? 'Plano Computacional' : 'Reto Adaptativo'}
-      className="absolute top-0 right-0 bottom-0 z-[25] w-full max-w-[400px] crayon-surface flex flex-col"
+      className="absolute top-0 right-0 bottom-0 z-[25] w-full max-w-[400px] crayon-surface crayon-ink-drawer flex flex-col"
     >
       {/* Clean unboxed crayon tab header */}
       <div className="px-6 pt-4 pb-3 flex items-center justify-between gap-4">
@@ -115,13 +115,13 @@ export function SlideDrawer({
 
       <RoughDivider theme={theme} seed={313} />
 
-      <div className="flex-1 overflow-y-auto notebook-scroll px-6 py-5 space-y-5">
+      <div className="flex-1 overflow-y-auto notebook-scroll px-5 py-4 space-y-4">
         {mode === 'computational' ? (
           <>
             {sceneId === 'calc-autodiff' && autoDiffSnapshot && (
-              <section className="space-y-2">
+              <section className="crayon-ink-panel p-3.5 space-y-2">
                 <div className="flex items-baseline justify-between">
-                  <h3 className="font-display crayon-ink text-[21px] text-[var(--text-primary)]">
+                  <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
                     Grafo Computacional (DAG)
                   </h3>
                   <span className="text-[12px] font-mono-math text-[var(--text-muted)]">
@@ -129,16 +129,15 @@ export function SlideDrawer({
                   </span>
                 </div>
                 <AutoDiffRoughGraph snapshot={autoDiffSnapshot} theme={theme} />
-                <p className="text-[14.5px] text-[var(--text-secondary)]">
+                <p className="text-[14px] text-[var(--text-secondary)]">
                   Verde salvia indica el valor hacia adelante; bermellón indica la derivada propagada
                   por la regla de la cadena.
                 </p>
-                <div className="border-t border-dashed border-[var(--hairline)] pt-1" />
               </section>
             )}
 
-            <section className="space-y-1.5">
-              <h3 className="font-display crayon-ink text-[21px] text-[var(--text-primary)]">
+            <section className="crayon-ink-panel p-3.5 space-y-1.5">
+              <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
                 Representación en Memoria
               </h3>
               <p className="text-[12.5px] font-mono-math text-[var(--ui-accent)]">
@@ -149,38 +148,36 @@ export function SlideDrawer({
               </div>
             </section>
 
-            <div className="border-t border-dashed border-[var(--hairline)]" />
+            <section className="crayon-ink-panel p-3.5 space-y-2.5">
+              <div className="space-y-1">
+                <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
+                  Costo Computacional
+                </h3>
+                <p className="text-[13px] font-mono-math text-[var(--text-secondary)]">
+                  {bridge.complexity}
+                </p>
+              </div>
 
-            <section className="space-y-1">
-              <h3 className="font-display crayon-ink text-[21px] text-[var(--text-primary)]">
-                Costo Computacional
-              </h3>
-              <p className="text-[13px] font-mono-math text-[var(--text-secondary)]">
-                {bridge.complexity}
-              </p>
+              <div className="border-t border-dashed border-[var(--hairline)]" />
+
+              <div className="space-y-1">
+                <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
+                  Aplicación en Ingeniería de Sistemas
+                </h3>
+                <p className="text-[15px] leading-snug text-[var(--text-secondary)]">
+                  {bridge.csApplication}
+                </p>
+              </div>
             </section>
 
-            <div className="border-t border-dashed border-[var(--hairline)]" />
-
-            <section className="space-y-1">
-              <h3 className="font-display crayon-ink text-[21px] text-[var(--text-primary)]">
-                Aplicación en Ingeniería de Sistemas
-              </h3>
-              <p className="text-[15.5px] leading-snug text-[var(--text-secondary)]">
-                {bridge.csApplication}
-              </p>
-            </section>
-
-            <div className="border-t border-dashed border-[var(--hairline)]" />
-
-            <section className="space-y-2">
+            <section className="crayon-ink-panel p-3.5 space-y-2">
               <div className="flex items-baseline justify-between">
-                <h3 className="font-display crayon-ink text-[21px] text-[var(--text-primary)]">
+                <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
                   Equivalente en Código
                 </h3>
                 <span className="text-[13px] text-[var(--text-muted)]">{bridge.codeLanguage}</span>
               </div>
-              <pre className="font-mono-math text-[12px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap py-2.5 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto">
+              <pre className="font-mono-math text-[12px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap pt-2 border-t border-dashed border-[var(--hairline-strong)] overflow-x-auto">
                 {bridge.codeSnippet}
               </pre>
             </section>
@@ -188,7 +185,7 @@ export function SlideDrawer({
         ) : (
           <>
             {/* Adaptive Challenge Mode (LinUCB + BKT) */}
-            <section className="space-y-1.5">
+            <section className="crayon-ink-panel p-3.5 space-y-1.5">
               <div className="flex items-baseline justify-between text-[14.5px] text-[var(--text-muted)]">
                 <span>Tu dominio · {getMasteryDescriptor(skillState.pL)}</span>
                 <span className="font-mono-math text-[13px] tabular-nums text-[var(--text-primary)]">
@@ -206,14 +203,14 @@ export function SlideDrawer({
 
             {challenge ? (
               <>
-                <section className="space-y-2">
+                <section className="crayon-ink-panel p-3.5 space-y-2">
                   <p className="font-display text-[17px] text-[var(--ui-accent)]">
                     Nivel adaptado · {challenge.armLabel}
                   </p>
                   <p className="text-[14.5px] text-[var(--text-muted)]">
                     {challenge.armDescription}
                   </p>
-                  <h3 className="font-display crayon-ink text-[23px] leading-snug text-[var(--text-primary)] pt-1">
+                  <h3 className="font-display crayon-ink text-[22px] leading-snug text-[var(--text-primary)] pt-1">
                     {challenge.prompt}
                   </h3>
                   <p className="text-[12.5px] font-mono-math text-[var(--text-secondary)] pt-0.5">
@@ -292,7 +289,7 @@ export function SlideDrawer({
 
                 {/* Phase 4: Contrast & Evaluation Result */}
                 {evaluation && (
-                  <section className="pt-4 border-t-2 border-dashed border-[var(--hairline-strong)] space-y-2.5">
+                  <section className="crayon-ink-panel p-3.5 space-y-2.5">
                     <div className="flex items-center justify-between gap-3">
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-baseline gap-2.5 flex-wrap">

@@ -11,6 +11,7 @@ import {
 import { createCrayonLineMaterial, createCrayonSurfaceMaterial } from '../CrayonMaterials';
 import { createCrayonLabelSprite } from '../PaperGrainGenerator';
 import {
+  createCrayonInkEdges,
   createCrayonVector,
   createFloorContourMesh,
   createHeightfieldMesh,
@@ -47,7 +48,7 @@ export function createPartialsScene(theme: ThemeMode): BibifoldSceneController {
   });
   structure.add(surface.mesh);
 
-  // Slice plane Y = y0 (vermilion hatched) & X = x0 (ochre hatched)
+  // Slice plane Y = y0 (vermilion hatched) & X = x0 (ochre hatched) with crisp inked borders
   const sliceGeoX = new THREE.PlaneGeometry(4.4, 2.5);
   const sliceMatX = createCrayonSurfaceMaterial({
     crayon: 'vermilion',
@@ -57,8 +58,11 @@ export function createPartialsScene(theme: ThemeMode): BibifoldSceneController {
     doubleSide: true,
     transparent: true,
     depthWrite: false,
+    borderInk: 0.95,
+    borderWidth: 0.022,
   });
   const slicePlaneYFixed = new THREE.Mesh(sliceGeoX, sliceMatX);
+  slicePlaneYFixed.add(createCrayonInkEdges(sliceGeoX, theme, { crayon: 'graphite', opacity: 0.86 }));
 
   const sliceGeoY = new THREE.PlaneGeometry(4.4, 2.5);
   sliceGeoY.rotateY(Math.PI / 2);
@@ -70,8 +74,11 @@ export function createPartialsScene(theme: ThemeMode): BibifoldSceneController {
     doubleSide: true,
     transparent: true,
     depthWrite: false,
+    borderInk: 0.95,
+    borderWidth: 0.022,
   });
   const slicePlaneXFixed = new THREE.Mesh(sliceGeoY, sliceMatY);
+  slicePlaneXFixed.add(createCrayonInkEdges(sliceGeoY, theme, { crayon: 'graphite', opacity: 0.86 }));
 
   // Intersection curves along both slices
   const curveSamples = 56;
@@ -87,27 +94,38 @@ export function createPartialsScene(theme: ThemeMode): BibifoldSceneController {
 
   operator.add(slicePlaneYFixed, slicePlaneXFixed, curveXLine, curveYLine);
 
-  // Tangent plane + marker point + gradient vector
+  // Tangent plane + live hand-inked 4-edge frame + marker point + gradient vector
   const tangentGeo = new THREE.PlaneGeometry(1.5, 1.5, 1, 1);
   tangentGeo.rotateX(-Math.PI / 2);
   const tangentBase = new Float32Array(tangentGeo.attributes.position.array);
   const tangentMat = createCrayonSurfaceMaterial({
     crayon: 'sage',
     theme,
-    opacity: 0.56,
+    opacity: 0.58,
     hatchStrength: 0.45,
     doubleSide: true,
     transparent: true,
     depthWrite: false,
+    borderInk: 0.95,
+    borderWidth: 0.045,
   });
   const tangentMesh = new THREE.Mesh(tangentGeo, tangentMat);
 
+  const tangentBorderPos = new Float32Array(4 * 3);
+  const tangentBorderGeo = new THREE.BufferGeometry();
+  tangentBorderGeo.setAttribute('position', new THREE.BufferAttribute(tangentBorderPos, 3));
+  const tangentBorder = new THREE.LineLoop(
+    tangentBorderGeo,
+    createCrayonLineMaterial('graphite', theme, 0.94, 0.0035)
+  );
+  tangentBorder.renderOrder = 3;
+
   const markerMesh = new THREE.Mesh(
     new THREE.SphereGeometry(0.095, 16, 12),
-    createCrayonSurfaceMaterial({ crayon: 'vermilion', theme, outlineStrength: 0.78 })
+    createCrayonSurfaceMaterial({ crayon: 'vermilion', theme, outlineStrength: 0.95 })
   );
   const gradVec = createCrayonVector('sage', theme, 0.046, '∇f');
-  invariant.add(tangentMesh, markerMesh, gradVec.group);
+  invariant.add(tangentMesh, tangentBorder, markerMesh, gradVec.group);
 
   const origin = new THREE.Vector3();
   const target = new THREE.Vector3();
@@ -144,7 +162,7 @@ export function createPartialsScene(theme: ThemeMode): BibifoldSceneController {
     (curveXGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
     (curveYGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
 
-    // Tangent plane z_tan(x,y) = z0 + fx*(x-x0) + fy*(y-y0)
+    // Tangent plane z_tan(x,y) = z0 + fx*(x-x0) + fy*(y-y0) + live inked perimeter
     const tPos = tangentGeo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < tPos.count; i++) {
       const dx = tangentBase[i * 3];
@@ -153,6 +171,16 @@ export function createPartialsScene(theme: ThemeMode): BibifoldSceneController {
     }
     tPos.needsUpdate = true;
     tangentGeo.computeVertexNormals();
+
+    // PlaneGeometry(1.5,1.5,1,1) corner indices in loop order: 0, 1, 3, 2
+    const cornerOrder = [0, 1, 3, 2];
+    for (let k = 0; k < 4; k++) {
+      const idx = cornerOrder[k];
+      tangentBorderPos[k * 3 + 0] = tPos.getX(idx);
+      tangentBorderPos[k * 3 + 1] = tPos.getY(idx) + 0.008;
+      tangentBorderPos[k * 3 + 2] = tPos.getZ(idx);
+    }
+    (tangentBorderGeo.attributes.position as THREE.BufferAttribute).needsUpdate = true;
 
     markerMesh.position.set(x0, z + 0.05, y0);
     const scaleG = 0.65;
@@ -194,7 +222,7 @@ export function createAutoDiffScene(theme: ThemeMode): BibifoldSceneController {
   // Forward pass vertical evaluation stalk + glowing wax node
   const nodeSphere = new THREE.Mesh(
     new THREE.SphereGeometry(0.11, 18, 14),
-    createCrayonSurfaceMaterial({ crayon: 'sage', theme })
+    createCrayonSurfaceMaterial({ crayon: 'sage', theme, outlineStrength: 0.95 })
   );
   const stalkPos = new Float32Array(6);
   const stalkGeo = new THREE.BufferGeometry();
@@ -293,7 +321,7 @@ export function createOptimizersScene(theme: ThemeMode): BibifoldSceneController
   const probeHandles = probeDefs.map((def) => {
     const sphere = new THREE.Mesh(
       new THREE.SphereGeometry(0.115, 16, 12),
-      createCrayonSurfaceMaterial({ crayon: def.crayon, theme, outlineStrength: 0.8 })
+      createCrayonSurfaceMaterial({ crayon: def.crayon, theme, outlineStrength: 0.95 })
     );
     const label = createCrayonLabelSprite(def.name, def.crayon, theme, 0.48);
     const trailPos = new Float32Array(maxTrailPts * 3);
@@ -471,6 +499,7 @@ export function createSymbolicScene(theme: ThemeMode): BibifoldSceneController {
         }
         pos.needsUpdate = true;
         aiSurf.geometry.computeVertexNormals();
+        aiSurf.syncBorderFromGeometry();
       }
     } else if (!payload.aiSymbolicGrid) {
       aiSurf.mesh.visible = false;

@@ -9,6 +9,7 @@ import {
   CrayonArrowRight,
   CrayonCheck,
   CrayonChevron,
+  CrayonLayers,
   CrayonPause,
   CrayonPlay,
   CrayonReset,
@@ -57,13 +58,6 @@ interface CoursePipelineDockProps {
   onToggleSymbolicWorker: () => void;
   onCycleSymbolicTarget: () => void;
 }
-
-const SCENES_WITH_EXPLODE = new Set<SceneId>([
-  'lin-span',
-  'lin-eigen',
-  'calc-partials',
-  'calc-symbolic',
-]);
 
 function getFormulaLeadLatex(sceneId: SceneId): string {
   switch (sceneId) {
@@ -121,12 +115,11 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
   const step = lesson.steps[activeStepIdx] ?? lesson.steps[0];
   const stepDone = completedStepIds.has(step.id);
   const allStepsDone = lesson.steps.every((s) => completedStepIds.has(s.id));
-  const showExplodeToggle = SCENES_WITH_EXPLODE.has(sceneId);
 
   return (
     <section
       aria-label="Guía práctica y controles de la lección"
-      className="relative z-20 w-full shrink-0 crayon-surface"
+      className="relative z-20 w-full shrink-0 crayon-surface crayon-ink-dock"
     >
       {/* Whisper-quiet collapse tab */}
       <div className="absolute left-1/2 -translate-x-1/2 -top-[27px]">
@@ -580,20 +573,21 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
                 </div>
               )}
 
-              {showExplodeToggle && (
-                <button
-                  type="button"
-                  onClick={onToggleExploded}
-                  aria-pressed={exploded}
-                  className={`font-display text-[17px] cursor-pointer whitespace-nowrap transition-colors ${
-                    exploded
-                      ? 'text-[var(--ui-accent)] underline decoration-2 underline-offset-4'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                  }`}
-                >
-                  {exploded ? 'Unir vista' : 'Separar vista'}
-                </button>
-              )}
+              <button
+                type="button"
+                data-testid="toggle-exploded-btn"
+                onClick={onToggleExploded}
+                aria-pressed={exploded}
+                title="Separa verticalmente las 4 capas anatómicas de la gráfica 3D"
+                className={`inline-flex items-center gap-1.5 font-display text-[17px] cursor-pointer whitespace-nowrap transition-colors ${
+                  exploded
+                    ? 'text-[var(--ui-accent)] underline decoration-2 underline-offset-4'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                <CrayonLayers size={15} />
+                <span>{exploded ? 'Unir vista' : 'Separar vista'}</span>
+              </button>
 
               <button
                 type="button"

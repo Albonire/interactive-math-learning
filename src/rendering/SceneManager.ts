@@ -5,7 +5,8 @@ import { globalFirstDrawRegistry } from '../core/firstDrawRegistry';
 import { THEME_PALETTES } from '../core/palette';
 import type { AnatomyLayerSpec, CrayonToken, SceneId, ThemeMode } from '../core/types';
 import { CrayonDustPoints } from './CrayonDustPoints';
-import { syncCrayonMaterialsInObject } from './CrayonMaterials';
+import { createCrayonLineMaterial, syncCrayonMaterialsInObject } from './CrayonMaterials';
+import { computeExplodedCameraPose, computeExplodeVerticalSpan } from './explodeView';
 import { refreshCrayonLabelSpritesInObject } from './PaperGrainGenerator';
 import {
   SCENE_ANNOTATIONS,
@@ -101,6 +102,10 @@ export class SceneManager {
   private dustPoints: CrayonDustPoints;
   private dustAnimating = false;
 
+  // Subtle architectural dashed vertical alignment rails visible while "Separar vista" is active
+  private explodeGuides: THREE.LineSegments;
+  private lastExplodeGuideSpanKey = '';
+
   // Non-obtrusive 3D-to-2D anatomy annotations projection (active only when Legend is toggled ON)
   private lastPayload: SceneUpdatePayload | null = null;
   private annotationsEnabled = false;
@@ -168,6 +173,14 @@ export class SceneManager {
     this.dustPoints.setPixelRatio(this.renderer.getPixelRatio());
     this.scene.add(this.dustPoints.points);
 
+    const guideGeo = new THREE.BufferGeometry();
+    guideGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3));
+    const guideMat = createCrayonLineMaterial('graphite', this.theme, 0.38, 0.0018);
+    this.explodeGuides = new THREE.LineSegments(guideGeo, guideMat);
+    this.explodeGuides.visible = false;
+    this.explodeGuides.renderOrder = 2;
+    this.scene.add(this.explodeGuides);
+
     this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
     this.camera.position.set(4.1, 3.1, 4.4);
 
@@ -208,7 +221,7 @@ export class SceneManager {
 
     this.updateContainerAttributes();
 
-    // Repaint 3D hand-lettered canvas labels once Caveat Brush finishes loading
+    // Repaint 3D hand-lettered canvas labels once Pangolin finishes loading
     if (typeof document !== 'undefined' && document.fonts?.ready) {
       document.fonts.ready.then(() => {
         if (!this.disposed && this.controller) {
@@ -251,6 +264,7 @@ export class SceneManager {
 
   private updateContainerAttributes(): void {
     const dustCount = this.dustPoints ? this.dustPoints.activeCount() : 0;
+    const spanInfo = computeExplodeVerticalSpan(this.layerSpecs, this.exploded);
     this.container.dataset.ecoFps = String(this.ecoProfile.targetFps);
     this.container.dataset.drawProgress = this.drawProgress.toFixed(2);
     this.container.dataset.drawComplete =
@@ -259,6 +273,50 @@ export class SceneManager {
     this.container.dataset.dustActive = dustCount > 0 ? 'true' : 'false';
     this.container.dataset.dustCount = String(dustCount);
     this.container.dataset.viewOffsetY = this.viewOffsetYRatio.toFixed(3);
+    this.container.dataset.exploded = this.exploded ? 'true' : 'false';
+    this.container.dataset.explodeSpan = String(spanInfo.span);
+  }
+
+  private updateExplodeGuides(): void {
+    const spanInfo = computeExplodeVerticalSpan(this.layerSpecs, this.exploded);
+    if (!this.exploded || spanInfo.span <= 0.2) {
+      this.explodeGuides.visible = false;
+      return;
+    }
+
+    this.explodeGuides.visible = true;
+    const minY = spanInfo.minY - 0.12;
+    const maxY = spanInfo.maxY + 0.18;
+    const key = `${minY.toFixed(2)}:${maxY.toFixed(2)}`;
+    if (key === this.lastExplodeGuideSpanKey) return;
+    this.lastExplodeGuideSpanKey = key;
+
+    // 4 architectural corner plumb lines + 1 central vertical alignment rail
+    const anchors: Array<[number, number]> = [
+      [-1.95, -1.95],
+      [1.95, -1.95],
+      [1.95, 1.95],
+      [-1.95, 1.95],
+      [0, 0],
+    ];
+    const dashLen = 0.14;
+    const gapLen = 0.12;
+    const coords: number[] = [];
+
+    for (const [ax, az] of anchors) {
+      let y = minY;
+      while (y < maxY) {
+        const yEnd = Math.min(maxY, y + dashLen);
+        coords.push(ax, y, az, ax, yEnd, az);
+        y += dashLen + gapLen;
+      }
+    }
+
+    const oldGeo = this.explodeGuides.geometry;
+    const nextGeo = new THREE.BufferGeometry();
+    nextGeo.setAttribute('position', new THREE.Float32BufferAttribute(coords, 3));
+    this.explodeGuides.geometry = nextGeo;
+    oldGeo.dispose();
   }
 
   /**
@@ -410,6 +468,9 @@ export class SceneManager {
   ): void {
     if (this.disposed) return;
 
+    const explodeChanged = this.exploded !== exploded;
+    const sceneChanged = this.activeSceneId !== payload.sceneId;
+
     this.theme = payload.theme;
     this.lastPayload = payload;
     this.steadyStrokes = steadyStrokes;
@@ -432,7 +493,7 @@ export class SceneManager {
       this.scene.fog.color.set(bgHex);
     }
 
-    if (this.activeSceneId !== payload.sceneId) {
+    if (sceneChanged) {
       if (this.controller) {
         this.scene.remove(this.controller.root);
         this.controller.dispose();
@@ -456,17 +517,28 @@ export class SceneManager {
         this.drawProgress = 1.0;
         this.drawAnimating = false;
       }
+    }
 
-      this.targetCamPos = this.controller.cameraPos.clone();
-      this.targetCamLook = this.controller.cameraTarget.clone();
-      if (this.isSoftwareGl) {
-        this.camera.position.copy(this.controller.cameraPos);
-        this.controls.target.copy(this.controller.cameraTarget);
+    if (this.controller && (sceneChanged || explodeChanged)) {
+      const pose = computeExplodedCameraPose(
+        this.controller.cameraPos,
+        this.controller.cameraTarget,
+        this.exploded,
+        this.layerSpecs
+      );
+      if (this.isSoftwareGl || (this.steadyStrokes && !sceneChanged)) {
+        this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+        this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
         this.controls.update();
         this.targetCamPos = null;
         this.targetCamLook = null;
+      } else {
+        this.targetCamPos = new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z);
+        this.targetCamLook = new THREE.Vector3(pose.target.x, pose.target.y, pose.target.z);
       }
     }
+
+    this.updateExplodeGuides();
 
     if (this.controller && this.activeSceneId) {
       this.controller.update(payload);
@@ -493,15 +565,27 @@ export class SceneManager {
         }
       );
 
+      const elapsedSec = (now - this.startTime) / 1000;
       syncCrayonMaterialsInObject(
         this.controller.root,
         this.theme,
-        (now - this.startTime) / 1000,
+        elapsedSec,
         this.steadyStrokes,
         this.focusedLayerId,
         this.drawProgress,
         this.ecoProfile.boilFps
       );
+      if (this.explodeGuides.visible) {
+        syncCrayonMaterialsInObject(
+          this.explodeGuides,
+          this.theme,
+          elapsedSec,
+          this.steadyStrokes,
+          null,
+          1.0,
+          this.ecoProfile.boilFps
+        );
+      }
       refreshCrayonLabelSpritesInObject(this.controller.root, this.theme, false);
     }
 
@@ -515,15 +599,21 @@ export class SceneManager {
 
   public resetCamera(): void {
     if (!this.controller) return;
+    const pose = computeExplodedCameraPose(
+      this.controller.cameraPos,
+      this.controller.cameraTarget,
+      this.exploded,
+      this.layerSpecs
+    );
     if (this.isSoftwareGl || this.steadyStrokes) {
-      this.camera.position.copy(this.controller.cameraPos);
-      this.controls.target.copy(this.controller.cameraTarget);
+      this.camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+      this.controls.target.set(pose.target.x, pose.target.y, pose.target.z);
       this.controls.update();
       this.emitProjectedAnnotations(true);
       if (this.isSoftwareGl) this.requestSoftwareRender();
     } else {
-      this.targetCamPos = this.controller.cameraPos.clone();
-      this.targetCamLook = this.controller.cameraTarget.clone();
+      this.targetCamPos = new THREE.Vector3(pose.position.x, pose.position.y, pose.position.z);
+      this.targetCamLook = new THREE.Vector3(pose.target.x, pose.target.y, pose.target.z);
     }
   }
 
@@ -543,6 +633,8 @@ export class SceneManager {
 
   private stepAnimations(dt: number, now: number): boolean {
     let stillMoving = this.advanceFirstDraw(now);
+    let layersMoved = false;
+    let cameraMoved = false;
 
     if (this.controller && this.activeSceneId) {
       const prevSketchAnimating = this.sketchAnimating;
@@ -573,22 +665,37 @@ export class SceneManager {
         this.drawProgress,
         this.ecoProfile.boilFps
       );
+      if (this.explodeGuides.visible) {
+        syncCrayonMaterialsInObject(
+          this.explodeGuides,
+          this.theme,
+          elapsedSec,
+          this.steadyStrokes,
+          null,
+          1.0,
+          this.ecoProfile.boilFps
+        );
+      }
 
       // Smooth damped vertical exploded-view layer separation
       for (const spec of this.layerSpecs) {
         const grp = this.controller.layers[spec.id];
         if (!grp) continue;
         const targetY = this.exploded ? spec.explodeOffsetY : 0;
-        if (Math.abs(grp.position.y - targetY) > 0.002) {
+        const diff = Math.abs(grp.position.y - targetY);
+        if (diff > 0.002) {
           grp.position.y = THREE.MathUtils.damp(grp.position.y, targetY, 8.5, dt);
           stillMoving = true;
-        } else {
+          layersMoved = true;
+        } else if (diff > 0.0001) {
           grp.position.y = targetY;
+          layersMoved = true;
         }
       }
     }
 
     if (this.targetCamPos && this.targetCamLook) {
+      cameraMoved = true;
       this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, this.targetCamPos.x, 7, dt);
       this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.targetCamPos.y, 7, dt);
       this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.targetCamPos.z, 7, dt);
@@ -619,25 +726,8 @@ export class SceneManager {
       this.updateContainerAttributes();
     }
 
-    let projectionNeedsUpdate = false;
-    if (this.controller && this.activeSceneId) {
-      // Check if layer positions moved during damped explode transition
-      for (const spec of this.layerSpecs) {
-        const grp = this.controller.layers[spec.id];
-        if (!grp) continue;
-        const targetY = this.exploded ? spec.explodeOffsetY : 0;
-        if (Math.abs(grp.position.y - targetY) > 0.002) {
-          projectionNeedsUpdate = true;
-          break;
-        }
-      }
-    }
-    if (this.targetCamPos && this.targetCamLook) {
-      projectionNeedsUpdate = true;
-    }
-
     this.controls.update();
-    if (projectionNeedsUpdate && this.annotationsEnabled) {
+    if ((layersMoved || cameraMoved) && this.annotationsEnabled) {
       this.emitProjectedAnnotations(false);
     }
     return stillMoving;
@@ -754,6 +844,13 @@ export class SceneManager {
     }
     this.scene.remove(this.dustPoints.points);
     this.dustPoints.dispose();
+    this.scene.remove(this.explodeGuides);
+    this.explodeGuides.geometry.dispose();
+    if (Array.isArray(this.explodeGuides.material)) {
+      this.explodeGuides.material.forEach((m) => m.dispose());
+    } else {
+      this.explodeGuides.material.dispose();
+    }
     this.controls.dispose();
     this.renderer.dispose();
     if (this.renderer.domElement.parentNode === this.container) {

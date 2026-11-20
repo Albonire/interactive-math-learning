@@ -9,7 +9,7 @@ import { animateSvgStrokesOnce } from './svgDrawAnimation';
 /**
  * Global hidden SVG filter bank:
  * - #crayon-stroke: microscopic random displacement + dry-wax edge roughness for all .crayon-surface containers
- * - #crayon-text-tooth: dry-wax edge tooth for Caveat Brush titles
+ * - #crayon-text-tooth: dry-wax edge tooth for Pangolin titles
  * - #crayon-stroke-tooth: dry-wax edge tooth for Rough.js strokes, sliders & icons
  * All filter octaves & scales adapt automatically when Modo Eco is enabled.
  */
@@ -63,7 +63,7 @@ export function CrayonSvgDefs({ ecoMode = false }: { ecoMode?: boolean }) {
           />
         </filter>
 
-        {/* Subtle wax grain edge for Caveat Brush titles & stamps (preserves full legibility) */}
+        {/* Subtle wax grain edge for Pangolin titles & stamps (preserves full legibility) */}
         <filter id="crayon-text-tooth" x="-4%" y="-6%" width="108%" height="112%">
           <feTurbulence
             type="fractalNoise"

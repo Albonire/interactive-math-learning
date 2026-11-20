@@ -14,6 +14,12 @@
   --hairline-strong: rgba(24, 25, 29, 0.38);
   --crayon-edge-stroke: rgba(34, 36, 42, 0.36);
 
+  /* Tinta artesanal para bordes de contenedores (Visor 3D, Dock y Paneles de Datos) */
+  --ink-frame-border: rgba(24, 25, 29, 0.56);
+  --ink-frame-secondary: rgba(53, 83, 110, 0.24);
+  --ink-corner-mark: rgba(24, 25, 29, 0.68);
+  --ink-paper-shadow: rgba(24, 25, 29, 0.08);
+
   /* Paleta Semántica de Crayones de Cera (Gráficas 3D — Papel Blanco) */
   --crayon-graphite: #18191D;
   --crayon-cobalt: #1B5694;
@@ -34,8 +40,8 @@
   --text-secondary: #3E4149;
   --text-muted: #656973;
 
-  /* Tipografía artesanal de crayón (2+1: Caveat Brush + Patrick Hand + JetBrains Mono) */
-  --font-display: 'Caveat Brush', 'Patrick Hand', cursive;
+  /* Tipografía artesanal de crayón (2+1: Pangolin + Patrick Hand + JetBrains Mono) */
+  --font-display: 'Pangolin', 'Patrick Hand', cursive;
   --font-sans: 'Patrick Hand', cursive, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 }
@@ -51,6 +57,12 @@
   --hairline: rgba(235, 239, 245, 0.15);
   --hairline-strong: rgba(235, 239, 245, 0.30);
   --crayon-edge-stroke: rgba(235, 239, 245, 0.26);
+
+  /* Tinta de tiza artesanal para bordes en Pizarra Oscura */
+  --ink-frame-border: rgba(235, 239, 245, 0.42);
+  --ink-frame-secondary: rgba(141, 174, 201, 0.24);
+  --ink-corner-mark: rgba(245, 243, 238, 0.56);
+  --ink-paper-shadow: rgba(0, 0, 0, 0.34);
 
   /* Paleta Semántica de Tiza Pastel y Crayón Luminoso (Gráficas 3D — Pizarra Oscura) */
   --crayon-graphite: #F5F3EE;
@@ -141,9 +153,9 @@ body,
 }
 
 /*
- * Superficie artesanal de contenedores principales (.crayon-surface):
- * Aplica el filtro SVG #crayon-stroke al borde y sustrato de papel mediante ::before
- * para simular el trazo irregular y rugoso del crayón sin deformar la tipografía ni recortar hijos.
+ * Superficie artesanal de contenedores principales (.crayon-surface) + acentos de tinta artesanal:
+ * Aplica el filtro SVG #crayon-stroke al borde y sustrato de papel mediante ::before / ::after
+ * para simular el trazo entintado de cuaderno hecho a mano sin deformar la tipografía ni recortar hijos.
  */
 @layer components {
   .crayon-surface {
@@ -162,7 +174,10 @@ body,
     background-image:
       linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, transparent 100%),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
-    border: 1.5px solid var(--crayon-edge-stroke);
+    border: 1.5px solid var(--ink-frame-border);
+    box-shadow:
+      inset 0 0 0 1px var(--ink-frame-secondary),
+      0 2px 10px var(--ink-paper-shadow);
     filter: url(#crayon-stroke);
   }
 
@@ -185,11 +200,102 @@ body,
       linear-gradient(180deg, rgba(255, 255, 255, 0.015) 0%, transparent 100%),
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.74' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.032'/%3E%3C/svg%3E");
   }
+
+  /* Marco de tinta artesanal alrededor del área del visor 3D (doble filo + marcas de esquina) */
+  .crayon-ink-viewport::after {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    z-index: 12;
+    pointer-events: none;
+    border-radius: 3px;
+    border: 1.5px solid var(--ink-frame-border);
+    box-shadow: inset 0 0 0 3px var(--ink-frame-secondary);
+    background-image:
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark));
+    background-repeat: no-repeat;
+    background-size:
+      14px 2px, 2px 14px,
+      14px 2px, 2px 14px,
+      14px 2px, 2px 14px,
+      14px 2px, 2px 14px;
+    background-position:
+      top left, top left,
+      top right, top right,
+      bottom left, bottom left,
+      bottom right, bottom right;
+    filter: url(#crayon-stroke);
+    opacity: 0.72;
+  }
+
+  .eco-mode .crayon-ink-viewport::after {
+    filter: none;
+    opacity: 0.56;
+  }
+
+  /* Acento de tinta artesanal en el CoursePipelineDock */
+  .crayon-ink-dock::before {
+    border-top-width: 2px;
+    border-top-color: var(--ink-corner-mark);
+    box-shadow:
+      inset 0 2px 0 0 var(--ink-frame-secondary),
+      0 -3px 12px var(--ink-paper-shadow);
+  }
+
+  /* Acento de tinta artesanal en el panel lateral de Código y Reto */
+  .crayon-ink-drawer::before {
+    border-left-width: 2px;
+    border-left-color: var(--ink-corner-mark);
+    box-shadow:
+      inset 2px 0 0 0 var(--ink-frame-secondary),
+      -4px 0 16px var(--ink-paper-shadow);
+  }
+
+  /* Tarjetas y paneles de datos con marco de tinta artesanal y marcas sutiles de cuaderno */
+  .crayon-ink-panel {
+    position: relative;
+    isolation: isolate;
+    border-radius: 4px;
+  }
+
+  .crayon-ink-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--bg-paper-wash);
+    border: 1.5px solid var(--ink-frame-border);
+    box-shadow:
+      inset 0 0 0 2px var(--ink-frame-secondary),
+      2px 2px 0 0 var(--ink-paper-shadow);
+    background-image:
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark));
+    background-repeat: no-repeat;
+    background-size: 9px 1.5px, 1.5px 9px, 9px 1.5px, 1.5px 9px;
+    background-position: top left, top left, bottom right, bottom right;
+    filter: url(#crayon-stroke);
+  }
+
+  .eco-mode .crayon-ink-panel::before {
+    filter: none;
+  }
 }
 
 .font-display {
   font-family: var(--font-display);
-  letter-spacing: 0.015em;
+  letter-spacing: 0.008em;
   text-wrap: balance;
 }
 

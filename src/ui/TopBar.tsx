@@ -1,7 +1,13 @@
 import { SCENES } from '../core/curriculum';
 import { GUIDED_LESSONS } from '../core/lessons';
 import type { SceneId, ThemeMode } from '../core/types';
-import { CrayonLeaf, CrayonMoon, CrayonSun } from './CrayonIcons';
+import {
+  CrayonLeaf,
+  CrayonMoon,
+  CrayonSoundOff,
+  CrayonSoundOn,
+  CrayonSun,
+} from './CrayonIcons';
 import { RoughDivider, RoughUnderline } from './RoughElements';
 
 interface TopBarProps {
@@ -10,18 +16,20 @@ interface TopBarProps {
   mapOpen: boolean;
   theme: ThemeMode;
   ecoMode: boolean;
+  audioEnabled: boolean;
   onToggleMap: () => void;
   onOpenIntro: () => void;
   onToggleInspector: () => void;
   onToggleTheme: () => void;
   onToggleEcoMode: () => void;
+  onToggleAudio: () => void;
 }
 
 /**
  * Calm, Intuitive 3-Zone Sketchbook Top Bar (converged graphite + cobalt palette):
  * - Zone 1: BIBIFOLD wordmark + quiet current lesson indicator (opens Índice)
  * - Zone 2: 3 clean editorial links (Índice · Teoría · Código)
- * - Zone 3: 2 subtle environment switches (Eco · Pizarra/Papel)
+ * - Zone 3: Subtle environment switches (Sonido · Eco · Pizarra/Papel)
  */
 export function TopBar({
   activeSceneId,
@@ -29,14 +37,17 @@ export function TopBar({
   mapOpen,
   theme,
   ecoMode,
+  audioEnabled,
   onToggleMap,
   onOpenIntro,
   onToggleInspector,
   onToggleTheme,
   onToggleEcoMode,
+  onToggleAudio,
 }: TopBarProps) {
   const meta = SCENES[activeSceneId];
   const lesson = GUIDED_LESSONS[activeSceneId];
+  const audioEffectivelyOn = audioEnabled && !ecoMode;
 
   const linkClass = (isActive: boolean) =>
     `relative py-1 font-display text-[19px] leading-none whitespace-nowrap shrink-0 transition-colors duration-150 cursor-pointer ${
@@ -118,6 +129,40 @@ export function TopBar({
         <div className="flex items-center gap-3.5 sm:gap-5 shrink-0">
           <button
             type="button"
+            data-testid="toggle-audio-btn"
+            onClick={onToggleAudio}
+            aria-pressed={audioEffectivelyOn}
+            aria-label={
+              ecoMode
+                ? 'Sonido de crayón silenciado por Modo Eco'
+                : audioEnabled
+                  ? 'Silenciar sonido sutil de crayón'
+                  : 'Activar sonido sutil de crayón'
+            }
+            title={
+              ecoMode
+                ? 'Audio silenciado automáticamente mientras Modo Eco está activo'
+                : audioEnabled
+                  ? 'Sonido sutil de trazo de crayón y papel activo (clic para silenciar)'
+                  : 'Activar sonido sutil de trazo de crayón y papel'
+            }
+            className={`relative py-1 inline-flex items-center gap-1 text-[15px] whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+              ecoMode
+                ? 'text-[var(--text-muted)] opacity-60 hover:opacity-85'
+                : audioEnabled
+                  ? 'text-[var(--text-primary)] hover:text-[var(--ui-accent)]'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {audioEffectivelyOn ? <CrayonSoundOn size={15} /> : <CrayonSoundOff size={15} />}
+            <span className="hidden md:inline">
+              {audioEffectivelyOn ? 'Sonido' : 'Silencio'}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            data-testid="toggle-eco-btn"
             onClick={onToggleEcoMode}
             aria-pressed={ecoMode}
             aria-label={
