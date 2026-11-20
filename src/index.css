@@ -329,6 +329,29 @@ body,
   animation: crayonSketchLabelIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Movimiento sutil artesanal para la flecha 'Crayón Guía' tras 5s de inactividad */
+@keyframes crayonGuideNudge {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.88;
+  }
+  50% {
+    transform: translate3d(3px, -3px, 0);
+    opacity: 1;
+  }
+}
+
+.crayon-guide-nudge {
+  animation: crayonGuideNudge 2.1s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.eco-mode .crayon-guide-nudge {
+  animation: none;
+  opacity: 0.78;
+}
+
 /* Resplandor artesanal tipo crayón de cera al alcanzar la zona óptima en un Reto */
 @keyframes crayonOptimalGlowBreathe {
   0%,

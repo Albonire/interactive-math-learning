@@ -51,6 +51,7 @@ import {
 import { SceneManager } from './rendering/SceneManager';
 import { ParameterEnergyTracker } from './rendering/crayonDust';
 import {
+  IDLE_GUIDE_DELAY_MS,
   getWorldAnchorForParam,
   type ProjectedAnnotation,
 } from './rendering/sceneAnnotations';
@@ -105,7 +106,9 @@ export default function App() {
       const el = rootRef.current;
       if (el) {
         el.dataset.audioState = stats.state;
-        el.dataset.audioPlays = String(stats.strokePlays + stats.dustPlays);
+        el.dataset.audioPlays = String(
+          stats.strokePlays + stats.dustPlays + stats.introPlays + stats.annotationPlays
+        );
       }
     });
   }
@@ -127,8 +130,9 @@ export default function App() {
   const [introBeatIdx, setIntroBeatIdx] = useState<number>(0);
   const seenIntrosRef = useRef<Set<SceneId>>(new Set(['lin-span']));
 
-  // Non-obtrusive 3D Viewport Legend & Crayon Dust interaction energy tracker
+  // Non-obtrusive 3D Viewport Legend, 5s idle Crayón Guía & Crayon Dust energy tracker
   const [legendOpen, setLegendOpen] = useState<boolean>(false);
+  const [idleGuideActive, setIdleGuideActive] = useState<boolean>(false);
   const [projectedAnnotations, setProjectedAnnotations] = useState<ProjectedAnnotation[]>([]);
   const dustEnergyRef = useRef<ParameterEnergyTracker>(new ParameterEnergyTracker());
 
@@ -219,16 +223,32 @@ export default function App() {
 
   // Initialize Web Audio engine on app mount (strictly honoring initial audioEnabled & ecoMode)
   useEffect(() => {
+    if (!audioEngineRef.current) {
+      audioEngineRef.current = new CrayonAudioEngine(audioEnabled, ecoMode, (stats) => {
+        const el = rootRef.current;
+        if (el) {
+          el.dataset.audioState = stats.state;
+          el.dataset.audioPlays = String(
+            stats.strokePlays + stats.dustPlays + stats.introPlays + stats.annotationPlays
+          );
+        }
+      });
+    }
     const engine = audioEngineRef.current;
-    engine?.initialize();
-    if (rootRef.current && engine) {
+    engine.initialize();
+    if (rootRef.current) {
       const st = engine.getStats();
       rootRef.current.dataset.audioState = st.state;
-      rootRef.current.dataset.audioPlays = String(st.strokePlays + st.dustPlays);
+      rootRef.current.dataset.audioPlays = String(
+        st.strokePlays + st.dustPlays + st.introPlays + st.annotationPlays
+      );
     }
     return () => {
-      engine?.dispose();
+      engine.dispose();
+      audioEngineRef.current = null;
     };
+    // Mount-only lifecycle; settings updates sync in the effect below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep optional Web Audio engine synchronized with user preference & ecoMode silencing
@@ -355,6 +375,9 @@ export default function App() {
 
     const targetParams = { ...defaultParamsFor(sceneId), ...(st.params ?? {}) };
     cancelParamAnim();
+    // Subtle sweeping crayon sketch cue as each intro beat choreographs the 3D diagram
+    audioEngineRef.current?.playIntroSketch(theme, performance.now());
+
     const startParams = { ...paramValuesRef.current };
     const durationMs = steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 820;
 
@@ -379,7 +402,7 @@ export default function App() {
       };
       animRafRef.current = requestAnimationFrame(tick);
     }
-  }, [introOpen, sceneId, introBeatIdx, steadyStrokes, cancelParamAnim]);
+  }, [introOpen, sceneId, introBeatIdx, steadyStrokes, cancelParamAnim, theme]);
 
   // Transition smoothly from fullscreen intro to clean hands-on practice
   const handleFinishIntro = useCallback(() => {
@@ -524,10 +547,51 @@ export default function App() {
     ecoMode,
   ]);
 
-  // Toggle 3D-to-2D annotation projection only when Legend is open during hands-on practice
+  // Toggle 3D-to-2D annotation projection when Legend or 5s idle Crayón Guía is active
   useEffect(() => {
-    managerRef.current?.setAnnotationsEnabled(legendOpen && !introOpen && drawerMode === 'closed');
-  }, [legendOpen, introOpen, drawerMode]);
+    const needsProjection = !introOpen && drawerMode === 'closed' && (legendOpen || idleGuideActive);
+    managerRef.current?.setAnnotationsEnabled(needsProjection);
+  }, [legendOpen, idleGuideActive, introOpen, drawerMode]);
+
+  // 5-second inactivity timer for 'Crayón Guía' during open hands-on practice
+  useEffect(() => {
+    if (introOpen || mapOpen || drawerMode !== 'closed') {
+      setIdleGuideActive(false);
+      return;
+    }
+
+    let timerId: number | null = null;
+    const armTimer = () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      setIdleGuideActive(false);
+      timerId = window.setTimeout(() => {
+        setIdleGuideActive(true);
+      }, IDLE_GUIDE_DELAY_MS);
+    };
+
+    armTimer();
+    const onUserActivity = () => armTimer();
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener('pointerdown', onUserActivity, opts);
+    window.addEventListener('keydown', onUserActivity, opts);
+    window.addEventListener('wheel', onUserActivity, opts);
+    window.addEventListener('touchstart', onUserActivity, opts);
+
+    return () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      window.removeEventListener('pointerdown', onUserActivity, { capture: true });
+      window.removeEventListener('keydown', onUserActivity, { capture: true });
+      window.removeEventListener('wheel', onUserActivity, { capture: true });
+      window.removeEventListener('touchstart', onUserActivity, { capture: true });
+    };
+  }, [introOpen, mapOpen, drawerMode, sceneId, paramValues, exploded, legendOpen, activeStepIdx]);
+
+  // Play delicate pencil/crayon flick when Crayón Guía draws in (if unlocked and not in Eco Mode)
+  useEffect(() => {
+    if (idleGuideActive && !introOpen && drawerMode === 'closed') {
+      audioEngineRef.current?.playAnnotationSketch(theme, performance.now());
+    }
+  }, [idleGuideActive, introOpen, drawerMode, theme]);
 
   // Center the 3D diagram cleanly in the open stage above the bottom narration bar during Intro
   useEffect(() => {
@@ -551,7 +615,14 @@ export default function App() {
       if (e.key === 'h' || e.key === 'H') {
         setAnatomyCollapsed((v) => !v);
       } else if ((e.key === 'l' || e.key === 'L') && !mapOpen && drawerMode === 'closed') {
-        setLegendOpen((v) => !v);
+        setLegendOpen((prev) => {
+          const next = !prev;
+          if (next) {
+            audioEngineRef.current?.unlock();
+            audioEngineRef.current?.playAnnotationSketch(theme, performance.now());
+          }
+          return next;
+        });
       } else if (e.key === 'Escape') {
         if (mapOpen) setMapOpen(false);
         else if (drawerMode !== 'closed') setDrawerMode('closed');
@@ -559,7 +630,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [introOpen, mapOpen, drawerMode]);
+  }, [introOpen, mapOpen, drawerMode, theme]);
 
   const handleParamChange = useCallback(
     (id: string, nextVal: number) => {
@@ -1031,6 +1102,7 @@ export default function App() {
           audioEnabled={audioEnabled}
           onToggleMap={() => setMapOpen((v) => !v)}
           onOpenIntro={() => {
+            audioEngineRef.current?.unlock();
             setDrawerMode('closed');
             setMapOpen(false);
             setIntroBeatIdx(0);
@@ -1074,7 +1146,10 @@ export default function App() {
             intro={LESSON_INTROS[sceneId]}
             beatIndex={introBeatIdx}
             theme={theme}
-            onChangeBeat={setIntroBeatIdx}
+            onChangeBeat={(nextBeat) => {
+              audioEngineRef.current?.unlock();
+              setIntroBeatIdx(nextBeat);
+            }}
             onFinish={handleFinishIntro}
           />
         )}
@@ -1142,13 +1217,24 @@ export default function App() {
           </div>
         )}
 
-        {/* Non-obtrusive hand-drawn 3D anatomy callouts + quiet top-right "Leyenda" toggle */}
+        {/* Non-obtrusive hand-drawn 3D anatomy callouts, Eco dynamic opacity & 5s idle Crayón Guía */}
         <ViewportAnnotationsOverlay
           open={legendOpen}
-          onToggle={() => setLegendOpen((v) => !v)}
+          onToggle={() => {
+            setLegendOpen((prev) => {
+              const next = !prev;
+              if (next) {
+                audioEngineRef.current?.unlock();
+                audioEngineRef.current?.playAnnotationSketch(theme, performance.now());
+              }
+              return next;
+            });
+          }}
           annotations={projectedAnnotations}
           focusedParamId={focusedParamId}
           theme={theme}
+          ecoMode={ecoMode}
+          guideActive={idleGuideActive}
           hidden={introOpen || drawerMode !== 'closed'}
         />
 

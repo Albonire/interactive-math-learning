@@ -3,9 +3,15 @@ import assert from 'node:assert/strict';
 import { LESSON_ORDER } from '../core/lessons';
 import { SCENES } from '../core/curriculum';
 import {
+  ECO_ACTIVE_BASE_OPACITY,
+  ECO_RESTING_OPACITY,
+  IDLE_GUIDE_DELAY_MS,
   SCENE_ANNOTATIONS,
+  computeAnnotationOpacity,
   computeCalloutLayout,
+  computeGuideArrowGeometry,
   getWorldAnchorForParam,
+  selectPrimaryInteractiveAnnotation,
   type ProjectedAnnotation,
 } from './sceneAnnotations';
 import type { SceneUpdatePayload } from './scenes/types';
@@ -115,5 +121,104 @@ test('dynamic isVisible guards hide annotations when their 3D mesh is absent', (
   eigPayload.params.c = 1;
   eigPayload.params.d = 0;
   assert.equal(eigLine.isVisible(eigPayload), false, 'Rotation matrix hides real eigenvector callout');
+});
+
+test('selectPrimaryInteractiveAnnotation picks highest interaction-weight 3D component and computes bounded arrow', () => {
+  assert.equal(IDLE_GUIDE_DELAY_MS, 5000);
+
+  const projected: ProjectedAnnotation[] = [
+    {
+      id: 'low-weight',
+      label: 'Vector v₁',
+      note: '1 parámetro',
+      layerId: 'operator',
+      crayon: 'cobalt',
+      linkedParamIds: ['c1'],
+      anchorX: 600,
+      anchorY: 360,
+      visible: true,
+    },
+    {
+      id: 'high-weight',
+      label: 'Volumen |det|',
+      note: '3 parámetros',
+      layerId: 'structure',
+      crayon: 'sage',
+      linkedParamIds: ['c1', 'c2', 'v3y'],
+      anchorX: 720,
+      anchorY: 320,
+      visible: true,
+    },
+    {
+      id: 'offscreen-high',
+      label: 'Fuera',
+      note: 'Oculto',
+      layerId: 'operator',
+      crayon: 'vermilion',
+      linkedParamIds: ['a', 'b', 'c', 'd', 'e'],
+      anchorX: -50,
+      anchorY: 300,
+      visible: true,
+    },
+  ];
+
+  const primary = selectPrimaryInteractiveAnnotation(projected, 1440, 720);
+  assert.equal(primary?.id, 'high-weight');
+
+  const arrow = computeGuideArrowGeometry(primary!, 1440, 720);
+  assert.ok(arrow.startX >= 40 && arrow.startX <= 1400);
+  assert.ok(arrow.startY >= 80 && arrow.startY <= 680);
+  const distToAnchor = Math.hypot(arrow.tipX - primary!.anchorX, arrow.tipY - primary!.anchorY);
+  assert.ok(distToAnchor > 8 && distToAnchor < 18, 'arrow tip sits neatly beside anchor ring');
+});
+
+test('computeAnnotationOpacity switches from fixed in normal mode to mouse-linked dynamic opacity in Eco Mode', () => {
+  const normalSteady = computeAnnotationOpacity({
+    ecoMode: false,
+    isLinked: false,
+    isDimmed: false,
+    pointer: null,
+    anchorX: 700,
+    anchorY: 340,
+    labelX: 160,
+    labelY: 340,
+  });
+  assert.equal(normalSteady, 0.88);
+
+  const ecoResting = computeAnnotationOpacity({
+    ecoMode: true,
+    isLinked: false,
+    isDimmed: false,
+    pointer: { x: 700, y: 340, active: false },
+    anchorX: 700,
+    anchorY: 340,
+    labelX: 160,
+    labelY: 340,
+  });
+  assert.equal(ecoResting, ECO_RESTING_OPACITY);
+
+  const ecoFarMoving = computeAnnotationOpacity({
+    ecoMode: true,
+    isLinked: false,
+    isDimmed: false,
+    pointer: { x: 1380, y: 680, active: true },
+    anchorX: 700,
+    anchorY: 340,
+    labelX: 160,
+    labelY: 340,
+  });
+  const ecoNearMoving = computeAnnotationOpacity({
+    ecoMode: true,
+    isLinked: false,
+    isDimmed: false,
+    pointer: { x: 710, y: 345, active: true },
+    anchorX: 700,
+    anchorY: 340,
+    labelX: 160,
+    labelY: 340,
+  });
+
+  assert.ok(ecoFarMoving >= ECO_ACTIVE_BASE_OPACITY && ecoFarMoving < ecoNearMoving);
+  assert.ok(ecoNearMoving > 0.9 && ecoNearMoving <= 0.98);
 });
 

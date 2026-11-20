@@ -5,7 +5,9 @@ import {
   DUST_THROTTLE_MS,
   STROKE_THROTTLE_MS,
   canTriggerAudioAt,
+  computeAnnotationSketchParams,
   computeDustSoundParams,
+  computeIntroSketchParams,
   computeStrokeSoundParams,
   shouldPlayCrayonAudio,
 } from './crayonAudio';
@@ -25,13 +27,13 @@ test('audio throttle prevents overlapping burst distortion during rapid drags', 
   assert.equal(canTriggerAudioAt(150 + DUST_THROTTLE_MS, 150, DUST_THROTTLE_MS), true);
 });
 
-test('stroke and dust synthesis parameters stay audible, bounded, and theme-calibrated', () => {
+test('stroke, dust, intro, and annotation synthesis parameters stay audible, bounded, and theme-calibrated', () => {
   const gentlePaper = computeStrokeSoundParams(0.02, 'paper');
   const briskPaper = computeStrokeSoundParams(0.55, 'paper');
   const briskChalk = computeStrokeSoundParams(0.55, 'chalkboard');
 
-  assert.ok(gentlePaper.gain >= 0.14 && gentlePaper.gain < briskPaper.gain);
-  assert.ok(briskPaper.gain <= 0.36, 'stroke audio stays gentle and never harsh');
+  assert.ok(gentlePaper.gain >= 0.28 && gentlePaper.gain < briskPaper.gain);
+  assert.ok(briskPaper.gain <= 0.56, 'stroke audio stays gentle and never clips');
   assert.ok(
     briskChalk.centerFreqHz > briskPaper.centerFreqHz,
     'chalkboard stroke has crisper high-mid resonance'
@@ -41,13 +43,23 @@ test('stroke and dust synthesis parameters stay audible, bounded, and theme-cali
   const dustPaper = computeDustSoundParams(0.8, 'paper');
   const dustChalk = computeDustSoundParams(0.8, 'chalkboard');
   assert.ok(dustPaper.durationSec > gentlePaper.durationSec);
-  assert.ok(dustPaper.gain >= 0.17 && dustPaper.gain <= 0.4, 'dust rustle stays audible yet soft');
+  assert.ok(dustPaper.gain >= 0.3 && dustPaper.gain <= 0.56, 'dust rustle stays audible yet soft');
   assert.equal(dustPaper.grainCount, 3);
   assert.equal(computeDustSoundParams(0.3, 'paper').grainCount, 2);
   assert.ok(dustChalk.centerFreqHz > dustPaper.centerFreqHz);
+
+  const introPaper = computeIntroSketchParams('paper');
+  const introChalk = computeIntroSketchParams('chalkboard');
+  assert.ok(introPaper.durationSec >= 0.18 && introPaper.gain >= 0.3);
+  assert.ok(introChalk.centerFreqHz > introPaper.centerFreqHz);
+
+  const notePaper = computeAnnotationSketchParams('paper');
+  const noteChalk = computeAnnotationSketchParams('chalkboard');
+  assert.ok(notePaper.durationSec >= 0.1 && notePaper.durationSec < introPaper.durationSec);
+  assert.ok(noteChalk.centerFreqHz > notePaper.centerFreqHz);
 });
 
-test('CrayonAudioEngine initializes cleanly, flushes queued strokes on resume, and honors ecoMode on startup', async () => {
+test('CrayonAudioEngine initializes cleanly, flushes queued cues on resume, and plays intro + annotation cues while honoring ecoMode', async () => {
   let ctxCreations = 0;
   let suspendCalls = 0;
   let startedSources = 0;
@@ -143,28 +155,37 @@ test('CrayonAudioEngine initializes cleanly, flushes queued strokes on resume, a
     ecoEngine.initialize();
     assert.equal(ctxCreations, 0, 'ecoMode on startup avoids creating AudioContext');
     assert.equal(ecoEngine.playParameterStroke(0.2, 'paper', 1000), false);
+    assert.equal(ecoEngine.playIntroSketch('paper', 1000), false);
+    assert.equal(ecoEngine.playAnnotationSketch('paper', 1000), false);
     ecoEngine.dispose();
 
-    // 2. Normal startup: creates context, queues stroke while suspended, flushes upon resume without dropping
+    // 2. Normal startup: creates context, queues stroke while suspended, flushes upon resume
     const engine = new CrayonAudioEngine(true, false);
     engine.initialize();
     assert.equal(ctxCreations, 1, 'initializes AudioContext eagerly when active');
     assert.equal(engine.getStats().state, 'suspended');
 
-    const accepted = engine.playParameterStroke(0.25, 'paper', 2000);
-    assert.equal(accepted, true);
-    // Allow microtask resume() promise to settle
+    assert.equal(engine.playParameterStroke(0.25, 'paper', 2000), true);
     await new Promise((r) => setTimeout(r, 10));
 
     assert.equal(engine.getStats().state, 'running');
     assert.equal(engine.getStats().strokePlays, 1, 'queued stroke flushed without being dropped');
     assert.equal(startedSources, 1);
 
-    // 3. Activating ecoMode suspends context and silences further triggers
+    // 3. Intro sketch (2-pass sweep) & annotation flick play while running
+    assert.equal(engine.playIntroSketch('paper', 2500), true);
+    assert.equal(engine.playAnnotationSketch('chalkboard', 2600), true);
+    assert.equal(engine.getStats().introPlays, 1);
+    assert.equal(engine.getStats().annotationPlays, 1);
+    assert.equal(startedSources, 4); // 1 stroke + 2 intro passes + 1 annotation flick
+
+    // 4. Activating ecoMode suspends context and silences all further cues
     engine.syncSettings(true, true);
     await new Promise((r) => setTimeout(r, 10));
     assert.equal(suspendCalls, 1);
     assert.equal(engine.playParameterStroke(0.3, 'paper', 3000), false);
+    assert.equal(engine.playIntroSketch('paper', 3100), false);
+    assert.equal(engine.playAnnotationSketch('paper', 3200), false);
     assert.equal(engine.getStats().strokePlays, 1);
     engine.dispose();
   } finally {

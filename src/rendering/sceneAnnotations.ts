@@ -595,3 +595,152 @@ export function computeCalloutLayout(
     ...layoutSide(rightBucket, 'right', topBoundRight),
   ];
 }
+
+export const IDLE_GUIDE_DELAY_MS = 5000;
+export const ECO_RESTING_OPACITY = 0.36;
+export const ECO_ACTIVE_BASE_OPACITY = 0.78;
+export const ECO_PROXIMITY_RADIUS_PX = 340;
+
+export interface EcoPointerState {
+  x: number;
+  y: number;
+  active: boolean;
+}
+
+export interface GuideArrowGeometry {
+  startX: number;
+  startY: number;
+  ctrlX: number;
+  ctrlY: number;
+  tipX: number;
+  tipY: number;
+  labelX: number;
+  labelY: number;
+  labelAlign: 'left' | 'right';
+}
+
+/**
+ * Selects the visible 3D component with the highest interaction weight
+ * (driven by the most parameters, breaking ties in favor of direct operator elements)
+ * for the subtle idle 'Crayón Guía' arrow.
+ */
+export function selectPrimaryInteractiveAnnotation(
+  projected: readonly ProjectedAnnotation[],
+  viewportWidth: number,
+  viewportHeight: number
+): ProjectedAnnotation | null {
+  const candidates = projected.filter(
+    (p) =>
+      p.visible &&
+      Number.isFinite(p.anchorX) &&
+      Number.isFinite(p.anchorY) &&
+      p.anchorX > 28 &&
+      p.anchorX < viewportWidth - 28 &&
+      p.anchorY > 28 &&
+      p.anchorY < viewportHeight - 28
+  );
+  if (candidates.length === 0) return null;
+
+  const weightOf = (item: ProjectedAnnotation): number => {
+    const paramWeight = item.linkedParamIds.length * 10;
+    const layerBonus =
+      item.layerId === 'operator' ? 2 : item.layerId === 'invariant' ? 1 : 0;
+    return paramWeight + layerBonus;
+  };
+
+  let best = candidates[0];
+  let bestScore = weightOf(best);
+  for (let i = 1; i < candidates.length; i++) {
+    const score = weightOf(candidates[i]);
+    if (score > bestScore) {
+      best = candidates[i];
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/**
+ * Computes a compact, non-intrusive curved crayon arrow pointing onto the top-weighted 3D component,
+ * automatically choosing an open quadrant inside the viewport margins.
+ */
+export function computeGuideArrowGeometry(
+  target: ProjectedAnnotation,
+  viewportWidth: number,
+  viewportHeight: number
+): GuideArrowGeometry {
+  // Prefer pointing from the side with more open paper space
+  const placeOnRight = target.anchorX < viewportWidth * 0.62;
+  const placeAbove = target.anchorY > viewportHeight * 0.38;
+
+  const offsetX = placeOnRight ? 96 : -96;
+  const offsetY = placeAbove ? -72 : 72;
+
+  const startX = Math.max(48, Math.min(viewportWidth - 48, target.anchorX + offsetX));
+  const startY = Math.max(96, Math.min(viewportHeight - 68, target.anchorY + offsetY));
+
+  const dx = target.anchorX - startX;
+  const dy = target.anchorY - startY;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+
+  // Stop arrowhead gently just outside the 3D anchor ring
+  const tipX = target.anchorX - ux * 15;
+  const tipY = target.anchorY - uy * 15;
+
+  // Gentle organic bow perpendicular to the vector
+  const bow = placeOnRight ? -20 : 20;
+  const ctrlX = (startX + tipX) * 0.5 - uy * bow;
+  const ctrlY = (startY + tipY) * 0.5 + ux * bow;
+
+  return {
+    startX,
+    startY,
+    ctrlX,
+    ctrlY,
+    tipX,
+    tipY,
+    labelX: placeOnRight ? startX + 8 : startX - 8,
+    labelY: startY,
+    labelAlign: placeOnRight ? 'left' : 'right',
+  };
+}
+
+/**
+ * Computes annotation opacity:
+ * - Normal mode: steady legible opacity (dimming unrelated callouts during active parameter drag).
+ * - Eco Mode: dynamic opacity tied to pointer movement & proximity, settling softly at rest
+ *   to lower visual/compositing load while preserving clear readability.
+ */
+export function computeAnnotationOpacity(opts: {
+  ecoMode: boolean;
+  isLinked: boolean;
+  isDimmed: boolean;
+  pointer: EcoPointerState | null;
+  anchorX: number;
+  anchorY: number;
+  labelX: number;
+  labelY: number;
+}): number {
+  const { ecoMode, isLinked, isDimmed, pointer, anchorX, anchorY, labelX, labelY } = opts;
+
+  if (!ecoMode) {
+    if (isDimmed) return 0.26;
+    return isLinked ? 0.98 : 0.88;
+  }
+
+  if (isLinked) return 0.94;
+  if (isDimmed) return 0.18;
+
+  if (!pointer || !pointer.active) {
+    return ECO_RESTING_OPACITY;
+  }
+
+  const distAnchor = Math.hypot(pointer.x - anchorX, pointer.y - anchorY);
+  const distLabel = Math.hypot(pointer.x - labelX, pointer.y - labelY);
+  const minDist = Math.min(distAnchor, distLabel);
+  const proximity = Math.max(0, 1 - minDist / ECO_PROXIMITY_RADIUS_PX);
+
+  return Number((ECO_ACTIVE_BASE_OPACITY + proximity * 0.18).toFixed(2));
+}
