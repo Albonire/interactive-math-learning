@@ -97,6 +97,8 @@ function defaultParamsFor(sceneId: SceneId): Record<string, number> {
 export default function App() {
   const [sceneId, setSceneId] = useState<SceneId>('lin-span');
   const [theme, setTheme] = useState<ThemeMode>('paper');
+  const themeRef = useRef<ThemeMode>(theme);
+  themeRef.current = theme;
   const [ecoMode, setEcoMode] = useState<boolean>(() => loadInitialEcoMode());
   const [audioEnabled, setAudioEnabled] = useState<boolean>(() => loadInitialAudioEnabled());
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -270,6 +272,14 @@ export default function App() {
         onContextLost: () => setWebglLost(true),
         onContextRestored: () => setWebglLost(false),
         onAnnotationsProjected: (items) => setProjectedAnnotations(items),
+        onConstructionStroke: (ev) => {
+          audioEngineRef.current?.playConstructionStroke(
+            ev.layerId,
+            themeRef.current,
+            ev.isSprite,
+            performance.now()
+          );
+        },
       });
       managerRef.current = manager;
     } catch {
@@ -358,7 +368,10 @@ export default function App() {
 
   // Live 3D choreography while the fullscreen theory intro plays
   useEffect(() => {
-    if (!introOpen) return;
+    if (!introOpen) {
+      audioEngineRef.current?.stopIntroPhrase();
+      return;
+    }
     const beat = LESSON_INTROS[sceneId]?.beats[introBeatIdx];
     if (!beat) return;
 
@@ -373,13 +386,18 @@ export default function App() {
     setAutoDiffPass(st.autoDiffPass ?? 'idle');
     setOptimizerRunning(Boolean(st.startOptimizer));
 
+    // Beat 0 replays the full structured, stroke-by-stroke procedural 3D build in real time
+    if (introBeatIdx === 0) {
+      managerRef.current?.replayProceduralBuild();
+    }
+
     const targetParams = { ...defaultParamsFor(sceneId), ...(st.params ?? {}) };
     cancelParamAnim();
-    // Subtle sweeping crayon sketch cue as each intro beat choreographs the 3D diagram
-    audioEngineRef.current?.playIntroSketch(theme, performance.now());
+    // Warm, multi-stroke crayon sketching phrase spanning the slow intro choreography
+    audioEngineRef.current?.playIntroPhrase(theme, introBeatIdx, performance.now());
 
     const startParams = { ...paramValuesRef.current };
-    const durationMs = steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 820;
+    const durationMs = steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 2800;
 
     if (durationMs === 0) {
       setParamValues(targetParams);
@@ -387,7 +405,8 @@ export default function App() {
       const t0 = performance.now();
       const tick = (now: number) => {
         const raw = Math.min(1, (now - t0) / durationMs);
-        const ease = 1 - Math.pow(1 - raw, 3);
+        // Smooth ease-in-out cubic for unhurried, structured visual storytelling
+        const ease = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
         const next: Record<string, number> = { ...targetParams };
         for (const [k, endVal] of Object.entries(targetParams)) {
           const startVal = startParams[k] ?? endVal;
@@ -402,11 +421,16 @@ export default function App() {
       };
       animRafRef.current = requestAnimationFrame(tick);
     }
+
+    return () => {
+      audioEngineRef.current?.stopIntroPhrase();
+    };
   }, [introOpen, sceneId, introBeatIdx, steadyStrokes, cancelParamAnim, theme]);
 
   // Transition smoothly from fullscreen intro to clean hands-on practice
   const handleFinishIntro = useCallback(() => {
     cancelParamAnim();
+    audioEngineRef.current?.stopIntroPhrase();
     setOptimizerRunning(false);
     setParamValues(defaultParamsFor(sceneId));
     setExploded(false);
@@ -780,7 +804,7 @@ export default function App() {
         const targetParams = demo.params;
         const startParams = { ...paramValues };
         const durationMs =
-          steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 520;
+          steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 1500;
 
         if (durationMs === 0) {
           setParamValues((prev) => ({ ...prev, ...targetParams }));
@@ -788,7 +812,7 @@ export default function App() {
           const t0 = performance.now();
           const tick = (now: number) => {
             const raw = Math.min(1, (now - t0) / durationMs);
-            const ease = 1 - Math.pow(1 - raw, 3);
+            const ease = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
             setParamValues((prev) => {
               const next = { ...prev };
               for (const [k, endVal] of Object.entries(targetParams)) {

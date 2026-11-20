@@ -61,13 +61,20 @@ export interface SymbolicParameter {
   unit?: string;
 }
 
-export interface ComputationalBridge {
+export type SystemsCodeLanguage = 'rust' | 'java';
+
+export interface CodeImplementation {
+  language: SystemsCodeLanguage;
+  label: 'Rust' | 'Java';
   memoryLayout: string;
+  codeSnippet: string;
+}
+
+export interface ComputationalBridge {
   memoryValues: string[];
   complexity: string;
   csApplication: string;
-  codeSnippet: string;
-  codeLanguage: 'TypeScript' | 'GLSL';
+  implementations: Record<SystemsCodeLanguage, CodeImplementation>;
 }
 
 export interface SceneMetadata {

@@ -12,7 +12,10 @@ import {
   SCENE_ANNOTATIONS,
   type ProjectedAnnotation,
 } from './sceneAnnotations';
-import { Object3DSketchAnimator } from './SketchAnimationWrapper';
+import {
+  Object3DSketchAnimator,
+  type ConstructionStrokeEvent,
+} from './SketchAnimationWrapper';
 import {
   createEigenScene,
   createManifoldScene,
@@ -70,6 +73,7 @@ export interface SceneManagerOptions {
   onContextLost: () => void;
   onContextRestored: () => void;
   onAnnotationsProjected?: (items: ProjectedAnnotation[]) => void;
+  onConstructionStroke?: (event: ConstructionStrokeEvent) => void;
 }
 
 export class SceneManager {
@@ -90,13 +94,14 @@ export class SceneManager {
   private focusedLayerId: string | null = null;
   private layerSpecs: AnatomyLayerSpec[] = [];
 
-  // First-time 3D hand-sketched draw-on & per-object SketchAnimationWrapper state
+  // First-time 3D hand-sketched procedural stroke-by-stroke construction state
   private drawProgress = 1.0;
   private drawAnimating = false;
   private drawStartTime = 0;
-  private drawDurationMs = 1350;
+  private drawDurationMs = 3850;
   private sketchAnimator = new Object3DSketchAnimator();
   private sketchAnimating = false;
+  private onConstructionStroke?: (event: ConstructionStrokeEvent) => void;
 
   // Artisanal dry-wax Crayon Dust particle system (single-draw-call THREE.Points)
   private dustPoints: CrayonDustPoints;
@@ -162,6 +167,7 @@ export class SceneManager {
     this.container.appendChild(this.renderer.domElement);
 
     this.onAnnotationsProjected = opts.onAnnotationsProjected;
+    this.onConstructionStroke = opts.onConstructionStroke;
 
     this.scene = new THREE.Scene();
     const bgHex = THEME_PALETTES[this.theme].paperBg;
@@ -509,10 +515,10 @@ export class SceneManager {
       const prefersReduced = this.prefersReducedMotion();
 
       if (shouldDrawFirst && !prefersReduced) {
-        this.drawProgress = 0.04;
+        this.drawProgress = 0.02;
         this.drawAnimating = true;
         this.drawStartTime = performance.now();
-        this.drawDurationMs = this.isSoftwareGl ? 760 : this.ecoMode ? 1150 : 1380;
+        this.drawDurationMs = this.isSoftwareGl ? 1450 : this.ecoMode ? 2150 : 3850;
       } else {
         this.drawProgress = 1.0;
         this.drawAnimating = false;
@@ -559,9 +565,11 @@ export class SceneManager {
         this.controller.root,
         now,
         {
-          durationMs: this.isSoftwareGl ? 640 : this.ecoMode ? 900 : 1080,
+          durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1180,
           reducedMotion: this.prefersReducedMotion(),
           staggerByLayer: true,
+          ecoMode: this.ecoMode,
+          onStrokeStart: this.onConstructionStroke,
         }
       );
 
@@ -617,11 +625,58 @@ export class SceneManager {
     }
   }
 
+  /**
+   * Replays the full structured, stroke-by-stroke 3D procedural construction from scratch
+   * (used when launching or replaying a lesson's Theory Intro so the student watches the
+   * diagram build itself live layer-by-layer).
+   */
+  public replayProceduralBuild(): void {
+    if (this.disposed || !this.controller || !this.activeSceneId || this.prefersReducedMotion()) {
+      return;
+    }
+    const now = performance.now();
+    globalFirstDrawRegistry.clear(`scene:${this.activeSceneId}`);
+    globalFirstDrawRegistry.claimFirstDraw(`scene:${this.activeSceneId}`);
+    this.sketchAnimator.replayScene(this.activeSceneId, this.controller.root);
+
+    this.drawProgress = 0.02;
+    this.drawAnimating = true;
+    this.drawStartTime = now;
+    this.drawDurationMs = this.isSoftwareGl ? 1450 : this.ecoMode ? 2150 : 3850;
+    this.sketchAnimating = this.sketchAnimator.updateObjectTree(
+      this.activeSceneId,
+      this.controller.root,
+      now,
+      {
+        durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1180,
+        reducedMotion: false,
+        staggerByLayer: true,
+        ecoMode: this.ecoMode,
+        onStrokeStart: this.onConstructionStroke,
+      }
+    );
+
+    const elapsedSec = (now - this.startTime) / 1000;
+    syncCrayonMaterialsInObject(
+      this.controller.root,
+      this.theme,
+      elapsedSec,
+      this.steadyStrokes,
+      this.focusedLayerId,
+      this.drawProgress,
+      this.ecoProfile.boilFps
+    );
+    this.updateContainerAttributes();
+    if (this.isSoftwareGl) {
+      this.requestSoftwareRender();
+    }
+  }
+
   private advanceFirstDraw(now: number): boolean {
     if (!this.drawAnimating) return false;
     const raw = Math.min(1, (now - this.drawStartTime) / Math.max(1, this.drawDurationMs));
-    // Gentle ease-out cubic so the crayon begins eagerly and feathers cleanly at completion
-    const eased = 1 - Math.pow(1 - raw, 2.4);
+    // Smooth ease-in-out sine so the global sketch frontier glides evenly from start to finish
+    const eased = 0.5 - 0.5 * Math.cos(Math.PI * raw);
     this.drawProgress = raw >= 1 ? 1.0 : Math.max(0.04, eased);
     if (raw >= 1) {
       this.drawAnimating = false;
@@ -643,9 +698,11 @@ export class SceneManager {
         this.controller.root,
         now,
         {
-          durationMs: this.isSoftwareGl ? 640 : this.ecoMode ? 900 : 1080,
+          durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1180,
           reducedMotion: this.prefersReducedMotion(),
           staggerByLayer: true,
+          ecoMode: this.ecoMode,
+          onStrokeStart: this.onConstructionStroke,
         }
       );
       if (this.sketchAnimating) {
@@ -677,14 +734,14 @@ export class SceneManager {
         );
       }
 
-      // Smooth damped vertical exploded-view layer separation
+      // Calm architectural damped vertical exploded-view layer separation
       for (const spec of this.layerSpecs) {
         const grp = this.controller.layers[spec.id];
         if (!grp) continue;
         const targetY = this.exploded ? spec.explodeOffsetY : 0;
         const diff = Math.abs(grp.position.y - targetY);
         if (diff > 0.002) {
-          grp.position.y = THREE.MathUtils.damp(grp.position.y, targetY, 8.5, dt);
+          grp.position.y = THREE.MathUtils.damp(grp.position.y, targetY, 4.2, dt);
           stillMoving = true;
           layersMoved = true;
         } else if (diff > 0.0001) {
@@ -696,13 +753,13 @@ export class SceneManager {
 
     if (this.targetCamPos && this.targetCamLook) {
       cameraMoved = true;
-      this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, this.targetCamPos.x, 7, dt);
-      this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.targetCamPos.y, 7, dt);
-      this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.targetCamPos.z, 7, dt);
+      this.camera.position.x = THREE.MathUtils.damp(this.camera.position.x, this.targetCamPos.x, 4.2, dt);
+      this.camera.position.y = THREE.MathUtils.damp(this.camera.position.y, this.targetCamPos.y, 4.2, dt);
+      this.camera.position.z = THREE.MathUtils.damp(this.camera.position.z, this.targetCamPos.z, 4.2, dt);
 
-      this.controls.target.x = THREE.MathUtils.damp(this.controls.target.x, this.targetCamLook.x, 7, dt);
-      this.controls.target.y = THREE.MathUtils.damp(this.controls.target.y, this.targetCamLook.y, 7, dt);
-      this.controls.target.z = THREE.MathUtils.damp(this.controls.target.z, this.targetCamLook.z, 7, dt);
+      this.controls.target.x = THREE.MathUtils.damp(this.controls.target.x, this.targetCamLook.x, 4.2, dt);
+      this.controls.target.y = THREE.MathUtils.damp(this.controls.target.y, this.targetCamLook.y, 4.2, dt);
+      this.controls.target.z = THREE.MathUtils.damp(this.controls.target.z, this.targetCamLook.z, 4.2, dt);
 
       if (
         this.camera.position.distanceTo(this.targetCamPos) < 0.02 &&

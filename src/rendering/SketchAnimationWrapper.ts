@@ -13,19 +13,35 @@ export interface SketchEntranceState {
   done: boolean;
 }
 
+export interface ProceduralStrokeTiming {
+  delayMs: number;
+  durationMs: number;
+}
+
+export interface ConstructionStrokeEvent {
+  layerId: string;
+  isLine: boolean;
+  isSprite: boolean;
+}
+
 interface TrackedObjectEntry {
   key: string;
+  layerId: string;
+  isLine: boolean;
+  isSprite: boolean;
   startTimeMs: number;
   durationMs: number;
   delayMs: number;
+  started: boolean;
   done: boolean;
 }
 
 /**
- * Pure easing calculation for a 3D object's first-time crayon sketch entrance:
- * - Opacity eases smoothly from 0 -> 1 so no mesh ever pops in harshly.
- * - Scale expands organically from 0.72 -> 1.0 as if sketched onto the paper.
- * - Shader drawProgress sweeps from 0.03 -> 1.0 with a fresh crayon tip edge.
+ * Pure easing calculation for a 3D object's procedural stroke-by-stroke entrance:
+ * - Opacity rises smoothly so no mesh or line ever pops in harshly.
+ * - Scale settles organically from 0.72 -> 1.0 (lines draw via drawRange + sweep, meshes unfold).
+ * - drawProgress uses a calm ease-in-out cubic so every stroke starts gently, glides cleanly,
+ *   and lands delicately like lifting a wax crayon off cotton paper.
  */
 export function computeSketchEntranceTransform(
   elapsedMs: number,
@@ -54,17 +70,101 @@ export function computeSketchEntranceTransform(
     };
   }
 
-  // Smooth ease-out cubic for scale & draw sweep; brisk ease-out quad for opacity
-  const easeCubic = 1 - Math.pow(1 - raw, 3);
-  const easeOpacity = Math.min(1, 1 - Math.pow(1 - Math.min(1, raw * 1.35), 2));
+  // Smooth ease-in-out cubic for draw sweep (procedural real-time hand speed)
+  const easeDraw =
+    raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
+  // Calm ease-out cubic for scale settling & gentle ease-out quad for opacity
+  const easeScale = 1 - Math.pow(1 - raw, 3);
+  const easeOpacity = Math.min(1, 1 - Math.pow(1 - Math.min(1, raw * 1.45), 2));
 
   return {
     progress: raw,
     opacity: easeOpacity,
-    scale: 0.72 + 0.28 * easeCubic,
-    drawProgress: Math.max(0.03, easeCubic),
+    scale: 0.72 + 0.28 * easeScale,
+    drawProgress: Math.max(0.03, easeDraw),
     done: false,
   };
+}
+
+/**
+ * Computes structured, unhurried procedural stroke timings so 3D scenes construct
+ * layer by layer AND element by element:
+ * 1. Substrate (grid & axes) sketches first
+ * 2. Structure (volumes, surfaces, manifolds) unfolds next
+ * 3. Operators (vectors, slice curves, probes) draw one by one
+ * 4. Invariants / error sheets complete the geometry
+ * 5. Hand-lettered 3D labels appear last like an illustrator signing the diagram
+ */
+export function computeProceduralStrokeTiming(opts: {
+  layerId: string;
+  indexInLayer: number;
+  isSprite: boolean;
+  isLine: boolean;
+  baseDurationMs: number;
+  staggerByLayer: boolean;
+  isDynamicReveal: boolean;
+  ecoMode?: boolean;
+}): ProceduralStrokeTiming {
+  const {
+    layerId,
+    indexInLayer,
+    isSprite,
+    isLine,
+    baseDurationMs,
+    staggerByLayer,
+    isDynamicReveal,
+    ecoMode = false,
+  } = opts;
+
+  const durationScale = isSprite ? 0.62 : isLine ? 1.05 : 1.12;
+  const durationMs = Math.max(240, Math.round(baseDurationMs * durationScale));
+
+  if (!staggerByLayer || (isDynamicReveal && layerId === 'error')) {
+    return { delayMs: 0, durationMs };
+  }
+
+  const pace = ecoMode ? 0.58 : 1.0;
+
+  if (isSprite) {
+    // Labels are written last in sequence after the main geometry has taken shape
+    const cappedIdx = Math.min(indexInLayer, 7);
+    const delayMs = Math.round((2750 + cappedIdx * 165) * pace);
+    return { delayMs, durationMs };
+  }
+
+  const layerOrder = getAnatomyLayerDrawOrder(layerId);
+  // Layer stage start times: substrate(0ms) -> structure(~920ms) -> operator(~1820ms) -> invariant(~2480ms)
+  const layerBaseMs = layerOrder * 3750;
+  // Element-by-element cadence inside each layer (capped gently so dense meshes sweep smoothly)
+  const stepMs = layerId === 'operator' || layerId === 'invariant' ? 190 : 135;
+  const cappedIdx = Math.min(indexInLayer, 7);
+  const delayMs = Math.round((layerBaseMs + cappedIdx * stepMs) * pace);
+
+  return { delayMs, durationMs };
+}
+
+/**
+ * Computes progressive BufferGeometry drawRange vertex count for THREE.Line / THREE.LineSegments
+ * so axes, grids, vector shafts, and curves literally draw stroke-by-stroke across the canvas.
+ */
+export function computeLineDrawRangeCount(
+  totalVertices: number,
+  drawProgress: number,
+  isLineSegments: boolean
+): number {
+  if (totalVertices <= 0) return 0;
+  const clamped = Math.max(0, Math.min(1, drawProgress));
+  if (clamped >= 0.999) return totalVertices;
+  if (clamped <= 0.002) return 0;
+
+  if (isLineSegments) {
+    const totalPairs = Math.floor(totalVertices / 2);
+    if (totalPairs <= 0) return 0;
+    const activePairs = Math.max(1, Math.min(totalPairs, Math.ceil(totalPairs * clamped)));
+    return activePairs * 2;
+  }
+
+  return Math.max(2, Math.min(totalVertices, Math.ceil(totalVertices * clamped)));
 }
 
 function isObjectEffectivelyVisible(obj: THREE.Object3D): boolean {
@@ -87,11 +187,34 @@ function findEnclosingLayerId(obj: THREE.Object3D): string {
   return 'default';
 }
 
+function applyProgressiveLineDrawRange(
+  lineObj: THREE.Line,
+  drawProgress: number,
+  done: boolean
+): void {
+  const geo = lineObj.geometry;
+  if (!geo) return;
+  const posAttr = geo.getAttribute('position');
+  if (!posAttr) return;
+  const totalVertices = geo.index ? geo.index.count : posAttr.count;
+  if (totalVertices <= 2) return;
+
+  if (done) {
+    geo.setDrawRange(0, Infinity);
+    return;
+  }
+
+  const isSegments = Boolean((lineObj as THREE.LineSegments).isLineSegments);
+  const count = computeLineDrawRangeCount(totalVertices, drawProgress, isSegments);
+  geo.setDrawRange(0, count);
+}
+
 /**
- * Detects whenever ANY 3D object (initial scene mesh, line, sprite, or dynamically
- * revealed element like a rank-collapse sheet or AI surface) becomes visible for
- * the FIRST time, and animates its smooth opacity, scale, and crayon-stroke reveal
- * from zero — eliminating abrupt pop-ins everywhere in the 3D sketchbook.
+ * Orchestrates structured, procedural, stroke-by-stroke 3D construction for every object
+ * (lines, wireframes, surfaces, vectors, sprites, and dynamically revealed elements).
+ * - Lines & LineSegments draw progressively vertex-by-vertex / segment-by-segment.
+ * - Meshes unfold smoothly with a moving wax-crayon frontier and organic dry-tooth fade.
+ * - Emits `onStrokeStart` milestones as each element begins sketching for synced crayon audio.
  */
 export class Object3DSketchAnimator {
   private registry: FirstDrawRegistry;
@@ -101,12 +224,6 @@ export class Object3DSketchAnimator {
     this.registry = registry;
   }
 
-  /**
-   * Scans the scene graph, registers newly visible 3D objects on their first appearance,
-   * and writes smooth `_sketchOpacity`, `_sketchScale`, and `_sketchDraw` factors
-   * onto `obj.userData` for `CrayonMaterials` and `Sprite` labels to consume.
-   * Returns `true` if any 3D object is still animating.
-   */
   public updateObjectTree(
     sceneKey: string,
     root: THREE.Object3D,
@@ -115,22 +232,28 @@ export class Object3DSketchAnimator {
       durationMs?: number;
       reducedMotion?: boolean;
       staggerByLayer?: boolean;
+      ecoMode?: boolean;
+      onStrokeStart?: (event: ConstructionStrokeEvent) => void;
     }
   ): boolean {
-    const durationMs = options?.durationMs ?? 820;
+    const durationMs = options?.durationMs ?? 1160;
     const reducedMotion = options?.reducedMotion ?? false;
     const staggerByLayer = options?.staggerByLayer ?? true;
+    const ecoMode = options?.ecoMode ?? false;
+    const onStrokeStart = options?.onStrokeStart;
 
     let anyAnimating = false;
     let ordinal = 0;
+    const layerCounters = new Map<string, number>();
+    let spriteCounter = 0;
+    const alreadyHadTracks = this.activeTracks.size > 0;
 
     root.traverse((obj) => {
-      const isDrawable =
-        (obj as THREE.Mesh).isMesh ||
-        (obj as THREE.Line).isLine ||
-        (obj as THREE.Sprite).isSprite;
+      const isMesh = Boolean((obj as THREE.Mesh).isMesh);
+      const isLine = Boolean((obj as THREE.Line).isLine);
+      const isSprite = Boolean((obj as THREE.Sprite).isSprite);
 
-      if (!isDrawable) return;
+      if (!isMesh && !isLine && !isSprite) return;
       ordinal++;
 
       if (!isObjectEffectivelyVisible(obj)) {
@@ -150,33 +273,47 @@ export class Object3DSketchAnimator {
       if (!track) {
         const isFirstAppearance = this.registry.claimFirstDraw(key);
         if (isFirstAppearance && !reducedMotion) {
-          const isSprite = Boolean((obj as THREE.Sprite).isSprite);
-          const layerOrder = getAnatomyLayerDrawOrder(layerId);
-          // Initial scene objects cascade by anatomy layer; dynamically revealed objects start immediately
-          const alreadyHasOtherObjects = this.activeTracks.size > 0;
-          const delayMs = !staggerByLayer
-            ? 0
-            : isSprite
-              ? 420
-              : alreadyHasOtherObjects && layerId === 'error'
-                ? 0
-                : Math.round(layerOrder * 520);
+          let idxInLayer = 0;
+          if (isSprite) {
+            idxInLayer = spriteCounter++;
+          } else {
+            idxInLayer = layerCounters.get(layerId) ?? 0;
+            layerCounters.set(layerId, idxInLayer + 1);
+          }
+
+          const timing = computeProceduralStrokeTiming({
+            layerId,
+            indexInLayer: idxInLayer,
+            isSprite,
+            isLine,
+            baseDurationMs: durationMs,
+            staggerByLayer,
+            isDynamicReveal: alreadyHadTracks,
+            ecoMode,
+          });
 
           track = {
             key,
+            layerId,
+            isLine,
+            isSprite,
             startTimeMs: nowMs,
-            durationMs: isSprite ? Math.round(durationMs * 0.55) : durationMs,
-            delayMs,
+            durationMs: timing.durationMs,
+            delayMs: timing.delayMs,
+            started: false,
             done: false,
           };
           this.activeTracks.set(key, track);
         } else {
-          // Already seen before or reduced-motion: settle immediately
           track = {
             key,
+            layerId,
+            isLine,
+            isSprite,
             startTimeMs: nowMs - durationMs,
             durationMs,
             delayMs: 0,
+            started: true,
             done: true,
           };
           this.activeTracks.set(key, track);
@@ -187,17 +324,38 @@ export class Object3DSketchAnimator {
         obj.userData._sketchOpacity = 1;
         obj.userData._sketchScale = 1;
         obj.userData._sketchDraw = 1;
+        if (isLine) {
+          applyProgressiveLineDrawRange(obj as THREE.Line, 1, true);
+        }
         return;
       }
 
+      const elapsedMs = nowMs - track.startTimeMs;
+      if (!track.started && elapsedMs >= track.delayMs) {
+        track.started = true;
+        onStrokeStart?.({
+          layerId: track.layerId,
+          isLine: track.isLine,
+          isSprite: track.isSprite,
+        });
+      }
+
       const state = computeSketchEntranceTransform(
-        nowMs - track.startTimeMs,
+        elapsedMs,
         track.durationMs,
         track.delayMs
       );
       obj.userData._sketchOpacity = state.opacity;
-      obj.userData._sketchScale = state.scale;
+      obj.userData._sketchScale = isLine ? 1 : state.scale;
       obj.userData._sketchDraw = state.drawProgress;
+
+      if (isLine) {
+        applyProgressiveLineDrawRange(
+          obj as THREE.Line,
+          state.opacity <= 0.005 ? 0 : state.drawProgress,
+          state.done
+        );
+      }
 
       if (state.done) {
         track.done = true;
@@ -219,6 +377,25 @@ export class Object3DSketchAnimator {
       }
     });
     return count > 0 ? sum / count : 1;
+  }
+
+  /**
+   * Resets a scene's tracked strokes and FirstDrawRegistry claims so the full
+   * stroke-by-stroke procedural construction can replay cleanly (e.g. when entering a Theory Intro).
+   */
+  public replayScene(sceneKey: string, root?: THREE.Object3D): void {
+    const prefix = `obj3d:${sceneKey}:`;
+    this.registry.clearPrefix(prefix);
+    this.resetTrackedScene(sceneKey);
+    if (root) {
+      root.traverse((obj) => {
+        if (typeof obj.userData._sketchKey === 'string') {
+          delete obj.userData._sketchOpacity;
+          delete obj.userData._sketchScale;
+          delete obj.userData._sketchDraw;
+        }
+      });
+    }
   }
 
   public resetTrackedScene(sceneKey: string): void {

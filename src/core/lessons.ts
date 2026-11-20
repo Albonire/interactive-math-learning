@@ -176,7 +176,7 @@ export const GUIDED_LESSONS: Record<SceneId, GuidedLessonSpec> = {
         id: 'svd-inspector',
         title: 'Mira la matriz en memoria GPU',
         instruction: 'Pulsa «Código» arriba para leer los 9 floats en memoria y los valores singulares σ.',
-        takeaway: 'En WebGL y ML, esta matriz vive como un Float32Array(9) column-major de 36 bytes.',
+        takeaway: 'En motores de sistemas, esta matriz vive en 36 bytes contiguos (Rust [f32; 9] / Java float[9]) para maximizar caché.',
         crayon: 'ochre',
         demo: {
           label: 'Abrir Código',

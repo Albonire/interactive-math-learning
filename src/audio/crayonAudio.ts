@@ -26,6 +26,12 @@ export interface DustSoundParams {
   grainCount: number;
 }
 
+export interface IntroPhraseStroke {
+  delaySec: number;
+  gainScale: number;
+  params: StrokeSoundParams;
+}
+
 export interface CrayonAudioStats {
   state: string;
   strokePlays: number;
@@ -38,6 +44,7 @@ export interface CrayonAudioStats {
 export const STROKE_THROTTLE_MS = 48;
 export const DUST_THROTTLE_MS = 115;
 export const INTRO_THROTTLE_MS = 220;
+export const CONSTRUCTION_THROTTLE_MS = 380;
 export const ANNOTATION_THROTTLE_MS = 140;
 
 /**
@@ -72,12 +79,12 @@ export function computeStrokeSoundParams(
   const isChalk = theme === 'chalkboard';
 
   return {
-    durationSec: Number((0.085 + energy * 0.06).toFixed(4)),
-    bodyFreqHz: Math.round((isChalk ? 980 : 720) + energy * (isChalk ? 420 : 340)),
-    centerFreqHz: Math.round((isChalk ? 2350 : 1780) + energy * (isChalk ? 980 : 780)),
-    qFactor: Number((isChalk ? 1.15 : 0.92).toFixed(2)),
+    durationSec: Number((0.095 + energy * 0.07).toFixed(4)),
+    bodyFreqHz: Math.round((isChalk ? 960 : 690) + energy * (isChalk ? 400 : 320)),
+    centerFreqHz: Math.round((isChalk ? 2320 : 1720) + energy * (isChalk ? 940 : 740)),
+    qFactor: Number((isChalk ? 1.08 : 0.86).toFixed(2)),
     gain: Number((0.28 + energy * 0.22).toFixed(4)),
-    highpassHz: isChalk ? 460 : 280,
+    highpassHz: isChalk ? 420 : 240,
   };
 }
 
@@ -92,28 +99,127 @@ export function computeDustSoundParams(
   const isChalk = theme === 'chalkboard';
 
   return {
-    durationSec: Number((0.125 + clamped * 0.075).toFixed(4)),
-    bodyFreqHz: Math.round((isChalk ? 1320 : 980) + clamped * 400),
-    centerFreqHz: Math.round((isChalk ? 3050 : 2420) + clamped * 860),
-    qFactor: Number((isChalk ? 1.05 : 0.88).toFixed(2)),
+    durationSec: Number((0.14 + clamped * 0.085).toFixed(4)),
+    bodyFreqHz: Math.round((isChalk ? 1280 : 940) + clamped * 380),
+    centerFreqHz: Math.round((isChalk ? 2980 : 2360) + clamped * 840),
+    qFactor: Number((isChalk ? 1.02 : 0.85).toFixed(2)),
     gain: Number((0.3 + clamped * 0.22).toFixed(4)),
-    highpassHz: isChalk ? 780 : 540,
+    highpassHz: isChalk ? 740 : 500,
     grainCount: clamped > 0.55 ? 3 : 2,
   };
 }
 
 /**
- * Computes parameters for a sweeping artisanal crayon sketch stroke during lesson intro animations.
+ * Computes parameters for a warm, sustained artisanal crayon glide during lesson intro animations.
  */
 export function computeIntroSketchParams(theme: ThemeMode): StrokeSoundParams {
   const isChalk = theme === 'chalkboard';
   return {
-    durationSec: 0.21,
-    bodyFreqHz: isChalk ? 1040 : 760,
-    centerFreqHz: isChalk ? 2450 : 1860,
-    qFactor: isChalk ? 1.05 : 0.85,
+    durationSec: 0.42,
+    bodyFreqHz: isChalk ? 980 : 700,
+    centerFreqHz: isChalk ? 2360 : 1740,
+    qFactor: isChalk ? 0.96 : 0.78,
     gain: 0.36,
-    highpassHz: isChalk ? 440 : 260,
+    highpassHz: isChalk ? 380 : 210,
+  };
+}
+
+/**
+ * Computes an organic multi-stroke drawing phrase (~2.2s span) that accompanies
+ * slow procedural intro animations so the audio feels warm, continuous, and alive.
+ */
+export function computeIntroPhraseStrokes(
+  theme: ThemeMode,
+  beatIndex: number
+): IntroPhraseStroke[] {
+  const base = computeIntroSketchParams(theme);
+  const beatShift = 1 + ((beatIndex % 4) - 1.5) * 0.04;
+
+  return [
+    {
+      delaySec: 0.0,
+      gainScale: 0.88,
+      params: {
+        ...base,
+        durationSec: 0.46,
+        bodyFreqHz: Math.round(base.bodyFreqHz * 0.92 * beatShift),
+        centerFreqHz: Math.round(base.centerFreqHz * 0.94 * beatShift),
+      },
+    },
+    {
+      delaySec: 0.54,
+      gainScale: 0.96,
+      params: {
+        ...base,
+        durationSec: 0.52,
+        bodyFreqHz: Math.round(base.bodyFreqHz * 1.02 * beatShift),
+        centerFreqHz: Math.round(base.centerFreqHz * 1.04 * beatShift),
+      },
+    },
+    {
+      delaySec: 1.14,
+      gainScale: 0.84,
+      params: {
+        ...base,
+        durationSec: 0.44,
+        bodyFreqHz: Math.round(base.bodyFreqHz * 1.08 * beatShift),
+        centerFreqHz: Math.round(base.centerFreqHz * 1.1 * beatShift),
+      },
+    },
+    {
+      delaySec: 1.7,
+      gainScale: 0.68,
+      params: {
+        ...base,
+        durationSec: 0.38,
+        bodyFreqHz: Math.round(base.bodyFreqHz * 1.14 * beatShift),
+        centerFreqHz: Math.round(base.centerFreqHz * 1.16 * beatShift),
+      },
+    },
+  ];
+}
+
+/**
+ * Computes warm, layer-calibrated stroke parameters synced to real-time procedural
+ * 3D geometry construction (substrate -> structure -> operator -> invariant -> label).
+ */
+export function computeConstructionStrokeParams(
+  layerId: string,
+  theme: ThemeMode,
+  isSprite = false
+): StrokeSoundParams {
+  const base = computeIntroSketchParams(theme);
+  if (isSprite) {
+    return {
+      ...base,
+      durationSec: 0.22,
+      bodyFreqHz: Math.round(base.bodyFreqHz * 1.24),
+      centerFreqHz: Math.round(base.centerFreqHz * 1.26),
+      gain: 0.28,
+    };
+  }
+  const layerScale =
+    layerId === 'substrate'
+      ? 0.88
+      : layerId === 'structure'
+        ? 0.98
+        : layerId === 'operator'
+          ? 1.1
+          : 1.18;
+  const durationSec =
+    layerId === 'substrate'
+      ? 0.46
+      : layerId === 'structure'
+        ? 0.48
+        : layerId === 'operator'
+          ? 0.38
+          : 0.34;
+  return {
+    ...base,
+    durationSec,
+    bodyFreqHz: Math.round(base.bodyFreqHz * layerScale),
+    centerFreqHz: Math.round(base.centerFreqHz * layerScale),
+    gain: 0.32,
   };
 }
 
@@ -123,12 +229,12 @@ export function computeIntroSketchParams(theme: ThemeMode): StrokeSoundParams {
 export function computeAnnotationSketchParams(theme: ThemeMode): StrokeSoundParams {
   const isChalk = theme === 'chalkboard';
   return {
-    durationSec: 0.135,
-    bodyFreqHz: isChalk ? 1220 : 880,
-    centerFreqHz: isChalk ? 2800 : 2180,
-    qFactor: isChalk ? 1.15 : 0.95,
+    durationSec: 0.16,
+    bodyFreqHz: isChalk ? 1180 : 840,
+    centerFreqHz: isChalk ? 2740 : 2100,
+    qFactor: isChalk ? 1.08 : 0.9,
     gain: 0.34,
-    highpassHz: isChalk ? 560 : 340,
+    highpassHz: isChalk ? 520 : 300,
   };
 }
 
@@ -157,7 +263,8 @@ export function saveAudioEnabled(enabled: boolean): void {
 /**
  * Lightweight procedural Web Audio synthesizer for warm wax-crayon strokes & paper-rustle sounds.
  * - Uses one RMS-calibrated cotton-paper grain buffer shared across all cues (slider drags,
- *   crayon dust, intro sketch sweeps, and legend/guide callout flicks).
+ *   crayon dust, procedural 3D construction glides, intro sketching phrases, and legend callouts).
+ * - Adds a subtle warm paper-desk resonance band so sustained strokes feel plush, never dry.
  * - Unlocks cleanly on the first user gesture and queues wake-up events without dropping them.
  * - Strictly respects `audioEnabled` and silences/suspends immediately under `ecoMode`.
  */
@@ -170,6 +277,7 @@ export class CrayonAudioEngine {
   private lastStrokeMs = -1;
   private lastDustMs = -1;
   private lastIntroMs = -1;
+  private lastConstructionMs = -1;
   private lastAnnotationMs = -1;
   private strokePlays = 0;
   private dustPlays = 0;
@@ -177,12 +285,15 @@ export class CrayonAudioEngine {
   private annotationPlays = 0;
   private initialized = false;
   private disposed = false;
+  private hasUserGesture = false;
   private resumePromise: Promise<void> | null = null;
   private pendingTasks: Array<{ run: (ctx: AudioContext) => void; queuedAtMs: number }> = [];
+  private activePhraseSources = new Set<AudioBufferSourceNode>();
   private gestureListenersBound = false;
   private onStatsChange?: (stats: CrayonAudioStats) => void;
 
   private readonly handleUserGesture = () => {
+    this.hasUserGesture = true;
     this.unlock();
   };
 
@@ -262,12 +373,29 @@ export class CrayonAudioEngine {
     return st === 'suspended' || st === 'interrupted';
   }
 
+  public stopIntroPhrase(): void {
+    for (const src of this.activePhraseSources) {
+      try {
+        src.stop();
+      } catch {
+        // Ignore already stopped sources
+      }
+      try {
+        src.disconnect();
+      } catch {
+        // Ignore disconnect errors
+      }
+    }
+    this.activePhraseSources.clear();
+  }
+
   public syncSettings(enabled: boolean, ecoMode: boolean): void {
     this.enabled = enabled;
     this.ecoMode = ecoMode;
 
     if (!this.isActive()) {
       this.pendingTasks = [];
+      this.stopIntroPhrase();
       if (this.ctx && this.ctx.state === 'running') {
         void this.ctx
           .suspend()
@@ -288,6 +416,7 @@ export class CrayonAudioEngine {
   }
 
   public unlock(): void {
+    this.hasUserGesture = true;
     if (!this.isActive()) return;
     const ctx = this.ensureContext();
     if (!ctx) return;
@@ -361,12 +490,12 @@ export class CrayonAudioEngine {
   }
 
   /**
-   * Generates a 1.6s cotton-paper & dry-wax friction noise buffer normalized by RMS (~0.32 RMS)
-   * with rich mid/high-mid grain so gentle filter gains sound genuinely tactile on laptop speakers.
+   * Generates a 1.8s warm cotton-paper & dry-wax friction noise buffer normalized by RMS (~0.34 RMS)
+   * with rich mid/low-mid weave modulation so sustained drawing glides feel plush and tactile.
    */
   private createPaperGrainBuffer(ctx: AudioContext): AudioBuffer {
     const sampleRate = ctx.sampleRate || 44100;
-    const length = Math.floor(sampleRate * 1.6);
+    const length = Math.floor(sampleRate * 1.8);
     const buffer = ctx.createBuffer(1, length, sampleRate);
     const data = buffer.getChannelData(0);
 
@@ -378,22 +507,26 @@ export class CrayonAudioEngine {
 
     for (let i = 0; i < length; i++) {
       const white = Math.random() * 2 - 1;
-      // Warm mid-focused pink component + crisp differentiated paper-tooth grit
-      b0 = 0.96 * b0 + white * 0.14;
-      b1 = 0.84 * b1 + white * 0.28;
-      b2 = 0.52 * b2 + white * 0.48;
-      const grit = white - prevWhite * 0.65;
+      // Warm low-mid paper body + organic mid friction + subtle cotton tooth grit
+      b0 = 0.972 * b0 + white * 0.14;
+      b1 = 0.86 * b1 + white * 0.27;
+      b2 = 0.54 * b2 + white * 0.45;
+      const grit = white - prevWhite * 0.62;
       prevWhite = white;
 
-      // Subtle paper fiber weave modulation so sustained strokes feel organic, not static hiss
+      // Gentle multi-rate paper fiber weave modulation so longer glides breathe naturally
       const t = i / sampleRate;
-      const weave = 0.78 + 0.14 * Math.sin(t * 210) + 0.08 * Math.sin(t * 890);
-      const sample = (b0 * 0.55 + b1 * 0.72 + b2 * 0.65 + grit * 0.42) * weave;
+      const weave =
+        0.76 +
+        0.13 * Math.sin(t * 175) +
+        0.07 * Math.sin(t * 620) +
+        0.04 * Math.sin(t * 24);
+      const sample = (b0 * 0.68 + b1 * 0.76 + b2 * 0.58 + grit * 0.34) * weave;
       data[i] = sample;
       sumSq += sample * sample;
     }
 
-    // RMS-normalize to 0.34 RMS with soft limiting at +-0.96 for crisp, warm audibility
+    // RMS-normalize to 0.34 RMS with soft limiting at +-0.96 for warm, clear audibility
     const rms = Math.sqrt(sumSq / Math.max(1, length)) || 0.001;
     const scale = 0.34 / rms;
     for (let i = 0; i < length; i++) {
@@ -404,19 +537,20 @@ export class CrayonAudioEngine {
     return buffer;
   }
 
-  private scheduleDualBandGrain(
+  private scheduleWarmCrayonGrain(
     ctx: AudioContext,
     params: StrokeSoundParams | DustSoundParams,
     pitchJitter: number,
     delaySec: number,
     gainScale: number,
-    kind: 'stroke' | 'dust' | 'intro' | 'annotation'
+    kind: 'stroke' | 'dust' | 'intro' | 'annotation',
+    trackInPhrase = false
   ): void {
     if (this.disposed || !this.isActive() || !this.noiseBuffer || !this.masterGain) return;
 
     const now = ctx.currentTime + delaySec;
     const duration = params.durationSec;
-    const gainTarget = Math.min(0.62, params.gain * gainScale);
+    const gainTarget = Math.min(0.6, params.gain * gainScale);
 
     const source = ctx.createBufferSource();
     source.buffer = this.noiseBuffer;
@@ -425,6 +559,17 @@ export class CrayonAudioEngine {
     const highpass = ctx.createBiquadFilter();
     highpass.type = 'highpass';
     highpass.frequency.setValueAtTime(params.highpassHz, now);
+
+    // Layer 0: Warm paper-desk resonance (eliminates dry/thin high-frequency hiss)
+    const warmthFilter = ctx.createBiquadFilter();
+    warmthFilter.type = 'bandpass';
+    warmthFilter.frequency.setValueAtTime(
+      kind === 'dust' ? 520 : Math.max(260, params.bodyFreqHz * 0.52),
+      now
+    );
+    warmthFilter.Q.setValueAtTime(0.68, now);
+    const warmthGain = ctx.createGain();
+    warmthGain.gain.setValueAtTime(kind === 'intro' ? 0.56 : 0.4, now);
 
     // Layer 1: Warm wax-on-paper friction body
     const bodyFilter = ctx.createBiquadFilter();
@@ -435,10 +580,10 @@ export class CrayonAudioEngine {
     );
     bodyFilter.frequency.setValueAtTime(bodyFreq, now);
     bodyFilter.frequency.exponentialRampToValueAtTime(
-      Math.max(220, bodyFreq * (kind === 'annotation' ? 1.12 : 0.86)),
+      Math.max(220, bodyFreq * (kind === 'annotation' ? 1.12 : 0.88)),
       now + duration
     );
-    bodyFilter.Q.setValueAtTime(0.85, now);
+    bodyFilter.Q.setValueAtTime(0.82, now);
 
     const bodyGain = ctx.createGain();
     bodyGain.gain.setValueAtTime(0.95, now);
@@ -452,37 +597,49 @@ export class CrayonAudioEngine {
     );
     raspFilter.frequency.setValueAtTime(raspFreq, now);
     raspFilter.frequency.exponentialRampToValueAtTime(
-      Math.max(520, raspFreq * (kind === 'annotation' ? 1.18 : 0.82)),
+      Math.max(520, raspFreq * (kind === 'annotation' ? 1.16 : 0.84)),
       now + duration
     );
     raspFilter.Q.setValueAtTime(params.qFactor, now);
 
     const raspGain = ctx.createGain();
-    raspGain.gain.setValueAtTime(kind === 'dust' ? 1.15 : 0.98, now);
+    raspGain.gain.setValueAtTime(kind === 'dust' ? 1.1 : kind === 'intro' ? 0.86 : 0.92, now);
 
-    // Organic hand-stroke envelope (smooth swell, warm dry release)
+    // Plush hand-stroke envelope: rounded swell -> steady wax glide -> silky decay tail
     const envGain = ctx.createGain();
-    const attack = Math.min(0.018, duration * 0.22);
-    const holdEnd = now + Math.max(attack + 0.008, duration * 0.42);
+    const attack = Math.min(kind === 'intro' ? 0.075 : 0.024, duration * 0.24);
+    const holdEnd = now + Math.max(attack + 0.015, duration * (kind === 'intro' ? 0.58 : 0.45));
     envGain.gain.setValueAtTime(0.0001, now);
     envGain.gain.linearRampToValueAtTime(gainTarget, now + attack);
-    envGain.gain.setValueAtTime(gainTarget * 0.82, holdEnd);
+    envGain.gain.linearRampToValueAtTime(gainTarget * 0.78, holdEnd);
     envGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
     source.connect(highpass);
+    highpass.connect(warmthFilter);
     highpass.connect(bodyFilter);
     highpass.connect(raspFilter);
+    warmthFilter.connect(warmthGain);
     bodyFilter.connect(bodyGain);
     raspFilter.connect(raspGain);
+    warmthGain.connect(envGain);
     bodyGain.connect(envGain);
     raspGain.connect(envGain);
     envGain.connect(this.masterGain);
 
-    const randomOffset = Math.random() * Math.max(0.05, this.noiseBuffer.duration - 0.3);
-    source.start(now, randomOffset, duration + 0.025);
+    if (trackInPhrase) {
+      this.activePhraseSources.add(source);
+    }
+
+    const randomOffset = Math.random() * Math.max(0.05, this.noiseBuffer.duration - 0.5);
+    source.start(now, randomOffset, duration + 0.03);
     source.onended = () => {
+      if (trackInPhrase) {
+        this.activePhraseSources.delete(source);
+      }
       source.disconnect();
       highpass.disconnect();
+      warmthFilter.disconnect();
+      warmthGain.disconnect();
       bodyFilter.disconnect();
       raspFilter.disconnect();
       bodyGain.disconnect();
@@ -491,7 +648,7 @@ export class CrayonAudioEngine {
     };
   }
 
-  private playOrResumeThen(task: (ctx: AudioContext) => void): void {
+  private playOrResumeThen(task: (ctx: AudioContext) => void, fromUserGesture = true): void {
     const ctx = this.ensureContext();
     if (!ctx || !this.noiseBuffer) return;
 
@@ -505,7 +662,9 @@ export class CrayonAudioEngine {
         this.pendingTasks.shift();
       }
       this.pendingTasks.push({ run: task, queuedAtMs: performance.now() });
-      this.triggerResume(ctx);
+      if (fromUserGesture || this.hasUserGesture) {
+        this.triggerResume(ctx);
+      }
     }
   }
 
@@ -519,7 +678,7 @@ export class CrayonAudioEngine {
 
     const params = computeStrokeSoundParams(normDelta, theme);
     this.playOrResumeThen((ctx) => {
-      this.scheduleDualBandGrain(ctx, params, 0.2, 0, 1.0, 'stroke');
+      this.scheduleWarmCrayonGrain(ctx, params, 0.2, 0, 1.0, 'stroke');
       this.strokePlays++;
       this.emitStats();
     });
@@ -539,7 +698,7 @@ export class CrayonAudioEngine {
       for (let g = 0; g < params.grainCount; g++) {
         const delaySec = g * 0.028 + Math.random() * 0.008;
         const scale = g === 0 ? 1.0 : 0.78 - g * 0.14;
-        this.scheduleDualBandGrain(ctx, params, 0.28, delaySec, Math.max(0.4, scale), 'dust');
+        this.scheduleWarmCrayonGrain(ctx, params, 0.28, delaySec, Math.max(0.4, scale), 'dust');
       }
       this.dustPlays++;
       this.emitStats();
@@ -548,7 +707,7 @@ export class CrayonAudioEngine {
   }
 
   /**
-   * Gentle two-pass wax-crayon sweep played when an animated lesson intro beat choreographs the 3D graph.
+   * Warm two-pass wax-crayon sweep (retained for quick beat transitions & compatibility).
    */
   public playIntroSketch(theme: ThemeMode, nowMs = performance.now()): boolean {
     if (!this.isActive()) return false;
@@ -557,18 +716,66 @@ export class CrayonAudioEngine {
 
     const params = computeIntroSketchParams(theme);
     this.playOrResumeThen((ctx) => {
-      this.scheduleDualBandGrain(ctx, params, 0.16, 0, 0.95, 'intro');
-      this.scheduleDualBandGrain(
+      this.scheduleWarmCrayonGrain(ctx, params, 0.14, 0, 0.92, 'intro', true);
+      this.scheduleWarmCrayonGrain(
         ctx,
-        { ...params, durationSec: 0.145, centerFreqHz: Math.round(params.centerFreqHz * 1.12) },
-        0.18,
-        0.13,
-        0.72,
-        'intro'
+        { ...params, durationSec: 0.34, centerFreqHz: Math.round(params.centerFreqHz * 1.1) },
+        0.16,
+        0.34,
+        0.74,
+        'intro',
+        true
       );
       this.introPlays++;
       this.emitStats();
     });
+    return true;
+  }
+
+  /**
+   * Warm, continuous 4-stroke crayon sketching phrase spanning ~2.2s across slow intro choreography.
+   */
+  public playIntroPhrase(
+    theme: ThemeMode,
+    beatIndex: number,
+    nowMs = performance.now()
+  ): boolean {
+    if (!this.isActive()) return false;
+    if (!canTriggerAudioAt(nowMs, this.lastIntroMs, INTRO_THROTTLE_MS)) return false;
+    this.lastIntroMs = nowMs;
+
+    const strokes = computeIntroPhraseStrokes(theme, beatIndex);
+    this.stopIntroPhrase();
+    this.playOrResumeThen((ctx) => {
+      for (const s of strokes) {
+        this.scheduleWarmCrayonGrain(ctx, s.params, 0.14, s.delaySec, s.gainScale, 'intro', true);
+      }
+      this.introPlays++;
+      this.emitStats();
+    }, false);
+    return true;
+  }
+
+  /**
+   * Rhythmic layer-by-layer crayon glide fired directly by the procedural 3D sketch animator
+   * as each visual stage (grid, volume, vector, label) begins drawing in real time.
+   */
+  public playConstructionStroke(
+    layerId: string,
+    theme: ThemeMode,
+    isSprite = false,
+    nowMs = performance.now()
+  ): boolean {
+    if (!this.isActive()) return false;
+    if (!canTriggerAudioAt(nowMs, this.lastConstructionMs, CONSTRUCTION_THROTTLE_MS)) return false;
+    this.lastConstructionMs = nowMs;
+
+    const params = computeConstructionStrokeParams(layerId, theme, isSprite);
+    this.playOrResumeThen((ctx) => {
+      this.scheduleWarmCrayonGrain(ctx, params, 0.15, 0, 0.88, 'intro', true);
+      this.introPlays++;
+      this.emitStats();
+    }, false);
     return true;
   }
 
@@ -582,7 +789,7 @@ export class CrayonAudioEngine {
 
     const params = computeAnnotationSketchParams(theme);
     this.playOrResumeThen((ctx) => {
-      this.scheduleDualBandGrain(ctx, params, 0.14, 0, 0.92, 'annotation');
+      this.scheduleWarmCrayonGrain(ctx, params, 0.14, 0, 0.92, 'annotation');
       this.annotationPlays++;
       this.emitStats();
     });
@@ -592,6 +799,7 @@ export class CrayonAudioEngine {
   public dispose(): void {
     this.disposed = true;
     this.pendingTasks = [];
+    this.stopIntroPhrase();
     this.unbindGestureUnlockListeners();
     if (this.ctx) {
       this.ctx.removeEventListener('statechange', this.handleContextStateChange);

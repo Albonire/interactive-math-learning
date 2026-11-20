@@ -586,40 +586,82 @@ export function buildComputationalBridge(
       const m = mat3FromColumns([c1, 0.2, 0.1], [0.2, 0.3, c2], [0.4, v3y, 0.35]);
       const buf = mat3ToColumnMajorFloat32(m);
       return {
-        memoryLayout: 'Float32Array(9) — Column-Major (36 bytes)',
         memoryValues: Array.from(buf).map((v) => v.toFixed(2)),
         complexity: 'O(n³) eliminación gaussiana · O(n) combinación lineal',
         csApplication:
           'Bases ortonormales de cámaras 3D, mezcla de canales RGB y detección de columnas redundantes en matrices de características (ML).',
-        codeLanguage: 'TypeScript',
-        codeSnippet: `const v1 = [${c1.toFixed(2)}, 0.20, 0.10];
-const v2 = [0.20, 0.30, ${c2.toFixed(2)}];
-const v3 = [0.40, ${v3y.toFixed(2)}, 0.35];
-// Volumen = |det([v1, v2, v3])|`,
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: '[f32; 9] en Stack (36 bytes, Column-Major, #[repr(C)])',
+            codeSnippet: `let v1: [f32; 3] = [${c1.toFixed(2)}, 0.20, 0.10];
+let v2: [f32; 3] = [0.20, 0.30, ${c2.toFixed(2)}];
+let v3: [f32; 3] = [0.40, ${v3y.toFixed(2)}, 0.35];
+
+// Volumen = |v1 · (v2 × v3)| sin asignaciones en heap
+let vol = dot3(v1, cross3(v2, v3)).abs();`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: 'float[9] contiguo en Heap (16 B cabecera JVM + 36 B datos)',
+            codeSnippet: `float[] m = {
+  ${c1.toFixed(2)}f, 0.20f, 0.10f, // col v1
+  0.20f, 0.30f, ${c2.toFixed(2)}f, // col v2
+  0.40f, ${v3y.toFixed(2)}f, 0.35f  // col v3
+};
+// Evita float[][] para mantener localidad en caché L1
+float vol = Math.abs(det3ColumnMajor(m));`,
+          },
+        },
       };
     }
 
     case 'lin-svd': {
+      const a11 = params.a11 ?? 1.3;
+      const a12 = params.a12 ?? 0.5;
+      const a21 = params.a21 ?? 0.2;
+      const a22 = params.a22 ?? 1.1;
+      const a33 = params.a33 ?? 1.0;
       const m: [number, number, number, number, number, number, number, number, number] = [
-        params.a11 ?? 1.3, params.a12 ?? 0.5, 0,
-        params.a21 ?? 0.2, params.a22 ?? 1.1, 0,
-        0, 0, params.a33 ?? 1.0,
+        a11, a12, 0,
+        a21, a22, 0,
+        0, 0, a33,
       ];
       const svd = computeSvd3(m);
       const buf = mat3ToColumnMajorFloat32(m);
       return {
-        memoryLayout: 'Float32Array(9) + Σ = [σ₁, σ₂, σ₃]',
         memoryValues: [
           ...Array.from(buf).map((v) => v.toFixed(2)),
           `σ=[${svd.S.map((s) => s.toFixed(2)).join(', ')}]`,
         ],
         complexity: 'O(min(mn², m²n)) descomposición SVD · O(1) determinante 3×3',
         csApplication:
-          'Matrices Model-View-Projection en WebGL, compresión de imágenes por truncamiento de valores singulares y estabilidad de inversas.',
-        codeLanguage: 'GLSL',
-        codeSnippet: `uniform mat3 uTransform; // A = U * Sigma * Vt
-vec3 p = uTransform * position;
-// Si det(uTransform) < 0 se invierte el winding`,
+          'Matrices Model-View-Projection en motores gráficos, compresión de imágenes por truncamiento de valores singulares y estabilidad numérica.',
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: 'struct Svd3 { u: [f32; 9], s: [f32; 3], vt: [f32; 9] } (84 B)',
+            codeSnippet: `#[repr(C)]
+struct Mat3([f32; 9]); // A = U * Σ * Vᵀ
+
+let sigma = [${svd.S.map((s) => s.toFixed(2)).join(', ')}];
+let p = transform_mat3(&a, pos);
+// Si det(A) < 0 se invierte la orientación (winding)`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: 'record Svd3(float[] u, float[] s, float[] vt) · 3 arreglos planos',
+            codeSnippet: `record Svd3(float[] u, float[] s, float[] vt) {}
+
+float[] sigma = { ${svd.S.map((s) => `${s.toFixed(2)}f`).join(', ')} };
+// Aplica Vᵀ -> Σ -> U sobre buffer plano de vértices
+float det = a[0] * (a[4] * a[8] - a[5] * a[7]);`,
+          },
+        },
       };
     }
 
@@ -630,7 +672,6 @@ vec3 p = uTransform * position;
       const d = params.d ?? 0.9;
       const pairs = computeRealEigen2D(a, b, c, d);
       return {
-        memoryLayout: 'Float32Array(4) — Matriz 2×2 + espectro λ',
         memoryValues: [
           a.toFixed(2),
           b.toFixed(2),
@@ -641,12 +682,34 @@ vec3 p = uTransform * position;
         complexity: 'O(k·n²) iteración de potencia · O(n³) espectro completo',
         csApplication:
           'Análisis de Componentes Principales (PCA), algoritmo PageRank en grafos web y análisis de estabilidad en sistemas dinámicos.',
-        codeLanguage: 'TypeScript',
-        codeSnippet: `// Iteración de potencia (autovector dominante)
-for (let k = 0; k < 20; k++) {
-  v = normalize(matMulVec(A, v));
-}
-const lambda = dot(v, matMulVec(A, v));`,
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: '[[f64; 2]; 2] en Stack (32 bytes) + espectro λ',
+            codeSnippet: `let a = [[${a.toFixed(2)}, ${b.toFixed(2)}], [${c.toFixed(2)}, ${d.toFixed(2)}]];
+let mut v = [1.0_f64, 0.0];
+for _ in 0..20 {
+    let av = [a[0][0]*v[0] + a[0][1]*v[1],
+              a[1][0]*v[0] + a[1][1]*v[1]];
+    let n = av[0].hypot(av[1]);
+    v = [av[0] / n, av[1] / n];
+}`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: 'double[4] plano en Heap (32 B payload) + cociente de Rayleigh',
+            codeSnippet: `double[] a = { ${a.toFixed(2)}, ${b.toFixed(2)}, ${c.toFixed(2)}, ${d.toFixed(2)} };
+double vx = 1.0, vy = 0.0;
+for (int k = 0; k < 20; k++) {
+    double nx = a[0] * vx + a[1] * vy;
+    double ny = a[2] * vx + a[3] * vy;
+    double norm = Math.hypot(nx, ny);
+    vx = nx / norm; vy = ny / norm;
+}`,
+          },
+        },
       };
     }
 
@@ -655,8 +718,23 @@ const lambda = dot(v, matMulVec(A, v));`,
       const b = params.bias ?? 0.0;
       const fold = params.fold ?? 1.0;
       const res = generateManifoldPoints(extras.dataset, w, b, fold, extras.activation);
+      const rustAct =
+        extras.activation === 'relu'
+          ? 'z.max(0.0)'
+          : extras.activation === 'tanh'
+            ? 'z.tanh()'
+            : extras.activation === 'sigmoid'
+              ? '1.0 / (1.0 + (-z).exp())'
+              : 'z';
+      const javaAct =
+        extras.activation === 'relu'
+          ? 'Math.max(0.0f, z)'
+          : extras.activation === 'tanh'
+            ? '(float) Math.tanh(z)'
+            : extras.activation === 'sigmoid'
+              ? '(float) (1.0 / (1.0 + Math.exp(-z)))'
+              : 'z';
       return {
-        memoryLayout: `Tensor [96 × 3] Float32Array · φ = ${extras.activation}`,
         memoryValues: [
           `W=${w.toFixed(2)}`,
           `b=${b.toFixed(2)}`,
@@ -666,12 +744,29 @@ const lambda = dot(v, matMulVec(A, v));`,
         ],
         complexity: 'O(B·d_in·d_out) capa lineal + O(B·d_out) activación',
         csApplication:
-          'Capa oculta de una red neuronal en PyTorch: sin una función no lineal φ, componer capas lineales colapsa en una única matriz.',
-        codeLanguage: 'TypeScript',
-        codeSnippet: `// Capa densa + activación no lineal
-const h = points.map((x) =>
-  ${extras.activation}(W * feature(x) + b) * ${fold.toFixed(2)}
-); // Precisión lineal: ${(res.accuracy * 100).toFixed(0)}%`,
+          'Capa oculta de una red neuronal: sin una función no lineal φ, apilar capas lineales colapsa en una única transformación afín.',
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: `Vec<[f32; 3]> contiguo (96×12 B = 1,152 B) · φ = ${extras.activation}`,
+            codeSnippet: `// Transformación in-place sin copia (acc ${(res.accuracy * 100).toFixed(0)}%)
+for p in points.iter_mut() {
+    let z = ${w.toFixed(2)} * feat(p[0], p[2]) + ${b.toFixed(2)};
+    p[1] = ${fold.toFixed(2)} * (${rustAct});
+}`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: `float[288] intercalado (SoA/AoS sin boxing) · φ = ${extras.activation}`,
+            codeSnippet: `// Evita List<Point> para eliminar sobrecarga de objetos
+for (int i = 0; i < pts.length; i += 3) {
+    float z = ${w.toFixed(2)}f * feat(pts[i], pts[i + 2]) + ${b.toFixed(2)}f;
+    pts[i + 1] = ${fold.toFixed(2)}f * (${javaAct});
+} // Precisión lineal: ${(res.accuracy * 100).toFixed(0)}%`,
+          },
+        },
       };
     }
 
@@ -681,23 +776,38 @@ const h = points.map((x) =>
       const freq = params.freq ?? 1.0;
       const { fx, fy, z } = evaluatePartialGradients(x0, y0, freq, 0.85);
       return {
-        memoryLayout: 'Float32Array(3) — [z₀, ∂f/∂x, ∂f/∂y]',
         memoryValues: [`z₀=${z.toFixed(3)}`, `fx=${fx.toFixed(3)}`, `fy=${fy.toFixed(3)}`],
         complexity: 'O(1) evaluación analítica · O(d) gradiente numérico',
         csApplication:
-          'Cálculo de normales de superficies en shaders 3D (bump/normal mapping) y linealización local en métodos de Newton.',
-        codeLanguage: 'GLSL',
-        codeSnippet: `// Normal exacta desde derivadas parciales
-vec3 tangentX = vec3(1.0, ${fx.toFixed(2)}, 0.0);
-vec3 tangentZ = vec3(0.0, ${fy.toFixed(2)}, 1.0);
-vec3 N = normalize(cross(tangentZ, tangentX));`,
+          'Cálculo de normales de superficies en motores 3D (bump/normal mapping) y linealización local en métodos de Newton.',
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: '(f64, [f64; 2]) en registros CPU (24 bytes, cero heap)',
+            codeSnippet: `// Normal exacta desde derivadas parciales
+let tx = [1.0, ${fx.toFixed(2)}, 0.0];
+let tz = [0.0, ${fy.toFixed(2)}, 1.0];
+let n = normalize3(cross3(tz, tx));
+// Plano tangente: z0 + fx*(x - x0) + fy*(y - y0)`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: 'record PartialJet(double z, double fx, double fy) · 3×double',
+            codeSnippet: `record PartialJet(double z, double fx, double fy) {}
+
+// Normal unitaria desde tangentes parciales
+double nx = -${fx.toFixed(2)}, ny = 1.0, nz = -${fy.toFixed(2)};
+double inv = 1.0 / Math.sqrt(nx*nx + ny*ny + nz*nz);`,
+          },
+        },
       };
     }
 
     case 'calc-autodiff': {
       const snap = evaluateAutoDiffDag(params.x ?? 0.7, params.y ?? 0.6, params.w ?? 1.6);
       return {
-        memoryLayout: 'DAG 8 nodos · Cinta reversa (value, grad)',
         memoryValues: [
           `f=${snap.outputValue.toFixed(3)}`,
           `∂f/∂x=${snap.gradX.toFixed(3)}`,
@@ -705,12 +815,31 @@ vec3 N = normalize(cross(tangentZ, tangentX));`,
         ],
         complexity: 'O(V + E) forward + O(V + E) backward (independiente de #parámetros)',
         csApplication:
-          'Motor de retropropagación (Autograd en PyTorch / JAX): calcula gradientes exactos sin errores de truncamiento de diferencias finitas.',
-        codeLanguage: 'TypeScript',
-        codeSnippet: `// Regla de la cadena en orden topológico inverso
-grad_v4 += 1.0 * grad_out;
-grad_wx += Math.cos(w * x) * grad_v2;
-grad_x  += y * grad_v1 + w * grad_wx; // ${snap.gradX.toFixed(3)}`,
+          'Motor de retropropagación (Autograd en PyTorch / Burn / DJL): calcula derivadas exactas sin error de truncamiento.',
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: 'Vec<TapeNode> arena plana (8 nodos · val, grad: f64)',
+            codeSnippet: `// Regla de la cadena en orden topológico inverso
+for id in (0..tape.len()).rev() {
+    let g = tape[id].grad;
+    tape[id].backprop(g, &mut grads);
+}
+// ∂f/∂x = ${snap.gradX.toFixed(3)}, ∂f/∂y = ${snap.gradY.toFixed(3)}`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: 'double[] val + double[] grad (Structure of Arrays, 8 nodos)',
+            codeSnippet: `// Cinta reversa en arreglos paralelos (cache-friendly)
+grad[OUT] = 1.0;
+for (int i = nodes - 1; i >= 0; i--) {
+    propagateLocal(i, val, grad);
+}
+// ∂f/∂x = ${snap.gradX.toFixed(3)}, ∂f/∂y = ${snap.gradY.toFixed(3)}`,
+          },
+        },
       };
     }
 
@@ -719,7 +848,6 @@ grad_x  += y * grad_v1 + w * grad_wx; // ${snap.gradX.toFixed(3)}`,
       const beta = params.beta ?? 0.82;
       const sample = evaluateLossLandscape(0.4, 0.4, extras.landscape);
       return {
-        memoryLayout: `Estado por parámetro: θ, m, v (3×Float32) · ${extras.landscape}`,
         memoryValues: [
           `α=${lr.toFixed(2)}`,
           `β=${beta.toFixed(2)}`,
@@ -727,11 +855,31 @@ grad_x  += y * grad_v1 + w * grad_wx; // ${snap.gradX.toFixed(3)}`,
         ],
         complexity: 'O(P) tiempo por paso · Adam requiere 3× memoria de pesos (θ, m, v)',
         csApplication:
-          'Entrenamiento de redes neuronales y modelos de lenguaje: Adam adapta el paso por coordenada usando el primer y segundo momento.',
-        codeLanguage: 'TypeScript',
-        codeSnippet: `m = beta1 * m + (1 - beta1) * g;
-v = beta2 * v + (1 - beta2) * (g * g);
-theta -= alpha * (mHat / (Math.sqrt(vHat) + 1e-8));`,
+          'Entrenamiento de redes neuronales y LLMs: Adam adapta el paso por parámetro manteniendo primer y segundo momento.',
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: `struct AdamState { theta: f32, m: f32, v: f32 } (12 B/param) · ${extras.landscape}`,
+            codeSnippet: `for ((th, m), (v, &g)) in theta.iter_mut()
+    .zip(&mut m_buf).zip(v_buf.iter_mut().zip(grad)) {
+    *m = ${beta.toFixed(2)} * *m + (1.0 - ${beta.toFixed(2)}) * g;
+    *v = 0.999 * *v + 0.001 * g * g;
+    *th -= ${lr.toFixed(2)} * (*m / (v.sqrt() + 1e-8));
+}`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: `3 × float[P] (theta, m, v) contiguos · ${extras.landscape}`,
+            codeSnippet: `for (int i = 0; i < theta.length; i++) {
+    float g = grad[i];
+    m[i] = ${beta.toFixed(2)}f * m[i] + (1f - ${beta.toFixed(2)}f) * g;
+    v[i] = 0.999f * v[i] + 0.001f * g * g;
+    theta[i] -= ${lr.toFixed(2)}f * (m[i] / ((float) Math.sqrt(v[i]) + 1e-8f));
+}`,
+          },
+        },
       };
     }
 
@@ -746,7 +894,6 @@ theta -= alpha * (mHat / (Math.sqrt(vHat) + 1e-8));`,
         target.weights
       );
       return {
-        memoryLayout: `Web Worker + Float32Array(625) transferible · Gen ${extras.generation}`,
         memoryValues: [
           `MSE Humano=${humanMse.toFixed(4)}`,
           `MSE IA=${extras.aiMse < 90 ? extras.aiMse.toFixed(4) : '—'}`,
@@ -754,12 +901,31 @@ theta -= alpha * (mHat / (Math.sqrt(vHat) + 1e-8));`,
         ],
         complexity: 'O(G · P · N²) en hilo paralelo (cero bloqueo del render 60 FPS)',
         csApplication:
-          'Descubrimiento científico asistido por IA y programación genética distribuida en Web Workers usando buffers transferibles.',
-        codeLanguage: 'TypeScript',
-        codeSnippet: `// Transferencia sin copia desde Web Worker
-self.postMessage({ generation, bestFormula, aiGrid }, [
-  aiGrid.buffer
-]);`,
+          'Descubrimiento científico asistido por IA y programación genética concurrente transfiriendo buffers planos entre hilos.',
+        implementations: {
+          rust: {
+            language: 'rust',
+            label: 'Rust',
+            memoryLayout: `Box<[f32; 625]> (2.5 KB) transferido por mpsc::Sender · Gen ${extras.generation}`,
+            codeSnippet: `// Propiedad transferida entre hilos sin copia (Send)
+let grid: Box<[f32; 625]> = eval_surface(&best_dna);
+tx.send(EvolutionMsg {
+    gen: ${extras.generation},
+    mse: best_mse,
+    grid, // move ownership: 0 copias de memoria
+})?;`,
+          },
+          java: {
+            language: 'java',
+            label: 'Java',
+            memoryLayout: `float[625] (2.5 KB) en ExecutorService / ForkJoinPool · Gen ${extras.generation}`,
+            codeSnippet: `// Evolución asíncrona fuera del hilo de renderizado
+CompletableFuture.supplyAsync(() -> {
+    float[] grid = evalSurface(bestDna); // 25x25 plano
+    return new EvolutionMsg(${extras.generation}, bestMse, grid);
+}, pool);`,
+          },
+        },
       };
     }
   }

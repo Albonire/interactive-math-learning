@@ -32,6 +32,14 @@ export class FirstDrawRegistry {
     }
   }
 
+  public clearPrefix(prefix: string): void {
+    for (const k of Array.from(this.seen)) {
+      if (k.startsWith(prefix)) {
+        this.seen.delete(k);
+      }
+    }
+  }
+
   public count(): number {
     return this.seen.size;
   }

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CrayonCheck, CrayonClose, CrayonReset } from './CrayonIcons';
 import type { ChallengeProximityState } from '../ai/challengeProximity';
 import type {
@@ -7,6 +8,7 @@ import type {
   ChallengeSpec,
   ComputationalBridge,
   SceneId,
+  SystemsCodeLanguage,
   ThemeMode,
 } from '../core/types';
 import { getMasteryDescriptor } from '../ai/bktEngine';
@@ -36,6 +38,20 @@ interface SlideDrawerProps {
   onToggleHint: () => void;
 }
 
+const CODE_LANG_STORAGE_KEY = 'bibifold_code_lang_v1';
+
+function loadInitialCodeLang(): SystemsCodeLanguage {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const v = localStorage.getItem(CODE_LANG_STORAGE_KEY);
+      if (v === 'java' || v === 'rust') return v;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return 'rust';
+}
+
 export function SlideDrawer({
   mode,
   sceneId,
@@ -52,8 +68,20 @@ export function SlideDrawer({
   onNewChallenge,
   onToggleHint,
 }: SlideDrawerProps) {
+  const [codeLang, setCodeLang] = useState<SystemsCodeLanguage>(() => loadInitialCodeLang());
+
   if (mode === 'closed') return null;
 
+  const handleSelectLang = (next: SystemsCodeLanguage) => {
+    setCodeLang(next);
+    try {
+      localStorage.setItem(CODE_LANG_STORAGE_KEY, next);
+    } catch {
+      // Ignore storage errors
+    }
+  };
+
+  const activeImpl = bridge.implementations[codeLang];
   const pct = Math.round(skillState.pL * 100);
 
   return (
@@ -136,12 +164,53 @@ export function SlideDrawer({
               </section>
             )}
 
-            <section className="crayon-ink-panel p-3.5 space-y-1.5">
-              <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
-                Representación en Memoria
-              </h3>
-              <p className="text-[12.5px] font-mono-math text-[var(--ui-accent)]">
-                {bridge.memoryLayout}
+            <section className="crayon-ink-panel p-3.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
+                  Representación en Memoria
+                </h3>
+                <div
+                  role="radiogroup"
+                  aria-label="Lenguaje de sistemas"
+                  className="inline-flex items-center gap-3"
+                >
+                  {(['rust', 'java'] as const).map((lang) => {
+                    const active = codeLang === lang;
+                    const label = lang === 'rust' ? 'Rust' : 'Java';
+                    return (
+                      <button
+                        key={lang}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        data-testid={`code-lang-${lang}`}
+                        onClick={() => handleSelectLang(lang)}
+                        className={`relative font-display text-[16px] leading-none pb-1 cursor-pointer transition-colors ${
+                          active
+                            ? 'text-[var(--ui-accent)]'
+                            : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                        }`}
+                      >
+                        {label}
+                        {active && (
+                          <span className="absolute left-0 right-0 -bottom-0.5">
+                            <RoughUnderline
+                              crayon="cobalt"
+                              theme={theme}
+                              seed={lang === 'rust' ? 91 : 97}
+                            />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <p
+                data-testid="memory-layout-text"
+                className="text-[12.5px] font-mono-math text-[var(--ui-accent)]"
+              >
+                {activeImpl.memoryLayout}
               </p>
               <div className="font-mono-math text-[12.5px] text-[var(--text-primary)] leading-relaxed break-words tabular-nums">
                 [ {bridge.memoryValues.join(' , ')} ]
@@ -171,14 +240,22 @@ export function SlideDrawer({
             </section>
 
             <section className="crayon-ink-panel p-3.5 space-y-2">
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-baseline justify-between gap-2">
                 <h3 className="font-display crayon-ink text-[20px] text-[var(--text-primary)]">
                   Equivalente en Código
                 </h3>
-                <span className="text-[13px] text-[var(--text-muted)]">{bridge.codeLanguage}</span>
+                <span
+                  data-testid="active-code-lang"
+                  className="text-[13px] font-mono-math text-[var(--ui-accent)]"
+                >
+                  {activeImpl.label}
+                </span>
               </div>
-              <pre className="font-mono-math text-[12px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap pt-2 border-t border-dashed border-[var(--hairline-strong)] overflow-x-auto">
-                {bridge.codeSnippet}
+              <pre
+                data-testid="code-snippet-block"
+                className="font-mono-math text-[12px] leading-relaxed text-[var(--text-primary)] whitespace-pre-wrap pt-2 border-t border-dashed border-[var(--hairline-strong)] overflow-x-auto"
+              >
+                {activeImpl.codeSnippet}
               </pre>
             </section>
           </>
