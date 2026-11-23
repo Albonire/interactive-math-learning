@@ -102,6 +102,10 @@ export interface ModuleBlockSpec {
   sceneIds: SceneId[];
 }
 
+export type WorkspaceEngineMode = 'webgl3d' | 'symbolic' | 'codelab';
+
+export type LessonTier = 0 | 1 | 2 | 3 | 4 | 5;
+
 export interface BktSkillState {
   skillId: SkillId;
   pL: number;
@@ -111,6 +115,100 @@ export interface BktSkillState {
   pS: number;
   attempts: number;
   correctCount: number;
+  lastPracticedAt?: number;
+  halfLifeDays?: number;
+}
+
+export interface SymbolicDerivationBlock {
+  id: string;
+  latex: string;
+  caption: string;
+  crayon: CrayonToken;
+}
+
+export interface SymbolicExerciseSpec {
+  sceneId: SceneId;
+  title: string;
+  prompt: string;
+  derivationGoal: string;
+  blocks: SymbolicDerivationBlock[];
+  correctOrder: string[];
+  equivalencePrompt: string;
+  variables: string[];
+  targetExpression: string;
+  placeholderExpression: string;
+  sampleInputs: Array<Record<string, number>>;
+  hint: string;
+}
+
+export interface CodeLabSlotOption {
+  id: string;
+  rustCode: string;
+  javaCode: string;
+  label: string;
+}
+
+export interface CodeLabSlotSpec {
+  id: string;
+  prompt: string;
+  options: CodeLabSlotOption[];
+  correctOptionId: string;
+}
+
+export interface CodeLabParsonsBlock {
+  id: string;
+  rustCode: string;
+  javaCode: string;
+  indent?: number;
+  slotId?: string;
+}
+
+export interface CodeLabMemoryCell {
+  label: string;
+  rustDetail: string;
+  javaDetail: string;
+  bytes: number;
+  crayon: CrayonToken;
+}
+
+export interface CodeLabTestCaseResult {
+  id: string;
+  name: string;
+  passed: boolean;
+  expected: string;
+  actual: string;
+  edgeCase?: boolean;
+}
+
+export interface CodeLabEvaluationResult {
+  passedAll: boolean;
+  orderCorrect: boolean;
+  slotsCorrect: boolean;
+  tests: CodeLabTestCaseResult[];
+  summary: string;
+  executionMs: number;
+}
+
+export interface CodeLabSpec {
+  sceneId: SceneId;
+  title: string;
+  objective: string;
+  complexity: string;
+  blocks: CodeLabParsonsBlock[];
+  correctOrder: string[];
+  slots: CodeLabSlotSpec[];
+  memoryCells: CodeLabMemoryCell[];
+  hint: string;
+}
+
+export interface LessonSpec {
+  id: SceneId;
+  tier: LessonTier;
+  tierLabel: string;
+  prerequisites: SceneId[];
+  engines: WorkspaceEngineMode[];
+  skillId: SkillId;
+  metadata: SceneMetadata;
 }
 
 export interface ChallengeSpec {

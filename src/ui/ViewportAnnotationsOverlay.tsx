@@ -331,7 +331,7 @@ export function ViewportAnnotationsOverlay({
       data-guide-active={guideTarget ? 'true' : 'false'}
     >
       {/* Small, unobtrusive top-right "Leyenda" toggle inside the 3D viewport */}
-      <div className="pointer-events-auto absolute top-3.5 sm:top-4 right-4 sm:right-6 z-20">
+      <div className="pointer-events-auto absolute top-[52px] sm:top-[56px] right-4 sm:right-6 z-20">
         <button
           type="button"
           onClick={onToggle}

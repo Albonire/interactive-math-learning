@@ -6,6 +6,7 @@ import { THEME_PALETTES } from '../core/palette';
 import type { AnatomyLayerSpec, CrayonToken, SceneId, ThemeMode } from '../core/types';
 import { CrayonDustPoints } from './CrayonDustPoints';
 import { createCrayonLineMaterial, syncCrayonMaterialsInObject } from './CrayonMaterials';
+import { CrayonNibMarker } from './CrayonNibMarker';
 import { computeExplodedCameraPose, computeExplodeVerticalSpan } from './explodeView';
 import { refreshCrayonLabelSpritesInObject } from './PaperGrainGenerator';
 import {
@@ -98,14 +99,19 @@ export class SceneManager {
   private drawProgress = 1.0;
   private drawAnimating = false;
   private drawStartTime = 0;
-  private drawDurationMs = 3850;
+  private drawDurationMs = 3400;
+  private constructionPaused = false;
+  private constructionPausedAtMs = 0;
   private sketchAnimator = new Object3DSketchAnimator();
   private sketchAnimating = false;
+  private nibAnimating = false;
+  private lastNibDustMs = 0;
   private onConstructionStroke?: (event: ConstructionStrokeEvent) => void;
 
   // Artisanal dry-wax Crayon Dust particle system (single-draw-call THREE.Points)
   private dustPoints: CrayonDustPoints;
   private dustAnimating = false;
+  private nibMarker: CrayonNibMarker;
 
   // Subtle architectural dashed vertical alignment rails visible while "Separar vista" is active
   private explodeGuides: THREE.LineSegments;
@@ -178,6 +184,9 @@ export class SceneManager {
     this.dustPoints = new CrayonDustPoints(this.theme);
     this.dustPoints.setPixelRatio(this.renderer.getPixelRatio());
     this.scene.add(this.dustPoints.points);
+
+    this.nibMarker = new CrayonNibMarker(this.theme);
+    this.scene.add(this.nibMarker.group);
 
     const guideGeo = new THREE.BufferGeometry();
     guideGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3));
@@ -271,11 +280,15 @@ export class SceneManager {
   private updateContainerAttributes(): void {
     const dustCount = this.dustPoints ? this.dustPoints.activeCount() : 0;
     const spanInfo = computeExplodeVerticalSpan(this.layerSpecs, this.exploded);
+    const activeTip = this.sketchAnimator.getActiveStrokeTip();
     this.container.dataset.ecoFps = String(this.ecoProfile.targetFps);
     this.container.dataset.drawProgress = this.drawProgress.toFixed(2);
     this.container.dataset.drawComplete =
       this.drawProgress >= 0.999 && !this.sketchAnimating ? 'true' : 'false';
     this.container.dataset.sketchActive = this.sketchAnimating ? 'true' : 'false';
+    this.container.dataset.strokePaused = this.constructionPaused ? 'true' : 'false';
+    this.container.dataset.nibVisible = this.nibMarker?.isVisible() ? 'true' : 'false';
+    this.container.dataset.activeStrokeLayer = activeTip?.active ? activeTip.layerId : 'none';
     this.container.dataset.dustActive = dustCount > 0 ? 'true' : 'false';
     this.container.dataset.dustCount = String(dustCount);
     this.container.dataset.viewOffsetY = this.viewOffsetYRatio.toFixed(3);
@@ -484,6 +497,7 @@ export class SceneManager {
     this.focusedLayerId = focusedLayerId;
     this.layerSpecs = layers;
     this.dustPoints.setTheme(this.theme);
+    this.nibMarker.setTheme(this.theme);
 
     if (this.ecoMode !== ecoMode) {
       this.ecoMode = ecoMode;
@@ -518,7 +532,7 @@ export class SceneManager {
         this.drawProgress = 0.02;
         this.drawAnimating = true;
         this.drawStartTime = performance.now();
-        this.drawDurationMs = this.isSoftwareGl ? 1450 : this.ecoMode ? 2150 : 3850;
+        this.drawDurationMs = this.isSoftwareGl ? 1350 : this.ecoMode ? 1950 : 3350;
       } else {
         this.drawProgress = 1.0;
         this.drawAnimating = false;
@@ -626,6 +640,95 @@ export class SceneManager {
   }
 
   /**
+   * Freezes or resumes the segmented trace-by-trace 3D construction & moving crayon nib
+   * so pausing the Theory Intro holds the exact active stroke in place without jumping on resume.
+   */
+  public setConstructionPaused(paused: boolean): void {
+    if (this.disposed || this.constructionPaused === paused) return;
+    const now = performance.now();
+    if (paused) {
+      this.constructionPaused = true;
+      this.constructionPausedAtMs = now;
+    } else {
+      const deltaMs = Math.max(0, now - this.constructionPausedAtMs);
+      if (this.drawAnimating) {
+        this.drawStartTime += deltaMs;
+      }
+      this.constructionPaused = false;
+      this.constructionPausedAtMs = 0;
+    }
+    this.sketchAnimator.setPaused(paused, now);
+    this.updateContainerAttributes();
+    if (!paused && this.isSoftwareGl && (this.drawAnimating || this.sketchAnimating)) {
+      this.requestSoftwareRender();
+    }
+  }
+
+  /**
+   * Snaps any unfinished first-draw strokes cleanly to 1.0 (e.g. when advancing to Beat 3/4
+   * or skipping straight to hands-on practice).
+   */
+  public completeProceduralBuild(): void {
+    if (this.disposed || !this.controller || !this.activeSceneId) return;
+    this.constructionPaused = false;
+    this.sketchAnimator.setPaused(false, performance.now());
+    this.drawAnimating = false;
+    this.drawProgress = 1.0;
+    this.sketchAnimator.completeScene(this.activeSceneId, this.controller.root);
+    this.sketchAnimating = false;
+    this.nibAnimating = this.nibMarker.update(0.05, null, true, false);
+    const elapsedSec = (performance.now() - this.startTime) / 1000;
+    syncCrayonMaterialsInObject(
+      this.controller.root,
+      this.theme,
+      elapsedSec,
+      this.steadyStrokes,
+      this.focusedLayerId,
+      1.0,
+      this.ecoProfile.boilFps
+    );
+    this.updateContainerAttributes();
+    if (this.isSoftwareGl) {
+      this.requestSoftwareRender();
+    }
+  }
+
+  /**
+   * Re-traces a single highlighted anatomy layer (used on Intro Beat 2 "Partes de la gráfica")
+   * so the student watches the explained layer redraw itself in crayon on cue.
+   */
+  public replayLayerBuild(layerId: string): void {
+    if (
+      this.disposed ||
+      !this.controller ||
+      !this.activeSceneId ||
+      this.prefersReducedMotion()
+    ) {
+      return;
+    }
+    const now = performance.now();
+    this.drawAnimating = false;
+    this.drawProgress = 1.0;
+    this.sketchAnimator.replayLayer(this.activeSceneId, this.controller.root, layerId);
+    this.sketchAnimating = this.sketchAnimator.updateObjectTree(
+      this.activeSceneId,
+      this.controller.root,
+      now,
+      {
+        durationMs: this.isSoftwareGl ? 620 : this.ecoMode ? 760 : 1080,
+        reducedMotion: false,
+        staggerByLayer: false,
+        ecoMode: this.ecoMode,
+        onStrokeStart: this.onConstructionStroke,
+      }
+    );
+    this.updateContainerAttributes();
+    if (this.isSoftwareGl) {
+      this.requestSoftwareRender();
+    }
+  }
+
+  /**
    * Replays the full structured, stroke-by-stroke 3D procedural construction from scratch
    * (used when launching or replaying a lesson's Theory Intro so the student watches the
    * diagram build itself live layer-by-layer).
@@ -635,6 +738,8 @@ export class SceneManager {
       return;
     }
     const now = performance.now();
+    this.constructionPaused = false;
+    this.sketchAnimator.setPaused(false, now);
     globalFirstDrawRegistry.clear(`scene:${this.activeSceneId}`);
     globalFirstDrawRegistry.claimFirstDraw(`scene:${this.activeSceneId}`);
     this.sketchAnimator.replayScene(this.activeSceneId, this.controller.root);
@@ -642,13 +747,13 @@ export class SceneManager {
     this.drawProgress = 0.02;
     this.drawAnimating = true;
     this.drawStartTime = now;
-    this.drawDurationMs = this.isSoftwareGl ? 1450 : this.ecoMode ? 2150 : 3850;
+    this.drawDurationMs = this.isSoftwareGl ? 1350 : this.ecoMode ? 1950 : 3350;
     this.sketchAnimating = this.sketchAnimator.updateObjectTree(
       this.activeSceneId,
       this.controller.root,
       now,
       {
-        durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1180,
+        durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1120,
         reducedMotion: false,
         staggerByLayer: true,
         ecoMode: this.ecoMode,
@@ -674,6 +779,7 @@ export class SceneManager {
 
   private advanceFirstDraw(now: number): boolean {
     if (!this.drawAnimating) return false;
+    if (this.constructionPaused) return false;
     const raw = Math.min(1, (now - this.drawStartTime) / Math.max(1, this.drawDurationMs));
     // Smooth ease-in-out sine so the global sketch frontier glides evenly from start to finish
     const eased = 0.5 - 0.5 * Math.cos(Math.PI * raw);
@@ -774,12 +880,35 @@ export class SceneManager {
       }
     }
 
+    const activeTip = this.sketchAnimator.getActiveStrokeTip();
+    const suppressNib = this.ecoMode || this.prefersReducedMotion();
+    const prevNibVisible = this.nibMarker.isVisible();
+    this.nibAnimating = this.nibMarker.update(dt, activeTip, suppressNib, this.constructionPaused);
+    if (this.nibAnimating && !this.constructionPaused) {
+      stillMoving = true;
+    }
+    if (
+      activeTip?.active &&
+      !suppressNib &&
+      !this.isSoftwareGl &&
+      !this.constructionPaused &&
+      now - this.lastNibDustMs >= 165
+    ) {
+      this.lastNibDustMs = now;
+      this.dustPoints.emit(activeTip.worldPos, activeTip.crayon, 0.24, false);
+      this.dustAnimating = true;
+    }
+
     const prevDustAnimating = this.dustAnimating;
     this.dustAnimating = this.dustPoints.step(dt);
     if (this.dustAnimating) {
       stillMoving = true;
     }
-    if (prevDustAnimating !== this.dustAnimating || this.dustAnimating) {
+    if (
+      prevDustAnimating !== this.dustAnimating ||
+      this.dustAnimating ||
+      prevNibVisible !== this.nibMarker.isVisible()
+    ) {
       this.updateContainerAttributes();
     }
 
@@ -864,18 +993,20 @@ export class SceneManager {
           const camMoved =
             this.lastRenderedCamPos.distanceToSquared(this.camera.position) > 1e-6 ||
             1 - Math.abs(this.lastRenderedCamQuat.dot(this.camera.quaternion)) > 1e-6;
+          const activeDraw =
+            !this.constructionPaused && (this.drawAnimating || this.sketchAnimating || this.nibAnimating);
           if (
             this.renderDirty ||
             camMoved ||
             keepAnimating ||
-            this.drawAnimating ||
-            this.sketchAnimating ||
+            activeDraw ||
             this.dustAnimating
           ) {
             this.requestSoftwareRender();
           }
         },
-        this.drawAnimating || this.sketchAnimating || this.dustAnimating
+        (!this.constructionPaused && (this.drawAnimating || this.sketchAnimating)) ||
+          this.dustAnimating
           ? 75
           : this.ecoProfile.softwareCooldownMs
       );
@@ -901,6 +1032,8 @@ export class SceneManager {
     }
     this.scene.remove(this.dustPoints.points);
     this.dustPoints.dispose();
+    this.scene.remove(this.nibMarker.group);
+    this.nibMarker.dispose();
     this.scene.remove(this.explodeGuides);
     this.explodeGuides.geometry.dispose();
     if (Array.isArray(this.explodeGuides.material)) {

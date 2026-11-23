@@ -16,6 +16,7 @@ interface LessonIntroPlayerProps {
   theme: ThemeMode;
   onChangeBeat: (nextIndex: number) => void;
   onFinish: () => void;
+  onPlayingChange?: (playing: boolean) => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export function LessonIntroPlayer({
   theme,
   onChangeBeat,
   onFinish,
+  onPlayingChange,
 }: LessonIntroPlayerProps) {
   const beats = intro.beats;
   const beat = beats[beatIndex] ?? beats[0];
@@ -43,6 +45,11 @@ export function LessonIntroPlayer({
   });
   const [elapsedMs, setElapsedMs] = useState(0);
   const elapsedRef = useRef(0);
+
+  // Sync play/pause state with 3D trace-by-trace stroke animator & audio engine
+  useEffect(() => {
+    onPlayingChange?.(playing);
+  }, [playing, onPlayingChange]);
 
   // Reset per-beat timer whenever the lesson or beat changes
   useEffect(() => {

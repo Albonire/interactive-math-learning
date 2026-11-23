@@ -55,8 +55,10 @@ test('mulberry32 PRNG and procedural challenge generation are deterministic', ()
 
 test('default local progress data initializes all 8 skills cleanly without external report bloat', () => {
   const data = createDefaultPersistedData();
-  assert.equal(data.version, 2);
+  assert.equal(data.version, 3);
   assert.equal(Object.keys(data.bkt).length, 8);
   assert.equal(Object.keys(data.bandit.arms).length, 4);
   assert.deepEqual(data.lastErrorBySkill, {});
+  assert.deepEqual(data.completedSymbolicScenes, []);
+  assert.deepEqual(data.completedCodeLabScenes, []);
 });

@@ -1,0 +1,286 @@
+# PLAN MAESTRO DE INGENIERÍA Y CURRÍCULO — BIBIFOLD (0 → 100)
+
+Especificación técnica y curricular completa para evolucionar [BIBIFOLD](https://interactive-math-learning-eight.vercel.app/) desde su prototipo actual (8 lecciones activas en Álgebra Lineal y Cálculo Multivariable) hasta una plataforma autónoma, interactiva, gamificada y de nivel portafolio que cubra toda la matemática esencial de Ingeniería de Sistemas y Ciencias de la Computación, integrando la progresión del [Math for computer science roadmap](https://dev.to/erupturatis/math-for-computer-science-roadmap-1d8h).
+
+## 1. Principios de Producto y Restricciones de Ingeniería
+
+* **Más allá de "solo gráficas":** Cada lección combina intuición visual con resolución activa mediante cuatro motores enchufables (`webgl3d`, `symbolic`, `discrete`, `codelab`). Ningún concepto se aprueba únicamente moviendo sliders.
+* **Identidad visual unificada:** Se mantiene la estética artesanal tipo *sketchbook* (cuadrícula sutil, trazo orgánico, paleta cobalto/bermellón/ámbar y selector de temas `Papel` y `Pizarra`), el flujo teórico en 4 pasos (`1 · La idea`, `2 · Partes de la gráfica`, `3 · Míralo en acción`, `4 · Fórmula y uso real`), la práctica guiada (`1 Explorar → 2 Probar → 3 Integrar → ★ Reto`) y el **Modo Anatomía** en tres planos sincronizados (simbólico, geométrico/visual y computacional en Rust/Java).
+* **Ejecución 100 % local (Edge AI):** Sin servidores obligatorios ni chatbots. El motor adaptativo (BKT + Bandits Contextuales), los verificadores simbólicos/discretos y los cálculos evolutivos corren localmente en el navegador y en *Web Workers*, con progreso persistido en `IndexedDB` / `localStorage` y exportación/importación JSON.
+* **Presupuesto de hardware objetivo (Lenovo Slim 3 — Ryzen 7 5700U, Radeon Vega 8, 12 GB DDR4):**
+  * Renderizado a 60 FPS estables en modo normal y 30 FPS con `pixelRatio <= 1.25` en modo `Eco`.
+  * Memoria de pestaña objetivo por debajo de 350 MB en escenas 3D activas.
+  * Degradación elegante automática a SVG/Canvas 2D cuando el contexto WebGL 2 no esté disponible (manteniendo 100 % operativos el motor simbólico, el discreto, el laboratorio de código y el motor BKT).
+
+## 2. Temario Completo Lección por Lección (40 Lecciones · 6 Niveles)
+
+El currículo se modela como un **Grafo Acíclico Dirigido (DAG)** de 40 lecciones. Las 8 lecciones ya activas en [BIBIFOLD](https://interactive-math-learning-eight.vercel.app/) se preservan en los Niveles 2 y 3, ampliándose en Fase 1 con retos simbólicos y de código.
+
+### Nivel 0 · Cimientos y Precálculo (6 lecciones)
+
+Base para estudiantes que inician desde cero o necesitan cerrar brechas detectadas por el diagnóstico inicial.
+
+| ID | Lección | Prerrequisitos | Motores | Subhabilidades BKT | Reto simbólico / discreto / código | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `L0-01` | Aritmética, razones y escala numérica | Ninguno | `symbolic` + `webgl3d` (2D) | `ratio_scale`, `order_ops`, `modular_rem` | Reordenar bloques de precedencia y calcular escalas de píxeles/resolución sin desbordamiento entero. | Fase 3 |
+| `L0-02` | Geometría euclidiana, distancias y coordenadas | `L0-01` | `webgl3d` (2D) + `codelab` | `euclid_dist`, `manhattan_dist`, `dot_angle` | Comparar distancia euclidiana vs. Manhattan en un mapa de colisiones 2D y corregir la fórmula en Rust/Java. | Fase 3 |
+| `L0-03` | Álgebra I: ecuaciones, despeje y linealidad | `L0-01` | `symbolic` + `webgl3d` (2D) | `linear_solve`, `slope_intercept`, `inequalities` | Despejar variables paso a paso con balanza simbólica y validar invariantes de borde en un condicional. | Fase 3 |
+| `L0-04` | Álgebra II: funciones, composición e inversas | `L0-03` | `symbolic` + `webgl3d` (2D) | `fn_composition`, `fn_inverse`, `domain_range` | Encadenar tuberías de funciones $f(g(x))$ y construir la inversa para decodificar una transformación reversible. | Fase 3 |
+| `L0-05` | Logaritmos y crecimiento exponencial | `L0-04` | `webgl3d` (2D) + `symbolic` | `log_rules`, `exp_growth`, `binary_halving` | Simplificar identidades logarítmicas y predecir cuántas iteraciones toma búsqueda binaria en $N = 10^6$. | Fase 3 |
+| `L0-06` | Trigonometría, círculo unitario y ondas | `L0-02`, `L0-04` | `webgl3d` (2D) + `codelab` | `unit_circle`, `phase_freq`, `polar_cartesian` | Ajustar amplitud/fase para cancelar una onda y convertir coordenadas polares a cartesianas en un movimiento 2D. | Fase 3 |
+
+### Nivel 1 · Matemáticas Esenciales para CS (9 lecciones)
+
+Núcleo directo de Ciencias de la Computación inspirado en la sección *Essential CS Math Concepts* del [roadmap de referencia](https://dev.to/erupturatis/math-for-computer-science-roadmap-1d8h).
+
+| ID | Lección | Prerrequisitos | Motores | Subhabilidades BKT | Reto simbólico / discreto / código | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `L1-01` | Lógica proposicional y tablas de verdad | `L0-03` | `symbolic` + `discrete` | `truth_tables`, `implication`, `demorgan` | Aplicar leyes de De Morgan en bloques para simplificar un predicado complejo y verificar equivalencia. | Fase 2 |
+| `L1-02` | Demostraciones e inducción matemática | `L1-01` | `symbolic` + `codelab` | `base_case`, `inductive_step`, `loop_invariant` | Ensamblar una demostración por inducción (caso base + paso inductivo) y emparejarla con un invariante de bucle. | Fase 2 |
+| `L1-03` | Teoría de conjuntos, relaciones y funciones | `L1-01` | `discrete` + `symbolic` | `set_ops`, `bijection`, `equivalence_rel` | Resolver consultas de intersección/diferencia simétrica y clasificar si un mapeo hash es inyectivo o biyectivo. | Fase 2 |
+| `L1-04` | Sucesiones, sumatorias y recurrencias | `L0-05`, `L1-02` | `symbolic` + `codelab` | `sigma_notation`, `geom_series`, `recurrence_tree` | Cerrar una sumatoria aritmética/geométrica y desplegar el árbol de llamadas de una función recursiva. | Fase 2 |
+| `L1-05` | Sistema binario, complemento a dos y bits | `L0-01` | `discrete` + `codelab` | `binary_conv`, `twos_comp`, `bitwise_ops` | Operar registros de 8 bits en vivo (AND, XOR, shifts) y detectar un desbordamiento con signo en Rust/Java. | Fase 2 |
+| `L1-06` | Álgebra booleana y compuertas lógicas | `L1-01`, `L1-05` | `discrete` + `symbolic` | `logic_gates`, `kmap_reduce`, `half_adder` | Cablear un semisumador (*half adder*) en el simulador y minimizar una expresión booleana. | Fase 2 |
+| `L1-07` | Autómatas finitos y máquinas de Turing | `L1-03`, `L1-06` | `discrete` | `dfa_design`, `regex_dfa`, `turing_tape` | Construir un autómata finito determinista que acepte cadenas binarias pares y trazar una cinta de Turing. | Fase 2 |
+| `L1-08` | Teoría de grafos, árboles y caminos mínimos | `L1-03`, `L1-04` | `discrete` + `codelab` | `bfs_dfs`, `dijkstra_pq`, `astar_heuristic` | Ejecutar paso a paso la cola de prioridad de Dijkstra y diseñar una heurística admisible para A*. | Fase 2 |
+| `L1-09` | Análisis asintótico y complejidad ($O, \Omega, \Theta$) | `L0-05`, `L1-04` | `symbolic` + `webgl3d` (2D) + `codelab` | `big_o_dom`, `master_theorem`, `space_time` | Eliminar términos no dominantes, clasificar 4 fragmentos de código por complejidad y optimizar un $O(n^2)$ a $O(n \log n)$. | Fase 2 |
+
+### Nivel 2 · Núcleo Universitario (10 lecciones)
+
+Integra las 4 lecciones activas de Álgebra Lineal junto con Cálculo I, Probabilidad y Criptografía.
+
+| ID | Lección | Prerrequisitos | Motores | Subhabilidades BKT | Reto simbólico / discreto / código | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `L2-01` | **Span e Independencia Lineal** | `L0-02`, `L0-03` | `webgl3d` + `symbolic` + `codelab` | `lin_comb`, `span_rank`, `collinearity` | *Activo en Vercel.* Sumar reto simbólico de dependencia lineal y prueba de rango en `[f32; 9]` (Rust/Java). | **Activa (Fase 1)** |
+| `L2-02` | **Transformaciones, Determinante y SVD** | `L2-01` | `webgl3d` + `symbolic` + `codelab` | `mat_mul_order`, `det_volume`, `svd_acts` | *Activo en Vercel.* Sumar reto de no conmutatividad $AB \neq BA$ y ordenamiento *Column-Major* en memoria. | **Activa (Fase 1)** |
+| `L2-03` | **Autovectores y Direcciones Invariantes** | `L2-02` | `webgl3d` + `symbolic` + `codelab` | `eigen_align`, `char_poly`, `power_iter` | *Activo en Vercel.* Sumar resolución paso a paso de $\det(A - \lambda I) = 0$ (2×2) y verificación de *Power Iteration*. | **Activa (Fase 1)** |
+| `L2-04` | **Plegado de Variedades Neuronales** | `L2-02`, `L0-04` | `webgl3d` + `codelab` | `affine_layer`, `relu_nonlin`, `linear_sep` | *Activo en Vercel.* Sumar reto de predicción de salida de una capa $\text{ReLU}(Wx + b)$ en código. | **Activa (Fase 1)** |
+| `L2-05` | Límites, continuidad y discretización | `L0-04`, `L0-05` | `webgl3d` (2D) + `symbolic` | `limit_eval`, `asymptote`, `discretization` | Evaluar límites indeterminados por bloques y diagnosticar errores de discretización por paso $\Delta t$ grande. | Fase 3 |
+| `L2-06` | Derivadas, linealización y series de Taylor | `L2-05`, `L0-06` | `webgl3d` (2D) + `symbolic` + `codelab` | `deriv_rules`, `tangent_approx`, `taylor_trunc` | Aplicar regla del producto/cadena simbólica y elegir el grado de Taylor necesario para aproximar $\sin(x)$ con error $< 10^{-4}$. | Fase 3 |
+| `L2-07` | Integración numérica y Monte Carlo | `L2-06` | `webgl3d` + `codelab` | `riemann_trap`, `simpson_err`, `monte_carlo` | Comparar error de truncamiento (trapecio vs. Simpson) y estimar un área irregular con muestreo Monte Carlo en Worker. | Fase 3 |
+| `L2-08` | Variables aleatorias, esperanza y distribuciones | `L1-04`, `L2-07` | `webgl3d` (2D) + `symbolic` | `expectation_var`, `binomial_norm`, `covariance` | Calcular $E[X]$ y $\text{Var}(X)$ paso a paso y detectar sesgo en una distribución binomial de pruebas A/B. | Fase 3 |
+| `L2-09` | Probabilidad condicional, Bayes y Markov | `L2-08`, `L2-02` | `webgl3d` + `discrete` + `symbolic` | `bayes_update`, `markov_matrix`, `steady_state` | Actualizar probabilidades posteriores ante nueva evidencia y hallar el estado estacionario de una cadena de Markov. | Fase 3 |
+| `L2-10` | Aritmética modular, entropía y criptografía (RSA) | `L1-05`, `L2-08` | `discrete` + `symbolic` + `codelab` | `mod_inverse`, `shannon_entropy`, `rsa_keys` | Calcular un inverso modular en $\mathbb{Z}_n$, medir entropía $\log_2(1/p)$ de contraseñas y cifrar/descifrar en sandbox RSA. | Fase 3 |
+
+### Nivel 3 · Avanzado Aplicado (8 lecciones)
+
+Integra las 4 lecciones activas de Cálculo Multivariable junto con Métodos Numéricos y Análisis Complejo.
+
+| ID | Lección | Prerrequisitos | Motores | Subhabilidades BKT | Reto simbólico / discreto / código | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `L3-01` | **Derivadas Parciales y Plano Tangente** | `L2-06`, `L2-01` | `webgl3d` + `symbolic` + `codelab` | `partial_deriv`, `gradient_dir`, `level_curves` | *Activo en Vercel.* Sumar derivación parcial simbólica y cálculo numérico de gradiente por diferencias finitas. | **Activa (Fase 1)** |
+| `L3-02` | **Grafo Computacional y AutoDiff** | `L3-01`, `L1-08` | `webgl3d` + `discrete` + `codelab` | `chain_rule_dag`, `forward_pass`, `backprop_grad` | *Activo en Vercel.* Sumar trazado manual de derivadas locales en el DAG y detección de gradiente desvanecido en código. | **Activa (Fase 1)** |
+| `L3-03` | **Carrera de Optimizadores (SGD, Momentum, Adam)** | `L3-02` | `webgl3d` + `codelab` | `lr_stability`, `momentum_inertia`, `saddle_escape` | *Activo en Vercel.* Sumar reto de ajuste de hiperparámetros para evitar divergencia y revisar el paso de actualización en código. | **Activa (Fase 1)** |
+| `L3-04` | **Regresión Simbólica Evolutiva** | `L3-03`, `L1-04` | `webgl3d` + `symbolic` + `codelab` | `ast_mutation`, `mse_loss`, `parsimony_tradeoff` | *Activo en Vercel.* Sumar reto de podar un árbol sintáctico sobreajustado comparando MSE vs. complejidad del AST. | **Activa (Fase 1)** |
+| `L3-05` | Aritmética IEEE 754 y error numérico | `L1-05`, `L2-06` | `discrete` + `codelab` | `ieee754_bits`, `catastrophic_cancel`, `ulp_error` | Inspeccionar signo/exponente/mantisa de un `f32` y reescribir una fórmula cuadrática para evitar cancelación catastrófica. | Fase 4 |
+| `L3-06` | Búsqueda de raíces y cuencas fractales | `L2-06`, `L3-05` | `webgl3d` (2D) + `codelab` | `bisection_conv`, `newton_tangent`, `divergence_basin` | Comparar iteraciones de Bisección vs. Newton-Raphson y detectar condiciones iniciales que divergen. | Fase 4 |
+| `L3-07` | Splines, FFT y EDOs (Euler vs. RK4) | `L0-06`, `L2-07`, `L3-05` | `webgl3d` + `codelab` | `bezier_interp`, `fft_spectrum`, `rk4_stability` | Filtrar ruido aislando armónicos en 3D y comparar la deriva de energía entre Euler explícito y RK4 en un simulador físico. | Fase 4 |
+| `L3-08` | Números complejos y mapeos conformes | `L0-06`, `L2-02` | `webgl3d` + `symbolic` | `complex_mult`, `euler_formula`, `conformal_map` | Multiplicar complejos como rotaciones-escalados y verificar la fórmula de Euler $e^{i\theta} = \cos\theta + i\sin\theta$. | Fase 4 |
+
+### Nivel 4 · Retos Integradores ("Jefes de Ingeniería") (3 lecciones)
+
+Misiones sin guías paso a paso donde el estudiante combina al menos tres motores para resolver un problema completo de ingeniería.
+
+| ID | Lección | Prerrequisitos | Motores | Subhabilidades BKT | Reto integrador | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `L4-01` | Mini-red neuronal desde cero | `L2-04`, `L3-02`, `L3-03` | `webgl3d` + `codelab` | `mlp_forward`, `mlp_backprop`, `loss_converge` | Configurar pesos, activaciones y optimizador para separar un conjunto no lineal y pasar la batería de tests en código. | Fase 4 |
+| `L4-02` | Enrutamiento y compresión en red | `L1-08`, `L1-09`, `L2-10` | `discrete` + `codelab` | `min_cost_route`, `huffman_tree`, `throughput_o` | Hallar la ruta mínima bajo pesos dinámicos y construir un árbol de Huffman cercano al límite de entropía de Shannon. | Fase 4 |
+| `L4-03` | Auditoría criptográfica y detección bayesiana | `L2-09`, `L2-10`, `L3-05` | `discrete` + `symbolic` + `codelab` | `rsa_break_small`, `bayes_anomaly`, `precision_audit` | Factorizar una clave RSA débil, calibrar un detector bayesiano de intrusos y corregir un error de redondeo en probabilidades pequeñas. | Fase 4 |
+
+### Nivel 5 · Rutas de Especialización / Nicho (4 lecciones)
+
+Módulos electivos de cierre alineados con la sección *Niche specific mathematics* del [roadmap](https://dev.to/erupturatis/math-for-computer-science-roadmap-1d8h).
+
+| ID | Ruta y Lección | Prerrequisitos | Motores | Subhabilidades BKT | Reto de especialización | Estado |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| `L5-01` | **ML / IA:** PCA, regularización y divergencia KL | `L2-03`, `L2-09`, `L4-01` | `webgl3d` + `codelab` | `pca_proj`, `l2_reg`, `kl_divergence` | Reducir dimensionalidad conservando >90 % de varianza y penalizar pesos para eliminar sobreajuste. | Fase 4 |
+| `L5-02` | **Gráficos 3D:** Cuaterniones, cámara y *ray-casting* | `L2-02`, `L3-08` | `webgl3d` + `codelab` | `homog_4x4`, `quat_slerp`, `ray_plane` | Evitar *gimbal lock* usando cuaterniones y programar la intersección rayo-triángulo en el plano computacional. | Fase 4 |
+| `L5-03` | **Sistemas y Señales:** Convolución y filtros digitales | `L3-07`, `L1-05` | `webgl3d` (2D) + `discrete` + `codelab` | `conv_1d`, `nyquist_alias`, `fir_filter` | Diseñar un kernel pasa-bajos discreto y evitar *aliasing* respetando el teorema de Nyquist. | Fase 4 |
+| `L5-04` | **Computación Cuántica:** Qubits, Bloch y compuertas | `L2-02`, `L3-08`, `L2-08` | `webgl3d` + `discrete` | `bloch_state`, `hadamard_gate`, `measurement_prob` | Aplicar compuertas Hadamard y Pauli-X/Z sobre la esfera de Bloch para producir una distribución de medición objetivo. | Fase 4 |
+
+## 3. Arquitectura de Software y Contratos TypeScript
+
+### 3.1 Estructura de carpetas objetivo
+
+```text
+bibifold/
+├── src/
+│   ├── main.ts                       # Arranque, tema Papel/Pizarra, modo Eco y estado global
+│   ├── core/
+│   │   ├── LessonSpec.ts             # Contrato declarativo de lecciones (4 motores)
+│   │   ├── InteractiveEngine.ts      # Interfaz común de motores + ciclo de vida
+│   │   ├── EngineRegistry.ts         # Registro dinámico y lazy-loading por motor
+│   │   ├── InputBus.ts               # Bus tipado (mouse, teclado, táctil, gamepad opcional)
+│   │   └── Storage.ts                # Persistencia local (IndexedDB / localStorage + JSON)
+│   ├── engines/
+│   │   ├── webgl3d/                  # Three.js + shaders GLSL crayón + fallback 2D SVG
+│   │   ├── symbolic/                 # AST matemático ligero, bloques arrastrables y verificador
+│   │   ├── discrete/                 # Simulador de bits, compuertas, DFA/Turing, grafos y RSA
+│   │   └── codelab/                  # Retos interactivos Rust/Java (predicción, bugfix, memoria)
+│   ├── ai/
+│   │   ├── bkt.ts                    # Rastreo Bayesiano del Conocimiento por subhabilidad
+│   │   ├── bandit.ts                 # Bandit contextual ligero para dificultad y andamiaje
+│   │   ├── dag.ts                    # Grafo de prerrequisitos y ruteo de micro-repasos
+│   │   └── placement.ts              # Diagnóstico inicial adaptativo (8 ítems)
+│   ├── workers/
+│   │   ├── symbolicReg.worker.ts     # Programación genética paralela (Ryzen 16 hilos)
+│   │   └── numerical.worker.ts       # Monte Carlo, FFT y verificaciones pesadas sin bloquear UI
+│   ├── curriculum/
+│   │   ├── tier-0/ ... tier-5/       # Archivos declarativos L0-01.ts ... L5-04.ts
+│   │   └── index.ts                  # Registro del DAG completo (40 lecciones)
+│   └── ui/
+│       ├── TheoryPlayer.ts           # Intro guiada de 4 pasos
+│       ├── PracticeBar.ts            # Flujo Explorar -> Probar -> Integrar -> Reto
+│       ├── AnatomyInspector.ts       # Separar/Unir capas + sincronización simbólica
+│       ├── CodeMemoryDrawer.ts       # Panel lateral Rust/Java + Reto Práctico
+│       └── SkillMapModal.ts          # Mapa interactivo del Índice con estados de dominio
+└── tests/
+    ├── math-kernels.test.ts          # Pruebas unitarias de SVD, AutoDiff, BKT, RSA, IEEE 754
+    ├── symbolic-ast.test.ts          # Equivalencia algebraica y verificación de pruebas
+    └── dag-integrity.test.ts         # Cero ciclos, prerrequisitos válidos y cobertura BKT
+```
+
+### 3.2 Contrato declarativo `LessonSpec` y motores enchufables
+
+Cada lección se declara como datos tipados, evitando duplicar lógica de UI, telemetría o persistencia.
+
+```ts
+export type EngineKind = 'webgl3d' | 'symbolic' | 'discrete' | 'codelab';
+export type TierId = 0 | 1 | 2 | 3 | 4 | 5;
+
+export interface TheoryStep {
+  step: 1 | 2 | 3 | 4;
+  label: 'La idea' | 'Partes de la gráfica' | 'Míralo en acción' | 'Fórmula y uso real';
+  headline: string;
+  body: string;
+  visualPresetId: string;
+}
+
+export interface AnatomyLayer {
+  id: string;
+  label: string;
+  symbolicToken: string;        // Token de ecuación vinculado a esta capa
+  defaultVisible: boolean;
+  scaffoldingPriority: number;  // Orden en que BKT/Bandit la enciende como ayuda
+}
+
+export interface CodeBridgeSpec {
+  memoryLayout: string;         // Ej: "[f32; 9] en Stack (36 bytes, Column-Major)"
+  timeComplexity: string;       // Ej: "O(n^3) para SVD 3x3; O(1) tamaño fijo"
+  systemsApplication: string;
+  snippets: {
+    rust: string;
+    java: string;
+  };
+  interactiveCheck: {
+    prompt: string;
+    kind: 'predict_output' | 'fix_expression' | 'select_complexity';
+    options?: string[];
+    expected: string;
+    explanation: string;
+  };
+}
+
+export interface ChallengeSpec {
+  id: string;
+  skillId: string;
+  difficulty: 1 | 2 | 3;
+  engine: EngineKind;
+  prompt: string;
+  hint: string;
+  validate: (state: unknown) => {
+    passed: boolean;
+    numericError?: number;
+    failedAnatomyLayerId?: string;
+    feedback: string;
+  };
+}
+
+export interface LessonSpec {
+  id: string;                   // Ej: "L2-01"
+  tier: TierId;
+  moduleTitle: string;
+  title: string;
+  summary: string;
+  prerequisites: string[];      // IDs de lecciones en el DAG
+  skills: string[];             // Subhabilidades rastreadas por BKT
+  primaryEngine: EngineKind;
+  secondaryEngines?: EngineKind[];
+  theory: [TheoryStep, TheoryStep, TheoryStep, TheoryStep];
+  anatomyLayers: AnatomyLayer[];
+  engineConfig: Record<string, unknown>;
+  codeBridge: CodeBridgeSpec;
+  challenges: ChallengeSpec[];
+}
+
+export interface InteractiveEngine<TConfig = unknown, TState = unknown> {
+  readonly kind: EngineKind;
+  mount(container: HTMLElement, config: TConfig, options: { ecoMode: boolean; theme: 'papel' | 'pizarra' }): void;
+  setAnatomyExploded(exploded: boolean, activeLayerIds: string[]): void;
+  getState(): TState;
+  reset(): void;
+  resize(): void;
+  dispose(): void;
+}
+```
+
+### 3.3 Motor adaptativo local (BKT + Bandit Contextual + DAG)
+
+Para cada subhabilidad $k$, el sistema mantiene una probabilidad de dominio $P(L_k) \in [0, 1]$ con parámetros $(P(L_0), P(T), P(G), P(S))$ actualizados localmente tras cada verificación de reto:
+
+* **Si el estudiante acierta:**
+  $$P(L_t \mid \text{acierto}) = \frac{P(L_{t-1})(1 - P(S))}{P(L_{t-1})(1 - P(S)) + (1 - P(L_{t-1})) P(G)}$$
+* **Si el estudiante falla:**
+  $$P(L_t \mid \text{fallo}) = \frac{P(L_{t-1}) P(S)}{P(L_{t-1}) P(S) + (1 - P(L_{t-1}))(1 - P(G))}$$
+* **Transición de aprendizaje:**
+  $$P(L_t^{\text{nuevo}}) = P(L_t \mid \text{obs}) + \big(1 - P(L_t \mid \text{obs})\big) P(T)$$
+
+Sobre ese vector de dominio y la telemetría de sesión (tiempo de respuesta, error numérico y número de reinicios), un **Bandit Contextual** (LinUCB ligero en < 50 líneas de TypeScript) decide entre tres acciones:
+
+1. **Refuerzo Anatómico Guiado:** reduce complejidad numérica y enciende automáticamente la capa `failedAnatomyLayerId` del Modo Anatomía.
+2. **Práctica Calibrada:** mantiene dificultad intermedia y retira capas guía progresivamente cuando $P(L_k) \ge 0.70$.
+3. **Desafío de Transferencia / Ruteo por Prerrequisito:** si $P(L_k) \ge 0.85$, activa el reto de código o dificultad 3; si el estudiante acumula 2 fallos seguidos en una subhabilidad cuyo prerrequisito tiene $P(L_{\text{pre}}) < 0.70$, el DAG sugiere un micro-repaso de 2 minutos en el nodo padre.
+
+## 4. Gamificación Sobria, Diagnóstico Inicial y Estrategia de Portafolio
+
+### 4.1 Diagnóstico inicial adaptativo (*Placement Test*)
+
+Al abrir BIBIFOLD por primera vez, el usuario elige entre **"Empezar desde 0"** o **"Diagnóstico rápido (5 min)"**:
+
+1. El algoritmo ejecuta una **búsqueda binaria sobre los Niveles 0 a 3** (8 micro-retos mixtos: 2 simbólicos, 2 discretos, 2 visuales y 2 de código).
+2. Cada acierto en un nivel marca automáticamente sus nodos prerrequisito con $P(L_k) = 0.85$ (`mastered`), desbloqueando el punto exacto donde el usuario necesita aprender.
+3. Quien prefiera exploración libre puede abrir cualquier lección en modo consulta sin perder el seguimiento de progreso verificado.
+
+### 4.2 Estados de nodo y retención espaciada
+
+| Estado del nodo en el `Índice` | Criterio de activación | Comportamiento visual |
+| :--- | :--- | :--- |
+| `locked` | Algún prerrequisito del DAG tiene $P(L) < 0.75$ | Trazo punteado tenue; permite vista previa pero sugiere completar la base primero. |
+| `available` | Todos los prerrequisitos dominados | Trazo sólido en tinta; listo para iniciar. |
+| `in_progress` | Al menos 1 etapa completada o $0.25 \le P(L) < 0.85$ | Barra de progreso circular y nivel adaptado visible. |
+| `mastered` | Todas las subhabilidades $\ge 0.85$ + reto de código aprobado | Sello en tinta cobalto; desbloquea nodos descendientes. |
+| `needs_review` | Han pasado > 21 días sin practicar y el decaimiento baja el dominio de 0.80 | Marca sutil en bermellón; ofrece un micro-reto de 1 minuto para revalidar. |
+
+### 4.3 Plan de pruebas y evidencias de ingeniería para tu portafolio
+
+Para que BIBIFOLD destaque frente a reclutadores y líderes técnicos, el repositorio debe incluir:
+
+* **Tests unitarios deterministas (Vitest):** Cobertura de los núcleos matemáticos (SVD, determinantes, autovectores, derivación automática, BKT, inverso modular RSA, codificación IEEE 754) y del validador de integridad del DAG (sin ciclos ni IDs huérfanos).
+* **Tests de degradación y accesibilidad:** Verificación automatizada de que todas las lecciones cargan sin errores cuando `WebGL2RenderingContext` no está disponible y con navegación por teclado.
+* **Sección de Benchmarks en el `README.md`:** Tabla medida directamente en tu Lenovo Slim 3 (Ryzen 7 5700U + Radeon Vega 8 + 12 GB RAM) reportando FPS promedio, *frame time* p95, consumo de RAM y latencia de *Web Workers* en modo normal frente a modo `Eco`.
+* **Documentación de arquitectura (`ARCHITECTURE.md`):** Diagrama de los 4 motores, cómo agregar una lección nueva en un solo archivo `.ts` y cómo corre la IA adaptativa 100 % en el cliente.
+
+## 5. Hoja de Ruta de Ejecución por Sprints (4 Fases)
+
+| Fase | Sprints | Alcance técnico concreto | Criterio de cierre (*Definition of Done*) |
+| :--- | :--- | :--- | :--- |
+| **Fase 1 · Consolidar v1** | Sprints 1–2 (3–4 semanas) | Extraer `LessonSpec` e `InteractiveEngine`; implementar `SymbolicEngine` v1 y `CodeLabEngine` v1; enriquecer las 8 lecciones activas (`L2-01..04`, `L3-01..04`) con retos simbólicos y de código; añadir suite Vitest base. | Las 8 lecciones desplegadas en Vercel superan "solo gráficas", pasan tests unitarios y funcionan con WebGL 2 y con fallback 2D. |
+| **Fase 2 · Motor Discreto y CS Esencial** | Sprints 3–5 (6 semanas) | Implementar `DiscreteEngine` (bits, compuertas, DFA/Turing, grafos paso a paso) y publicar las 9 lecciones del Nivel 1 (`L1-01..09`) conectadas al DAG de prerrequisitos. | 17 lecciones activas; el simulador discreto cubre lógica, inducción, binario, autómatas, grafos y Big-O con verificación local. |
+| **Fase 3 · 0 a Núcleo Completo** | Sprints 6–9 (8 semanas) | Publicar Nivel 0 (`L0-01..06`), Cálculo I (`L2-05..07`), Probabilidad/Bayes (`L2-08..09`), Criptografía RSA (`L2-10`) y el diagnóstico inicial (*Placement Test*). | 29 lecciones activas; un usuario nuevo puede aprender de 0 a nivel universitario de forma autónoma con ruteo BKT real. |
+| **Fase 4 · Avanzado, Jefes y Nichos** | Sprints 10–12 (6 semanas) | Publicar Métodos Numéricos y Complejo (`L3-05..08`), los 3 Retos Integradores (`L4-01..03`), las 4 Rutas de Especialización (`L5-01..04`), repaso espaciado y benchmarks finales de portafolio. | 40 lecciones activas, documentación open-source completa, benchmarks medidos en Ryzen 7 5700U y despliegue v2.0 listo para portafolio. |
+
+## 6. Fuentes y Referencias
+
+* [BIBIFOLD — Prototipo web desplegado en Vercel](https://interactive-math-learning-eight.vercel.app/)
+* [Math for computer science roadmap — Eugen Barbulescu (DEV Community, 2023)](https://dev.to/erupturatis/math-for-computer-science-roadmap-1d8h)
+* Especificación base del proyecto (`TELEMÁTICA.pdf` — Propuesta FPI-07 v.04 y lineamientos de hardware y estética de BIBIFOLD).

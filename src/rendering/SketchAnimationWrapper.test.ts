@@ -4,8 +4,10 @@ import * as THREE from 'three';
 import { FirstDrawRegistry } from '../core/firstDrawRegistry';
 import {
   Object3DSketchAnimator,
+  computeContourFillPhases,
   computeLineDrawRangeCount,
   computeProceduralStrokeTiming,
+  computeSegmentedStrokeTip,
   computeSketchEntranceTransform,
 } from './SketchAnimationWrapper';
 
@@ -26,6 +28,46 @@ test('computeSketchEntranceTransform transitions smoothly from 0 opacity and red
   assert.equal(end.scale, 1);
   assert.equal(end.drawProgress, 1);
   assert.equal(end.done, true);
+});
+
+test('computeContourFillPhases traces perimeter contour before sweeping wax interior fill', () => {
+  const start = computeContourFillPhases(0);
+  assert.equal(start.contourPhase, 0);
+  assert.equal(start.fillPhase, 0);
+
+  const early = computeContourFillPhases(0.22);
+  assert.ok(early.contourPhase > 0.5, 'contour leads early');
+  assert.equal(early.fillPhase, 0, 'interior fill waits until contour establishes');
+
+  const mid = computeContourFillPhases(0.6);
+  assert.equal(mid.contourPhase, 1);
+  assert.ok(mid.fillPhase > 0.25 && mid.fillPhase < 0.75);
+
+  const end = computeContourFillPhases(1);
+  assert.equal(end.contourPhase, 1);
+  assert.equal(end.fillPhase, 1);
+});
+
+test('computeSegmentedStrokeTip smoothly interpolates the moving crayon nib tip across segments', () => {
+  // Single segment from (0,0,0) -> (10,0,0)
+  const single = new Float32Array([0, 0, 0, 10, 0, 0]);
+  const mid = computeSegmentedStrokeTip(single, 0.5, false);
+  assert.equal(mid.drawVertexCount, 2);
+  assert.ok(mid.tipLocalPos);
+  assert.ok(Math.abs(mid.tipLocalPos[0] - 5) < 1e-4);
+  assert.equal(mid.activeSegmentIndex, 0);
+
+  // Two disjoint LineSegments: (0,0,0)->(4,0,0) and (0,2,0)->(4,2,0)
+  const segs = new Float32Array([0, 0, 0, 4, 0, 0, 0, 2, 0, 4, 2, 0]);
+  const q1 = computeSegmentedStrokeTip(segs, 0.25, true);
+  assert.equal(q1.drawVertexCount, 2);
+  assert.equal(q1.activeSegmentIndex, 0);
+  assert.ok(q1.tipLocalPos && Math.abs(q1.tipLocalPos[0] - 2) < 1e-4);
+
+  const q3 = computeSegmentedStrokeTip(segs, 0.75, true);
+  assert.equal(q3.drawVertexCount, 4);
+  assert.equal(q3.activeSegmentIndex, 1);
+  assert.ok(q3.tipLocalPos && Math.abs(q3.tipLocalPos[0] - 2) < 1e-4 && Math.abs(q3.tipLocalPos[1] - 2) < 1e-4);
 });
 
 test('computeProceduralStrokeTiming stages layers and individual elements sequentially', () => {
@@ -135,12 +177,14 @@ test('Object3DSketchAnimator drives progressive line drawRange, stroke callbacks
   assert.equal(collapseSheet.userData._sketchOpacity, undefined);
   assert.equal(milestones.length, 2);
 
-  // Mid-frame at t=1320: line has partially drawn vertices
+  // Mid-frame at t=1320: line has partially drawn vertices and reports an active 3D stroke tip
   animator.updateObjectTree('lin-span', root, 1320, {
     durationMs: 600,
     staggerByLayer: false,
   });
   assert.ok(line.geometry.drawRange.count >= 2 && line.geometry.drawRange.count < 6);
+  const tip = animator.getActiveStrokeTip();
+  assert.ok(tip && tip.active, 'active stroke tip tracks moving crayon nib mid-draw');
 
   // Frame at t=1900: settled cleanly at 1.0 and drawRange restored to Infinity
   const active1 = animator.updateObjectTree('lin-span', root, 1900, {
@@ -151,6 +195,7 @@ test('Object3DSketchAnimator drives progressive line drawRange, stroke callbacks
   assert.equal(cube.userData._sketchOpacity, 1);
   assert.equal(cube.userData._sketchScale, 1);
   assert.equal(line.geometry.drawRange.count, Infinity);
+  assert.equal(animator.getActiveStrokeTip(), null);
 
   // Dynamic reveal of collapseSheet at t=2000
   collapseSheet.visible = true;
@@ -170,4 +215,62 @@ test('Object3DSketchAnimator drives progressive line drawRange, stroke callbacks
   assert.equal(replayed, true);
   assert.equal(cube.userData._sketchOpacity, 0);
   assert.equal(line.geometry.drawRange.count, 0);
+});
+
+test('Object3DSketchAnimator setPaused freezes progress without jump on resume, completeScene settles, replayLayer isolates one layer', () => {
+  const reg = new FirstDrawRegistry();
+  const animator = new Object3DSketchAnimator(reg);
+
+  const root = new THREE.Group();
+  const substrate = new THREE.Group();
+  substrate.userData.anatomyLayerId = 'substrate';
+  const operator = new THREE.Group();
+  operator.userData.anatomyLayerId = 'operator';
+
+  const axis = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(4, 0, 0),
+    ]),
+    new THREE.LineBasicMaterial()
+  );
+  const vec = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 3, 0),
+    ]),
+    new THREE.LineBasicMaterial()
+  );
+  substrate.add(axis);
+  operator.add(vec);
+  root.add(substrate, operator);
+
+  animator.updateObjectTree('lin-span', root, 1000, { durationMs: 1000, staggerByLayer: false });
+  animator.updateObjectTree('lin-span', root, 1400, { durationMs: 1000, staggerByLayer: false });
+  const drawBeforePause = vec.userData._sketchDraw as number;
+  assert.ok(drawBeforePause > 0.1 && drawBeforePause < 0.9);
+
+  // Pause at t=1400, advance wall clock by 5000ms while paused -> progress stays frozen
+  animator.setPaused(true, 1400);
+  assert.equal(animator.isPaused(), true);
+  animator.updateObjectTree('lin-span', root, 6400, { durationMs: 1000, staggerByLayer: false });
+  assert.equal(vec.userData._sketchDraw, drawBeforePause);
+
+  // Resume at t=6400 -> at t=6400 progress has not jumped forward
+  animator.setPaused(false, 6400);
+  assert.equal(animator.isPaused(), false);
+  animator.updateObjectTree('lin-span', root, 6400, { durationMs: 1000, staggerByLayer: false });
+  assert.ok(Math.abs((vec.userData._sketchDraw as number) - drawBeforePause) < 0.02);
+
+  // completeScene immediately settles everything to 1.0
+  animator.completeScene('lin-span', root);
+  assert.equal(axis.userData._sketchDraw, 1);
+  assert.equal(vec.userData._sketchDraw, 1);
+  assert.equal(animator.getActiveStrokeTip(), null);
+
+  // replayLayer only resets 'operator', keeping 'substrate' settled
+  animator.replayLayer('lin-span', root, 'operator');
+  animator.updateObjectTree('lin-span', root, 7000, { durationMs: 600, staggerByLayer: false });
+  assert.equal(axis.userData._sketchDraw, 1, 'substrate remains untouched');
+  assert.ok((vec.userData._sketchDraw as number) < 0.1, 'operator restarts trace from beginning');
 });

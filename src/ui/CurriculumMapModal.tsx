@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import rough from 'roughjs';
 import { CrayonArrowRight, CrayonClose, CrayonReset } from './CrayonIcons';
+import { computeDecayedMastery, needsSpacedReview } from '../ai/bktEngine';
 import { CURRICULUM_BLOCKS, SCENES } from '../core/curriculum';
 import { globalFirstDrawRegistry } from '../core/firstDrawRegistry';
 import { GUIDED_LESSONS } from '../core/lessons';
+import { ROADMAP_TIERS } from '../core/lessonSpecs';
 import { getUiCrayonHex } from '../core/palette';
 import type { BktSkillState, SceneId, SkillId, ThemeMode } from '../core/types';
 import { CrayonProgressStroke, RoughDivider } from './RoughElements';
@@ -14,10 +16,14 @@ interface CurriculumMapModalProps {
   activeSceneId: SceneId;
   bktMap: Record<SkillId, BktSkillState>;
   completedStepIds: ReadonlySet<string>;
+  completedSymbolicScenes?: ReadonlyArray<SceneId>;
+  completedCodeLabScenes?: ReadonlyArray<SceneId>;
   theme: ThemeMode;
   onSelectScene: (sceneId: SceneId, replayIntro?: boolean) => void;
   onClose: () => void;
   onResetProgress: () => void;
+  onExportProgress?: () => string;
+  onImportProgress?: (rawJson: string) => { ok: boolean; message: string };
 }
 
 /**
@@ -150,11 +156,18 @@ export function CurriculumMapModal({
   activeSceneId,
   bktMap,
   completedStepIds,
+  completedSymbolicScenes = [],
+  completedCodeLabScenes = [],
   theme,
   onSelectScene,
   onClose,
   onResetProgress,
+  onExportProgress,
+  onImportProgress,
 }: CurriculumMapModalProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [transferNotice, setTransferNotice] = useState<{ ok: boolean; text: string } | null>(null);
+
   if (!open) return null;
 
   const totalSteps = Object.values(GUIDED_LESSONS).reduce((acc, l) => acc + l.steps.length, 0);
@@ -162,6 +175,38 @@ export function CurriculumMapModal({
     (acc, l) => acc + l.steps.filter((s) => completedStepIds.has(s.id)).length,
     0
   );
+
+  const handleExportClick = () => {
+    if (!onExportProgress) return;
+    const json = onExportProgress();
+    try {
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bibifold-progreso-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setTransferNotice({ ok: true, text: 'Respaldo JSON descargado.' });
+    } catch {
+      setTransferNotice({ ok: false, text: 'No se pudo generar la descarga.' });
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !onImportProgress) return;
+    try {
+      const text = await file.text();
+      const res = onImportProgress(text);
+      setTransferNotice({ ok: res.ok, text: res.message });
+    } catch {
+      setTransferNotice({ ok: false, text: 'No se pudo leer el archivo seleccionado.' });
+    }
+  };
 
   const jumpToBlock = (blockId: string) => {
     const el = document.getElementById(`index-${blockId}`);
@@ -227,11 +272,15 @@ export function CurriculumMapModal({
                   <div className="divide-y divide-dashed divide-[var(--hairline)]">
                     {scenes.map((scene) => {
                       const skill = bktMap[scene.skillId];
-                      const pct = Math.round((skill?.pL ?? 0.25) * 100);
+                      const effectivePL = skill ? computeDecayedMastery(skill) : 0.25;
+                      const reviewDue = skill ? needsSpacedReview(skill) : false;
+                      const pct = Math.round(effectivePL * 100);
                       const lesson = GUIDED_LESSONS[scene.id];
                       const stepsDone = lesson.steps.filter((s) =>
                         completedStepIds.has(s.id)
                       ).length;
+                      const symDone = completedSymbolicScenes.includes(scene.id);
+                      const codeDone = completedCodeLabScenes.includes(scene.id);
                       const isCurrent = scene.id === activeSceneId;
 
                       return (
@@ -263,6 +312,10 @@ export function CurriculumMapModal({
                             </div>
                             <p className="text-[14.5px] text-[var(--text-secondary)] pl-7">
                               {scene.subtitle}
+                            </p>
+                            <p className="text-[12.5px] text-[var(--text-muted)] pl-7 pt-0.5">
+                              3D · Simbólico{symDone ? ' ✓' : ''} · CodeLab{codeDone ? ' ✓' : ''}
+                              {reviewDue ? ' · Repaso sugerido' : ''}
                             </p>
                           </button>
 
@@ -306,52 +359,103 @@ export function CurriculumMapModal({
 
           <RoughDivider theme={theme} seed={419} />
 
-          {/* Future Chapters Roadmap — concise, readable */}
+          {/* Upgraded 0→100 Roadmap Overview (6 Tiers · 40 Planned Lessons) */}
           <section className="space-y-4">
             <div>
               <h3 className="font-display crayon-ink text-[23px] text-[var(--text-primary)]">
-                Próximos cuadernos (Módulos 03–06)
+                Ruta maestra 0→100 (40 lecciones · 4 motores)
               </h3>
               <p className="text-[15px] text-[var(--text-secondary)]">
-                Siguientes temas planeados en la ruta de matemáticas visuales para ingeniería.
+                Evolución modular desde cimientos hasta jefes integradores, comenzando en la siguiente ola por el Motor Discreto de CS.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-5">
-              {CURRICULUM_BLOCKS.filter((b) => b.status === 'phase2').map((block) => (
+              {ROADMAP_TIERS.map((tier) => (
                 <div
-                  key={block.id}
+                  key={tier.code}
                   className="pt-3 border-t border-dashed border-[var(--hairline)] space-y-1"
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <h4 className="font-display text-[20px] text-[var(--text-primary)]">
-                      0{block.index}. {block.title}
+                      {tier.code} · {tier.title}
                     </h4>
-                    <span className="text-[13.5px] text-[var(--text-muted)] whitespace-nowrap">
-                      Próximamente
+                    <span className="text-[13px] text-[var(--text-muted)] whitespace-nowrap tabular-nums">
+                      {tier.activeCount > 0
+                        ? `${tier.activeCount}/${tier.lessonCount} activas`
+                        : `${tier.lessonCount} lecc. · ${tier.waveLabel}`}
                     </span>
                   </div>
-                  <p className="text-[14.5px] text-[var(--text-secondary)] leading-snug">
-                    {block.csTopics.join(' · ')}
+                  <p className="text-[13px] text-[var(--text-muted)]">
+                    {tier.engineFocus}
+                  </p>
+                  <p className="text-[14px] text-[var(--text-secondary)] leading-snug">
+                    {tier.highlights.join(' · ')}
                   </p>
                 </div>
               ))}
             </div>
           </section>
 
-          {/* Quiet progress reset footer */}
-          <div className="pt-4 pb-6 border-t border-dashed border-[var(--hairline)] flex items-center justify-between gap-4">
-            <p className="text-[14px] text-[var(--text-muted)]">
-              Tu avance se guarda automáticamente en este navegador.
-            </p>
-            <button
-              type="button"
-              onClick={onResetProgress}
-              className="inline-flex items-center gap-1.5 text-[15px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
-            >
-              <CrayonReset size={15} />
-              <span>Reiniciar progreso</span>
-            </button>
+          {/* Quiet progress export/import & reset footer */}
+          <div className="pt-4 pb-6 border-t border-dashed border-[var(--hairline)] flex flex-wrap items-center justify-between gap-4">
+            <div className="space-y-0.5">
+              <p className="text-[14px] text-[var(--text-muted)]">
+                Tu avance (esquema v3 con decaimiento de repaso) se guarda localmente en este navegador.
+              </p>
+              {transferNotice && (
+                <p
+                  data-testid="progress-transfer-notice"
+                  className="text-[13.5px]"
+                  style={{
+                    color: transferNotice.ok ? 'var(--ui-success)' : 'var(--ui-warning)',
+                  }}
+                >
+                  {transferNotice.text}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              {onExportProgress && (
+                <button
+                  type="button"
+                  data-testid="export-progress-btn"
+                  onClick={handleExportClick}
+                  className="text-[14.5px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap transition-colors"
+                >
+                  Exportar JSON
+                </button>
+              )}
+              {onImportProgress && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={handleImportFile}
+                    className="hidden"
+                    aria-label="Importar respaldo JSON de progreso"
+                  />
+                  <button
+                    type="button"
+                    data-testid="import-progress-btn"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-[14.5px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap transition-colors"
+                  >
+                    Importar JSON
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                onClick={onResetProgress}
+                className="inline-flex items-center gap-1.5 text-[15px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
+              >
+                <CrayonReset size={15} />
+                <span>Reiniciar progreso</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

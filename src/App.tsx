@@ -19,6 +19,7 @@ import type {
   SceneId,
   SymbolicParameter,
   ThemeMode,
+  WorkspaceEngineMode,
 } from './core/types';
 import { updateBktSkill } from './ai/bktEngine';
 import {
@@ -36,7 +37,9 @@ import {
 } from './audio/crayonAudio';
 import {
   createDefaultPersistedData,
+  exportProgressJson,
   loadPersistedAiData,
+  parseImportedProgressJson,
   savePersistedAiData,
   type PersistedAiData,
 } from './storage/localTelemetry';
@@ -63,7 +66,9 @@ import { LessonIntroPlayer } from './ui/LessonIntroPlayer';
 import { CrayonStamp } from './ui/CrayonStamp';
 import { SketchAnimationWrapper } from './ui/SketchAnimationWrapper';
 import { ViewportAnnotationsOverlay } from './ui/ViewportAnnotationsOverlay';
-import { CrayonSvgDefs, WebGLFallbackSvg } from './ui/RoughElements';
+import { SymbolicWorkspace } from './ui/SymbolicWorkspace';
+import { CodeLabWorkspace } from './ui/CodeLabWorkspace';
+import { CrayonSvgDefs, RoughUnderline, WebGLFallbackSvg } from './ui/RoughElements';
 
 const LESSON_PROGRESS_KEY = 'bibifold_completed_steps_v1';
 
@@ -130,7 +135,9 @@ export default function App() {
     return true;
   });
   const [introBeatIdx, setIntroBeatIdx] = useState<number>(0);
+  const [introPlaying, setIntroPlaying] = useState<boolean>(true);
   const seenIntrosRef = useRef<Set<SceneId>>(new Set(['lin-span']));
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceEngineMode>('webgl3d');
 
   // Non-obtrusive 3D Viewport Legend, 5s idle Crayón Guía & Crayon Dust energy tracker
   const [legendOpen, setLegendOpen] = useState<boolean>(false);
@@ -336,6 +343,9 @@ export default function App() {
       setCelebrationStamp(null);
       setDrawerMode('closed');
       setMapOpen(false);
+      setWorkspaceMode('webgl3d');
+      setIntroPlaying(true);
+      managerRef.current?.setConstructionPaused(false);
       setProjectedAnnotations([]);
       dustEnergyRef.current.reset();
       erraticRef.current = { lastDeltaSign: 0, reversals: 0, moves: 0 };
@@ -386,9 +396,16 @@ export default function App() {
     setAutoDiffPass(st.autoDiffPass ?? 'idle');
     setOptimizerRunning(Boolean(st.startOptimizer));
 
-    // Beat 0 replays the full structured, stroke-by-stroke procedural 3D build in real time
+    // Beat choreography sync for segmented trace-by-trace 3D construction:
+    // - Beat 0: full structured, trace-by-trace procedural 3D build with moving crayon nib
+    // - Beat 1 ("Partes de la gráfica"): re-traces the focused anatomy layer cleanly
+    // - Beats 2+: settles all construction strokes cleanly so live parameter motion shines
     if (introBeatIdx === 0) {
       managerRef.current?.replayProceduralBuild();
+    } else if (introBeatIdx === 1 && st.focusedLayerId) {
+      managerRef.current?.replayLayerBuild(st.focusedLayerId);
+    } else if (introBeatIdx >= 2) {
+      managerRef.current?.completeProceduralBuild();
     }
 
     const targetParams = { ...defaultParamsFor(sceneId), ...(st.params ?? {}) };
@@ -427,10 +444,23 @@ export default function App() {
     };
   }, [introOpen, sceneId, introBeatIdx, steadyStrokes, cancelParamAnim, theme]);
 
+  // Synchronize LessonIntroPlayer Play/Pause with SceneManager segmented stroke construction
+  useEffect(() => {
+    const paused = introOpen && !introPlaying;
+    managerRef.current?.setConstructionPaused(paused);
+    if (paused) {
+      cancelParamAnim();
+      audioEngineRef.current?.stopIntroPhrase();
+    }
+  }, [introOpen, introPlaying, cancelParamAnim]);
+
   // Transition smoothly from fullscreen intro to clean hands-on practice
   const handleFinishIntro = useCallback(() => {
     cancelParamAnim();
     audioEngineRef.current?.stopIntroPhrase();
+    setIntroPlaying(true);
+    managerRef.current?.setConstructionPaused(false);
+    managerRef.current?.completeProceduralBuild();
     setOptimizerRunning(false);
     setParamValues(defaultParamsFor(sceneId));
     setExploded(false);
@@ -573,13 +603,17 @@ export default function App() {
 
   // Toggle 3D-to-2D annotation projection when Legend or 5s idle Crayón Guía is active
   useEffect(() => {
-    const needsProjection = !introOpen && drawerMode === 'closed' && (legendOpen || idleGuideActive);
+    const needsProjection =
+      !introOpen &&
+      workspaceMode === 'webgl3d' &&
+      drawerMode === 'closed' &&
+      (legendOpen || idleGuideActive);
     managerRef.current?.setAnnotationsEnabled(needsProjection);
-  }, [legendOpen, idleGuideActive, introOpen, drawerMode]);
+  }, [legendOpen, idleGuideActive, introOpen, workspaceMode, drawerMode]);
 
-  // 5-second inactivity timer for 'Crayón Guía' during open hands-on practice
+  // 5-second inactivity timer for 'Crayón Guía' during open hands-on 3D practice
   useEffect(() => {
-    if (introOpen || mapOpen || drawerMode !== 'closed') {
+    if (introOpen || workspaceMode !== 'webgl3d' || mapOpen || drawerMode !== 'closed') {
       setIdleGuideActive(false);
       return;
     }
@@ -608,14 +642,14 @@ export default function App() {
       window.removeEventListener('wheel', onUserActivity, { capture: true });
       window.removeEventListener('touchstart', onUserActivity, { capture: true });
     };
-  }, [introOpen, mapOpen, drawerMode, sceneId, paramValues, exploded, legendOpen, activeStepIdx]);
+  }, [introOpen, workspaceMode, mapOpen, drawerMode, sceneId, paramValues, exploded, legendOpen, activeStepIdx]);
 
   // Play delicate pencil/crayon flick when Crayón Guía draws in (if unlocked and not in Eco Mode)
   useEffect(() => {
-    if (idleGuideActive && !introOpen && drawerMode === 'closed') {
+    if (idleGuideActive && !introOpen && workspaceMode === 'webgl3d' && drawerMode === 'closed') {
       audioEngineRef.current?.playAnnotationSketch(theme, performance.now());
     }
-  }, [idleGuideActive, introOpen, drawerMode, theme]);
+  }, [idleGuideActive, introOpen, workspaceMode, drawerMode, theme]);
 
   // Center the 3D diagram cleanly in the open stage above the bottom narration bar during Intro
   useEffect(() => {
@@ -1003,6 +1037,64 @@ export default function App() {
     symbolicTargetIdx,
   ]);
 
+  // Record Symbolic Engine v1 and CodeLab Engine v1 attempts into BKT mastery + schema-v3 storage
+  const handleEngineAttempt = useCallback(
+    (engineKind: 'symbolic' | 'codelab', passed: boolean) => {
+      const skillId = sceneMeta.skillId;
+      const prevSkill = aiData.bkt[skillId];
+      const nextSkill = updateBktSkill(prevSkill, passed);
+
+      const listKey =
+        engineKind === 'symbolic' ? 'completedSymbolicScenes' : 'completedCodeLabScenes';
+      const existing = aiData[listKey];
+      const wasCompleted = existing.includes(sceneId);
+      const nextList = passed && !wasCompleted ? [...existing, sceneId] : existing;
+
+      const nextData: PersistedAiData = {
+        ...aiData,
+        bkt: {
+          ...aiData.bkt,
+          [skillId]: nextSkill,
+        },
+        [listKey]: nextList,
+      };
+      setAiData(nextData);
+      savePersistedAiData(nextData);
+
+      if (passed && !wasCompleted) {
+        setCelebrationStamp({
+          key: `${engineKind}-${sceneId}-${Date.now()}`,
+          title: engineKind === 'symbolic' ? '¡Prueba Lista!' : '¡CodeLab Listo!',
+          subtitle: `Dominio ${Math.round(nextSkill.pL * 100)}%`,
+          badge: engineKind === 'symbolic' ? 'SIMBÓLICO' : 'CODELAB',
+          crayon: engineKind === 'symbolic' ? 'sage' : 'ochre',
+        });
+      }
+    },
+    [aiData, sceneId, sceneMeta.skillId]
+  );
+
+  const handleExportProgress = useCallback(
+    () => exportProgressJson(aiData, completedStepIds),
+    [aiData, completedStepIds]
+  );
+
+  const handleImportProgress = useCallback(
+    (rawJson: string): { ok: boolean; message: string } => {
+      const res = parseImportedProgressJson(rawJson);
+      if (!res.ok) {
+        return { ok: false, message: res.error };
+      }
+      setAiData(res.aiData);
+      savePersistedAiData(res.aiData);
+      const nextSteps = new Set(res.completedStepIds);
+      setCompletedStepIds(nextSteps);
+      saveCompletedSteps(nextSteps);
+      return { ok: true, message: 'Progreso restaurado en tu cuaderno local.' };
+    },
+    []
+  );
+
   // Derived live computational bridge & metrics
   const adamCurrentLoss = adamProbe
     ? evaluateLossLandscape(adamProbe.x, adamProbe.y, landscape).loss
@@ -1112,6 +1204,7 @@ export default function App() {
       data-eco={ecoMode ? 'true' : 'false'}
       data-audio={ecoMode ? 'eco-muted' : audioEnabled ? 'on' : 'off'}
       data-intro={introOpen ? 'true' : 'false'}
+      data-workspace-mode={workspaceMode}
     >
       <CrayonSvgDefs ecoMode={ecoMode} />
 
@@ -1129,6 +1222,9 @@ export default function App() {
             audioEngineRef.current?.unlock();
             setDrawerMode('closed');
             setMapOpen(false);
+            setWorkspaceMode('webgl3d');
+            setIntroPlaying(true);
+            managerRef.current?.setConstructionPaused(false);
             setIntroBeatIdx(0);
             setIntroOpen(true);
           }}
@@ -1174,59 +1270,126 @@ export default function App() {
               audioEngineRef.current?.unlock();
               setIntroBeatIdx(nextBeat);
             }}
+            onPlayingChange={(playing) => setIntroPlaying(playing)}
             onFinish={handleFinishIntro}
           />
         )}
 
-        {/* HANDS-ON PRACTICE HEADER: Minimal direct-on-paper title + single live metric line */}
+        {/* Calm Top-Right Workspace Mode Switcher (Visual 3D · Simbólico · CodeLab) */}
+        {!introOpen && drawerMode === 'closed' && (
+          <div
+            role="tablist"
+            aria-label="Modo de laboratorio"
+            data-testid="workspace-mode-switcher"
+            className="pointer-events-auto absolute top-3 sm:top-3.5 right-4 sm:right-6 z-[22] inline-flex items-center gap-4 px-3 py-1.5 rounded bg-[var(--bg-paper)]/92 border border-dashed border-[var(--hairline-strong)]"
+          >
+            {(
+              [
+                { id: 'webgl3d' as const, label: 'Visual 3D', done: false },
+                {
+                  id: 'symbolic' as const,
+                  label: 'Simbólico',
+                  done: aiData.completedSymbolicScenes.includes(sceneId),
+                },
+                {
+                  id: 'codelab' as const,
+                  label: 'CodeLab',
+                  done: aiData.completedCodeLabScenes.includes(sceneId),
+                },
+              ]
+            ).map((tab, idx) => {
+              const active = workspaceMode === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  data-testid={`mode-tab-${tab.id}`}
+                  onClick={() => {
+                    audioEngineRef.current?.unlock();
+                    audioEngineRef.current?.playParameterStroke(0.16, theme, performance.now());
+                    setWorkspaceMode(tab.id);
+                  }}
+                  className={`relative pb-0.5 text-[14.5px] leading-none cursor-pointer whitespace-nowrap transition-colors ${
+                    active
+                      ? 'font-display text-[17.5px] text-[var(--ui-accent)]'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {tab.label}
+                  {tab.done && (
+                    <span
+                      className="ml-1 text-[12px] text-[var(--ui-success)]"
+                      aria-label="completado"
+                    >
+                      ✓
+                    </span>
+                  )}
+                  {active && (
+                    <span className="absolute left-0 right-0 -bottom-1">
+                      <RoughUnderline crayon="cobalt" theme={theme} seed={91 + idx * 13} />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* HANDS-ON PRACTICE HEADER: Minimal direct-on-paper title + single live metric line (3D mode) */}
         {!introOpen && (
           <div className="pointer-events-none absolute top-3 sm:top-4 left-4 sm:left-6 right-4 sm:right-6 z-10 flex items-start justify-between gap-6">
-            <div className="max-w-[680px] select-none">
-              <h1 className="font-display crayon-ink text-[26px] sm:text-[32px] leading-[1.06] text-[var(--text-primary)]">
-                {sceneMeta.title}
-              </h1>
+            {workspaceMode === 'webgl3d' ? (
+              <div className="max-w-[calc(100%-300px)] sm:max-w-[580px] select-none">
+                <h1 className="font-display crayon-ink text-[26px] sm:text-[32px] leading-[1.06] text-[var(--text-primary)]">
+                  {sceneMeta.title}
+                </h1>
 
-              {/* Single calm live reading directly beneath title */}
-              <div className="pt-1 flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-0.5 text-[14px] sm:text-[15.5px] text-[var(--text-secondary)] tabular-nums">
-                <span>
-                  {liveMetrics.primaryLabel}:{' '}
-                  <strong className="font-display text-[18px] sm:text-[20px] font-normal text-[var(--text-primary)]">
-                    {liveMetrics.primaryValue}
-                  </strong>
-                </span>
-                <span className="text-[var(--hairline-strong)]" aria-hidden="true">
-                  ·
-                </span>
-                <span>
-                  {liveMetrics.secondaryLabel}:{' '}
-                  <strong className="font-display text-[18px] sm:text-[20px] font-normal text-[var(--text-primary)]">
-                    {liveMetrics.secondaryValue}
-                  </strong>
-                </span>
-                <span className="hidden sm:inline-flex items-baseline gap-2 whitespace-nowrap">
+                {/* Single calm live reading directly beneath title */}
+                <div className="pt-1 flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-0.5 text-[14px] sm:text-[15.5px] text-[var(--text-secondary)] tabular-nums">
+                  <span>
+                    {liveMetrics.primaryLabel}:{' '}
+                    <strong className="font-display text-[18px] sm:text-[20px] font-normal text-[var(--text-primary)]">
+                      {liveMetrics.primaryValue}
+                    </strong>
+                  </span>
                   <span className="text-[var(--hairline-strong)]" aria-hidden="true">
-                    —
+                    ·
                   </span>
-                  <span
-                    className="font-display text-[18px] leading-tight"
-                    style={{
-                      color:
-                        liveMetrics.statusSeverity === 'warning'
-                          ? 'var(--ui-warning)'
-                          : liveMetrics.statusSeverity === 'highlight'
-                            ? 'var(--ui-success)'
-                            : 'var(--text-muted)',
-                    }}
-                  >
-                    {liveMetrics.statusText}
+                  <span>
+                    {liveMetrics.secondaryLabel}:{' '}
+                    <strong className="font-display text-[18px] sm:text-[20px] font-normal text-[var(--text-primary)]">
+                      {liveMetrics.secondaryValue}
+                    </strong>
                   </span>
-                </span>
+                  <span className="hidden sm:inline-flex items-baseline gap-2 whitespace-nowrap">
+                    <span className="text-[var(--hairline-strong)]" aria-hidden="true">
+                      —
+                    </span>
+                    <span
+                      className="font-display text-[18px] leading-tight"
+                      style={{
+                        color:
+                          liveMetrics.statusSeverity === 'warning'
+                            ? 'var(--ui-warning)'
+                            : liveMetrics.statusSeverity === 'highlight'
+                              ? 'var(--ui-success)'
+                              : 'var(--text-muted)',
+                      }}
+                    >
+                      {liveMetrics.statusText}
+                    </span>
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div />
+            )}
 
-            {/* Open top-right paper margin — displays CrayonStamp below the quiet Leyenda toggle */}
+            {/* Open top-right paper margin — displays CrayonStamp cleanly below mode switcher & Leyenda */}
             {drawerMode === 'closed' && celebrationStamp && (
-              <div className="pointer-events-auto pt-10 select-none">
+              <div className="pointer-events-auto pt-[86px] select-none z-[23]">
                 <CrayonStamp
                   key={celebrationStamp.key}
                   title={celebrationStamp.title}
@@ -1239,6 +1402,34 @@ export default function App() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Symbolic Engine v1 Workspace (Step-by-step KaTeX derivation + Equivalence verifier) */}
+        {!introOpen && workspaceMode === 'symbolic' && (
+          <SymbolicWorkspace
+            sceneId={sceneId}
+            theme={theme}
+            alreadyCompleted={aiData.completedSymbolicScenes.includes(sceneId)}
+            onAttemptResult={(passed) => handleEngineAttempt('symbolic', passed)}
+            onPlayStroke={() => {
+              audioEngineRef.current?.unlock();
+              audioEngineRef.current?.playParameterStroke(0.18, theme, performance.now());
+            }}
+          />
+        )}
+
+        {/* CodeLab Engine v1 Workspace (Rust & Java Parsons blocks + Web Worker test harness) */}
+        {!introOpen && workspaceMode === 'codelab' && (
+          <CodeLabWorkspace
+            sceneId={sceneId}
+            theme={theme}
+            alreadyCompleted={aiData.completedCodeLabScenes.includes(sceneId)}
+            onAttemptResult={(passed) => handleEngineAttempt('codelab', passed)}
+            onPlayStroke={() => {
+              audioEngineRef.current?.unlock();
+              audioEngineRef.current?.playParameterStroke(0.18, theme, performance.now());
+            }}
+          />
         )}
 
         {/* Non-obtrusive hand-drawn 3D anatomy callouts, Eco dynamic opacity & 5s idle Crayón Guía */}
@@ -1259,7 +1450,7 @@ export default function App() {
           theme={theme}
           ecoMode={ecoMode}
           guideActive={idleGuideActive}
-          hidden={introOpen || drawerMode !== 'closed'}
+          hidden={introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
         />
 
         {/* Clean Slide-Over Drawer (Code Bridge & Adaptive Challenge) — hidden during Intro */}
@@ -1289,8 +1480,8 @@ export default function App() {
         )}
       </main>
 
-      {/* Unified Sequential Practice Dock — completely hidden during Fullscreen Theory Intro */}
-      {!introOpen && (
+      {/* Unified Sequential Practice Dock — shown only in 3D hands-on mode */}
+      {!introOpen && workspaceMode === 'webgl3d' && (
         <CoursePipelineDock
           lesson={activeLesson}
           sceneId={sceneId}
@@ -1377,9 +1568,13 @@ export default function App() {
         activeSceneId={sceneId}
         bktMap={aiData.bkt}
         completedStepIds={completedStepIds}
+        completedSymbolicScenes={aiData.completedSymbolicScenes}
+        completedCodeLabScenes={aiData.completedCodeLabScenes}
         theme={theme}
         onSelectScene={selectScene}
         onClose={() => setMapOpen(false)}
+        onExportProgress={handleExportProgress}
+        onImportProgress={handleImportProgress}
         onResetProgress={() => {
           const fresh = createDefaultPersistedData();
           setAiData(fresh);

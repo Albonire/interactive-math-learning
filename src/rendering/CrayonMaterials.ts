@@ -109,8 +109,9 @@ const SURFACE_FRAG = /* glsl */ `
     float scribble = grainSample.g;
     float crumble = grainSample.b;
 
-    // First-time progressive hand-drawn crayon reveal across 3D geometry
+    // First-time two-stage hand-drawn crayon reveal: contour/rim outline traces first, then wax fill sweeps across
     float freshTipBoost = 0.0;
+    float contourOnlyBoost = 0.0;
     if (uDrawProgress < 0.999) {
       if (uDrawProgress <= 0.002) discard;
       float sweep = clamp(
@@ -118,11 +119,25 @@ const SURFACE_FRAG = /* glsl */ `
         0.0,
         1.0
       );
-      float sketchJitter = (tooth - 0.5) * 0.16 + (scribble - 0.5) * 0.10;
-      float frontier = uDrawProgress * 1.24 - (sweep + sketchJitter);
-      if (frontier < 0.0) discard;
-      // Concentrated freshly-laid wax edge right at the invisible hand's crayon tip
-      freshTipBoost = (1.0 - smoothstep(0.0, 0.14, frontier)) * (0.65 + 0.35 * tooth);
+      float sketchJitter = (tooth - 0.5) * 0.14 + (scribble - 0.5) * 0.09;
+      float contourProgress = clamp(uDrawProgress / 0.44, 0.0, 1.0);
+      float fillProgress = clamp((uDrawProgress - 0.26) / 0.74, 0.0, 1.0);
+
+      float edgeDistPre = min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y));
+      float isPerimeter = 1.0 - smoothstep(0.015, 0.055, edgeDistPre);
+      float fresnelPre = pow(1.0 - max(0.0, dot(normalize(vNormalView), normalize(vViewDir))), 1.8);
+      float isContourZone = max(isPerimeter, smoothstep(0.32, 0.62, fresnelPre));
+
+      float contourFrontier = contourProgress * 1.20 - (sweep + sketchJitter * 0.7);
+      float fillFrontier = fillProgress * 1.24 - (sweep + sketchJitter);
+
+      if (fillFrontier < 0.0) {
+        if (isContourZone < 0.25 || contourFrontier < 0.0) discard;
+        contourOnlyBoost = isContourZone * (1.0 - smoothstep(0.0, 0.22, contourFrontier) * 0.35);
+      } else {
+        // Concentrated freshly-laid wax edge right at the invisible hand's crayon tip
+        freshTipBoost = (1.0 - smoothstep(0.0, 0.14, fillFrontier)) * (0.65 + 0.35 * tooth);
+      }
     }
 
     // Dry-wax tooth stipple fade so both opaque & translucent meshes enter softly without popping
@@ -202,10 +217,10 @@ const SURFACE_FRAG = /* glsl */ `
       borderAlphaBoost = borderStrength * 0.55;
     }
 
-    // Emphasize active crayon-tip edge while drawing for the first time
-    if (freshTipBoost > 0.001) {
+    // Emphasize active crayon-tip edge & initial contour trace while drawing for the first time
+    if (freshTipBoost > 0.001 || contourOnlyBoost > 0.001) {
       vec3 tipTint = uIsDark > 0.5 ? mix(uColor * 1.38, uInkColor, 0.48) : mix(uColor * 0.42, uInkColor, 0.58);
-      pigment = mix(pigment, tipTint, freshTipBoost * 0.76);
+      pigment = mix(pigment, tipTint, max(freshTipBoost * 0.76, contourOnlyBoost * 0.85));
     }
 
     // Dimming when another symbolic parameter/layer is isolated + smooth entrance pigment lift
