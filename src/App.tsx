@@ -36,6 +36,11 @@ import {
   saveAudioEnabled,
 } from './audio/crayonAudio';
 import {
+  RhythmAudioEngine,
+  type RhythmAudioSnapshot,
+} from './audio/rhythmAudioEngine';
+import { RhythmAudioPopover } from './ui/RhythmAudioPopover';
+import {
   createDefaultPersistedData,
   exportProgressJson,
   loadPersistedAiData,
@@ -100,13 +105,17 @@ function defaultParamsFor(sceneId: SceneId): Record<string, number> {
 }
 
 export default function App() {
-  const [sceneId, setSceneId] = useState<SceneId>('lin-span');
+  const [aiData, setAiData] = useState<PersistedAiData>(() => loadPersistedAiData());
+  const initialSceneId: SceneId = aiData.lastSceneId ?? 'lin-span';
+
+  const [sceneId, setSceneId] = useState<SceneId>(initialSceneId);
   const [theme, setTheme] = useState<ThemeMode>('paper');
   const themeRef = useRef<ThemeMode>(theme);
   themeRef.current = theme;
   const [ecoMode, setEcoMode] = useState<boolean>(() => loadInitialEcoMode());
   const [audioEnabled, setAudioEnabled] = useState<boolean>(() => loadInitialAudioEnabled());
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [rhythmOpen, setRhythmOpen] = useState<boolean>(false);
   const audioEngineRef = useRef<CrayonAudioEngine | null>(null);
   if (!audioEngineRef.current) {
     audioEngineRef.current = new CrayonAudioEngine(audioEnabled, ecoMode, (stats) => {
@@ -116,9 +125,24 @@ export default function App() {
         el.dataset.audioPlays = String(
           stats.strokePlays + stats.dustPlays + stats.introPlays + stats.annotationPlays
         );
+        el.dataset.audioSyncedPlays = String(stats.syncedPlays);
       }
     });
   }
+  const rhythmEngineRef = useRef<RhythmAudioEngine | null>(null);
+  if (!rhythmEngineRef.current) {
+    rhythmEngineRef.current = new RhythmAudioEngine(
+      () => audioEngineRef.current?.ensureSharedContext() ?? null,
+      audioEnabled,
+      ecoMode,
+      (pulse) => {
+        managerRef.current?.setBeatPulse(pulse);
+      }
+    );
+  }
+  const [rhythmSnapshot, setRhythmSnapshot] = useState<RhythmAudioSnapshot>(() =>
+    rhythmEngineRef.current!.getSnapshot()
+  );
   const [steadyStrokes] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
       return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -126,17 +150,24 @@ export default function App() {
     return false;
   });
 
-  // Fullscreen Animated Theory Introduction (plays inside viewport before practice)
+  // Fullscreen Animated Theory Introduction (auto-skipped on reload when returning to a previously seen lesson)
   const [introOpen, setIntroOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('autostart') === '1') return false;
     }
+    if (aiData.lastSceneId && aiData.seenIntroScenes.includes(initialSceneId)) {
+      return false;
+    }
     return true;
   });
   const [introBeatIdx, setIntroBeatIdx] = useState<number>(0);
   const [introPlaying, setIntroPlaying] = useState<boolean>(true);
-  const seenIntrosRef = useRef<Set<SceneId>>(new Set(['lin-span']));
+  const seenIntrosRef = useRef<Set<SceneId>>(
+    new Set<SceneId>(
+      aiData.seenIntroScenes.length > 0 ? aiData.seenIntroScenes : [initialSceneId]
+    )
+  );
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceEngineMode>('webgl3d');
 
   // Non-obtrusive 3D Viewport Legend, 5s idle Crayón Guía & Crayon Dust energy tracker
@@ -146,10 +177,15 @@ export default function App() {
   const dustEnergyRef = useRef<ParameterEnergyTracker>(new ParameterEnergyTracker());
 
   // Guided Interactive Course State
-  const [activeStepIdx, setActiveStepIdx] = useState(0);
   const [completedStepIds, setCompletedStepIds] = useState<Set<string>>(() =>
     loadCompletedSteps()
   );
+  const [activeStepIdx, setActiveStepIdx] = useState<number>(() => {
+    const lesson = GUIDED_LESSONS[initialSceneId];
+    const done = loadCompletedSteps();
+    const firstOpen = lesson.steps.findIndex((s) => !done.has(s.id));
+    return firstOpen === -1 ? 0 : firstOpen;
+  });
   const [celebrationStamp, setCelebrationStamp] = useState<{
     key: string;
     title: string;
@@ -160,13 +196,13 @@ export default function App() {
 
   // Single Source of Truth for active scene parameters and anatomy state
   const [paramValues, setParamValues] = useState<Record<string, number>>(() =>
-    defaultParamsFor('lin-span')
+    defaultParamsFor(initialSceneId)
   );
   const paramValuesRef = useRef<Record<string, number>>(paramValues);
   paramValuesRef.current = paramValues;
 
   const [layers, setLayers] = useState<AnatomyLayerSpec[]>(() =>
-    SCENES['lin-span'].defaultLayers.map((l) => ({ ...l }))
+    SCENES[initialSceneId].defaultLayers.map((l) => ({ ...l }))
   );
   const [exploded, setExploded] = useState(false);
   const [anatomyCollapsed, setAnatomyCollapsed] = useState(false);
@@ -197,8 +233,7 @@ export default function App() {
   const [aiSymbolicGrid, setAiSymbolicGrid] = useState<Float32Array | null>(null);
   const workerRef = useRef<Worker | null>(null);
 
-  // Local Edge AI state (BKT + LinUCB Bandit + Telemetry)
-  const [aiData, setAiData] = useState<PersistedAiData>(() => loadPersistedAiData());
+  // Local Edge AI challenge UI state
   const [activeChallenge, setActiveChallenge] = useState<ChallengeSpec | null>(null);
   const [challengeEval, setChallengeEval] = useState<ChallengeEvaluation | null>(null);
   const [showHint, setShowHint] = useState(false);
@@ -230,7 +265,7 @@ export default function App() {
     saveEcoMode(ecoMode);
   }, [ecoMode]);
 
-  // Initialize Web Audio engine on app mount (strictly honoring initial audioEnabled & ecoMode)
+  // Initialize Web Audio & Rhythm Tempo engines on app mount (honoring initial audioEnabled & ecoMode)
   useEffect(() => {
     if (!audioEngineRef.current) {
       audioEngineRef.current = new CrayonAudioEngine(audioEnabled, ecoMode, (stats) => {
@@ -240,19 +275,40 @@ export default function App() {
           el.dataset.audioPlays = String(
             stats.strokePlays + stats.dustPlays + stats.introPlays + stats.annotationPlays
           );
+          el.dataset.audioSyncedPlays = String(stats.syncedPlays);
         }
       });
     }
+    if (!rhythmEngineRef.current) {
+      rhythmEngineRef.current = new RhythmAudioEngine(
+        () => audioEngineRef.current?.ensureSharedContext() ?? null,
+        audioEnabled,
+        ecoMode,
+        (pulse) => {
+          managerRef.current?.setBeatPulse(pulse);
+        }
+      );
+    }
+
     const engine = audioEngineRef.current;
+    const rhythm = rhythmEngineRef.current;
+    engine.setRhythmSource(rhythm);
     engine.initialize();
+    const unsubRhythm = rhythm.subscribe((snap) => setRhythmSnapshot(snap));
+
     if (rootRef.current) {
       const st = engine.getStats();
       rootRef.current.dataset.audioState = st.state;
       rootRef.current.dataset.audioPlays = String(
         st.strokePlays + st.dustPlays + st.introPlays + st.annotationPlays
       );
+      rootRef.current.dataset.audioSyncedPlays = String(st.syncedPlays);
     }
     return () => {
+      unsubRhythm();
+      engine.setRhythmSource(null);
+      rhythm.dispose();
+      rhythmEngineRef.current = null;
       engine.dispose();
       audioEngineRef.current = null;
     };
@@ -260,10 +316,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep optional Web Audio engine synchronized with user preference & ecoMode silencing
+  // Keep optional Web Audio & Rhythm engines synchronized with user preference & ecoMode silencing
   useEffect(() => {
     saveAudioEnabled(audioEnabled);
     audioEngineRef.current?.syncSettings(audioEnabled, ecoMode);
+    rhythmEngineRef.current?.syncSettings(audioEnabled, ecoMode);
   }, [audioEnabled, ecoMode]);
 
   // Initialize Three.js WebGL 2 SceneManager once on mount
@@ -325,6 +382,28 @@ export default function App() {
     };
   }, [cancelParamAnim, stopSymbolicWorker]);
 
+  // Helper to persist last active lesson & seen intros cleanly across reloads
+  const persistSessionLesson = useCallback((activeId: SceneId, markSeenIntro: boolean) => {
+    if (markSeenIntro) {
+      seenIntrosRef.current.add(activeId);
+    }
+    const seenList = Array.from(seenIntrosRef.current);
+    setAiData((prev) => {
+      const sameScene = prev.lastSceneId === activeId;
+      const sameSeen =
+        prev.seenIntroScenes.length === seenList.length &&
+        seenList.every((s) => prev.seenIntroScenes.includes(s));
+      if (sameScene && sameSeen) return prev;
+      const next: PersistedAiData = {
+        ...prev,
+        lastSceneId: activeId,
+        seenIntroScenes: seenList,
+      };
+      savePersistedAiData(next);
+      return next;
+    });
+  }, []);
+
   // Switch scene cleanly resetting defaults and launching fullscreen theory intro on first visit
   const selectScene = useCallback(
     (nextId: SceneId, replayIntro?: boolean) => {
@@ -336,7 +415,15 @@ export default function App() {
       setLayers(SCENES[nextId].defaultLayers.map((l) => ({ ...l })));
       setExploded(false);
       setFocusedParamId(null);
+      setActivation('tanh');
+      setDataset('rings');
+      setLandscape('rosenbrock');
       setAutoDiffPass('idle');
+      setOptimizerProbes(createInitialOptimizerProbes('rosenbrock'));
+      setSymbolicGen(0);
+      setSymbolicAiFormula('En espera');
+      setSymbolicAiMse(99);
+      setAiSymbolicGrid(null);
       setActiveChallenge(null);
       setChallengeEval(null);
       setShowHint(false);
@@ -354,26 +441,17 @@ export default function App() {
       const firstOpen = nextLesson.steps.findIndex((s) => !completedStepIds.has(s.id));
       setActiveStepIdx(firstOpen === -1 ? 0 : firstOpen);
 
-      if (nextId === 'calc-optimizers') {
-        setOptimizerProbes(createInitialOptimizerProbes(landscape));
-      }
-      if (nextId === 'calc-symbolic') {
-        setSymbolicGen(0);
-        setSymbolicAiFormula('En espera');
-        setSymbolicAiMse(99);
-        setAiSymbolicGrid(null);
-      }
-
       const shouldOpenIntro = replayIntro ?? !seenIntrosRef.current.has(nextId);
       if (shouldOpenIntro) {
-        seenIntrosRef.current.add(nextId);
+        persistSessionLesson(nextId, true);
         setIntroBeatIdx(0);
         setIntroOpen(true);
       } else {
+        persistSessionLesson(nextId, false);
         setIntroOpen(false);
       }
     },
-    [cancelParamAnim, completedStepIds, landscape, stopSymbolicWorker]
+    [cancelParamAnim, completedStepIds, persistSessionLesson, stopSymbolicWorker]
   );
 
   // Live 3D choreography while the fullscreen theory intro plays
@@ -454,9 +532,10 @@ export default function App() {
     }
   }, [introOpen, introPlaying, cancelParamAnim]);
 
-  // Transition smoothly from fullscreen intro to clean hands-on practice
+  // Transition smoothly from fullscreen intro to clean hands-on practice (resetting any intro demo mutations)
   const handleFinishIntro = useCallback(() => {
     cancelParamAnim();
+    stopSymbolicWorker();
     audioEngineRef.current?.stopIntroPhrase();
     setIntroPlaying(true);
     managerRef.current?.setConstructionPaused(false);
@@ -464,12 +543,18 @@ export default function App() {
     setOptimizerRunning(false);
     setParamValues(defaultParamsFor(sceneId));
     setExploded(false);
+    setActivation('tanh');
+    setDataset('rings');
+    setLandscape('rosenbrock');
     setAutoDiffPass('idle');
-    if (sceneId === 'calc-optimizers') {
-      setOptimizerProbes(createInitialOptimizerProbes(landscape));
-    }
+    setOptimizerProbes(createInitialOptimizerProbes('rosenbrock'));
+    setSymbolicGen(0);
+    setSymbolicAiFormula('En espera');
+    setSymbolicAiMse(99);
+    setAiSymbolicGrid(null);
+    persistSessionLesson(sceneId, true);
     setIntroOpen(false);
-  }, [cancelParamAnim, landscape, sceneId]);
+  }, [cancelParamAnim, persistSessionLesson, sceneId, stopSymbolicWorker]);
 
   // Optimizer race animation loop (Scene 2.3) — respects Eco Mode interval
   useEffect(() => {
@@ -772,17 +857,24 @@ export default function App() {
   }, []);
 
   const handleResetScene = useCallback(() => {
+    cancelParamAnim();
+    stopSymbolicWorker();
     setParamValues(defaultParamsFor(sceneId));
     setLayers(SCENES[sceneId].defaultLayers.map((l) => ({ ...l })));
     setExploded(false);
+    setActivation('tanh');
+    setDataset('rings');
+    setLandscape('rosenbrock');
     setAutoDiffPass('idle');
     dustEnergyRef.current.reset();
-    if (sceneId === 'calc-optimizers') {
-      setOptimizerRunning(false);
-      setOptimizerProbes(createInitialOptimizerProbes(landscape));
-    }
+    setOptimizerRunning(false);
+    setOptimizerProbes(createInitialOptimizerProbes('rosenbrock'));
+    setSymbolicGen(0);
+    setSymbolicAiFormula('En espera');
+    setSymbolicAiMse(99);
+    setAiSymbolicGrid(null);
     managerRef.current?.resetCamera();
-  }, [sceneId, landscape]);
+  }, [cancelParamAnim, sceneId, stopSymbolicWorker]);
 
   // Symbolic regression Web Worker trigger (Scene 2.4)
   const handleToggleSymbolicWorker = useCallback(() => {
@@ -836,17 +928,19 @@ export default function App() {
       if (demo.params) {
         cancelParamAnim();
         const targetParams = demo.params;
-        const startParams = { ...paramValues };
+        const startParams = { ...paramValuesRef.current };
         const durationMs =
-          steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 1500;
+          steadyStrokes || managerRef.current?.isSoftwareMode() ? 0 : 650;
 
         if (durationMs === 0) {
           setParamValues((prev) => ({ ...prev, ...targetParams }));
         } else {
-          const t0 = performance.now();
+          let t0: number | null = null;
           const tick = (now: number) => {
-            const raw = Math.min(1, (now - t0) / durationMs);
-            const ease = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
+            if (t0 === null) t0 = now;
+            const raw = Math.min(1, Math.max(0, (now - t0) / durationMs));
+            // Snappy ease-out cubic so every demo reaches its exact mathematical target smoothly
+            const ease = 1 - Math.pow(1 - raw, 3);
             setParamValues((prev) => {
               const next = { ...prev };
               for (const [k, endVal] of Object.entries(targetParams)) {
@@ -989,6 +1083,12 @@ export default function App() {
     const ctx = buildCurrentContext(res.errorMetric);
     const nextBandit = updateBanditState(aiData.bandit, activeChallenge.arm, ctx, reward);
 
+    const prev3D = aiData.completed3DChallengeScenes;
+    const next3D =
+      res.solved && !prev3D.includes(activeChallenge.sceneId)
+        ? [...prev3D, activeChallenge.sceneId]
+        : prev3D;
+
     const nextData: PersistedAiData = {
       ...aiData,
       bkt: {
@@ -1000,6 +1100,7 @@ export default function App() {
         ...aiData.lastErrorBySkill,
         [activeChallenge.skillId]: res.errorMetric,
       },
+      completed3DChallengeScenes: next3D,
     };
 
     setAiData(nextData);
@@ -1203,6 +1304,8 @@ export default function App() {
       data-theme={theme}
       data-eco={ecoMode ? 'true' : 'false'}
       data-audio={ecoMode ? 'eco-muted' : audioEnabled ? 'on' : 'off'}
+      data-rhythm-active={rhythmSnapshot.isPlaying ? 'true' : 'false'}
+      data-rhythm-bpm={rhythmSnapshot.detectedBpm !== null ? String(Math.round(rhythmSnapshot.detectedBpm)) : ''}
       data-intro={introOpen ? 'true' : 'false'}
       data-workspace-mode={workspaceMode}
     >
@@ -1214,35 +1317,83 @@ export default function App() {
           activeSceneId={sceneId}
           drawerMode={drawerMode}
           mapOpen={mapOpen}
+          rhythmOpen={rhythmOpen}
+          rhythmPlaying={rhythmSnapshot.isPlaying}
+          rhythmBpm={rhythmSnapshot.detectedBpm}
           theme={theme}
           ecoMode={ecoMode}
           audioEnabled={audioEnabled}
-          onToggleMap={() => setMapOpen((v) => !v)}
+          onToggleMap={() => {
+            setRhythmOpen(false);
+            setMapOpen((v) => !v);
+          }}
           onOpenIntro={() => {
             audioEngineRef.current?.unlock();
             setDrawerMode('closed');
             setMapOpen(false);
+            setRhythmOpen(false);
             setWorkspaceMode('webgl3d');
             setIntroPlaying(true);
             managerRef.current?.setConstructionPaused(false);
             setIntroBeatIdx(0);
             setIntroOpen(true);
           }}
-          onToggleInspector={() =>
-            setDrawerMode((m) => (m === 'computational' ? 'closed' : 'computational'))
-          }
+          onToggleInspector={() => {
+            setRhythmOpen(false);
+            setDrawerMode((m) => (m === 'computational' ? 'closed' : 'computational'));
+          }}
           onToggleTheme={() => setTheme((t) => (t === 'paper' ? 'chalkboard' : 'paper'))}
           onToggleEcoMode={() => setEcoMode((e) => !e)}
+          onToggleRhythm={() => {
+            audioEngineRef.current?.unlock();
+            setRhythmOpen((v) => !v);
+          }}
           onToggleAudio={() => {
             setAudioEnabled((prev) => {
               const next = !prev;
               audioEngineRef.current?.syncSettings(next, ecoMode);
+              rhythmEngineRef.current?.syncSettings(next, ecoMode);
               if (next && !ecoMode) {
                 audioEngineRef.current?.unlock();
                 audioEngineRef.current?.playParameterStroke(0.24, theme, performance.now());
               }
               return next;
             });
+          }}
+        />
+      )}
+
+      {!introOpen && (
+        <RhythmAudioPopover
+          open={rhythmOpen}
+          theme={theme}
+          snapshot={rhythmSnapshot}
+          onClose={() => setRhythmOpen(false)}
+          onTogglePlay={() => {
+            audioEngineRef.current?.unlock();
+            void rhythmEngineRef.current?.togglePlayback();
+          }}
+          onSelectTrack={(id) => {
+            audioEngineRef.current?.unlock();
+            rhythmEngineRef.current?.selectTrack(id);
+          }}
+          onUploadFile={(file) => {
+            audioEngineRef.current?.unlock();
+            void rhythmEngineRef.current?.loadCustomAudioFile(file);
+          }}
+          onTapTempo={() => {
+            audioEngineRef.current?.unlock();
+            rhythmEngineRef.current?.tapTempo();
+          }}
+          onChangeVolume={(vol) => rhythmEngineRef.current?.setMusicVolume(vol)}
+          onToggleSync={(en) => rhythmEngineRef.current?.setSyncEnabled(en)}
+          onChangeSyncStrength={(str) => rhythmEngineRef.current?.setSyncStrength(str)}
+          onEnableAudio={() => {
+            if (ecoMode) setEcoMode(false);
+            if (!audioEnabled) setAudioEnabled(true);
+            audioEngineRef.current?.syncSettings(true, false);
+            rhythmEngineRef.current?.syncSettings(true, false);
+            audioEngineRef.current?.unlock();
           }}
         />
       )}
@@ -1258,7 +1409,14 @@ export default function App() {
           />
         </SketchAnimationWrapper>
 
-        {webglLost && <WebGLFallbackSvg title={sceneMeta.title} theme={theme} />}
+        {webglLost && (
+          <WebGLFallbackSvg
+            title={sceneMeta.title}
+            theme={theme}
+            exploded={exploded}
+            legendOpen={legendOpen}
+          />
+        )}
 
         {/* FULLSCREEN ANIMATED THEORY INTRODUCTION (clears entire viewport around the 3D graph) */}
         {introOpen && (
@@ -1271,6 +1429,17 @@ export default function App() {
               setIntroBeatIdx(nextBeat);
             }}
             onPlayingChange={(playing) => setIntroPlaying(playing)}
+            onReplaySketch={() => {
+              audioEngineRef.current?.unlock();
+              const beat = LESSON_INTROS[sceneId]?.beats[introBeatIdx];
+              managerRef.current?.setConstructionPaused(false);
+              if (introBeatIdx === 1 && beat?.stageState.focusedLayerId) {
+                managerRef.current?.replayLayerBuild(beat.stageState.focusedLayerId);
+              } else {
+                managerRef.current?.replayProceduralBuild();
+              }
+              audioEngineRef.current?.playIntroPhrase(theme, introBeatIdx, performance.now());
+            }}
             onFinish={handleFinishIntro}
           />
         )}
@@ -1285,7 +1454,13 @@ export default function App() {
           >
             {(
               [
-                { id: 'webgl3d' as const, label: 'Visual 3D', done: false },
+                {
+                  id: 'webgl3d' as const,
+                  label: 'Visual 3D',
+                  done:
+                    aiData.completed3DChallengeScenes.includes(sceneId) ||
+                    activeLesson.steps.every((s) => completedStepIds.has(s.id)),
+                },
                 {
                   id: 'symbolic' as const,
                   label: 'Simbólico',
@@ -1568,6 +1743,7 @@ export default function App() {
         activeSceneId={sceneId}
         bktMap={aiData.bkt}
         completedStepIds={completedStepIds}
+        completed3DChallengeScenes={aiData.completed3DChallengeScenes}
         completedSymbolicScenes={aiData.completedSymbolicScenes}
         completedCodeLabScenes={aiData.completedCodeLabScenes}
         theme={theme}
@@ -1576,16 +1752,34 @@ export default function App() {
         onExportProgress={handleExportProgress}
         onImportProgress={handleImportProgress}
         onResetProgress={() => {
+          cancelParamAnim();
+          stopSymbolicWorker();
           const fresh = createDefaultPersistedData();
           setAiData(fresh);
           savePersistedAiData(fresh);
           const emptySteps = new Set<string>();
           setCompletedStepIds(emptySteps);
           saveCompletedSteps(emptySteps);
-          seenIntrosRef.current = new Set([sceneId]);
+          seenIntrosRef.current = new Set();
+          setParamValues(defaultParamsFor(sceneId));
+          setLayers(SCENES[sceneId].defaultLayers.map((l) => ({ ...l })));
+          setExploded(false);
+          setActivation('tanh');
+          setDataset('rings');
+          setLandscape('rosenbrock');
+          setAutoDiffPass('idle');
+          setOptimizerRunning(false);
+          setOptimizerProbes(createInitialOptimizerProbes('rosenbrock'));
+          setSymbolicGen(0);
+          setSymbolicAiFormula('En espera');
+          setSymbolicAiMse(99);
+          setAiSymbolicGrid(null);
+          setDrawerMode('closed');
+          setActiveChallenge(null);
           setActiveStepIdx(0);
           setChallengeEval(null);
           setCelebrationStamp(null);
+          managerRef.current?.resetCamera();
         }}
       />
     </div>

@@ -477,3 +477,83 @@ export function CrayonLayers({ size = 16, className = '', ...rest }: IconProps) 
     </svg>
   );
 }
+
+export function CrayonMusicNote({ size = 16, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M9.4 17.3 L9.7 6.8 C13.2 5.9, 16.4 5.3, 19.3 4.9 L19.1 14.8"
+        stroke="currentColor"
+        strokeWidth="2.0"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <ellipse
+        cx="7.4"
+        cy="17.6"
+        rx="2.6"
+        ry="2.0"
+        transform="rotate(-14 7.4 17.6)"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.24"
+        strokeWidth="1.9"
+      />
+      <ellipse
+        cx="16.9"
+        cy="15.3"
+        rx="2.6"
+        ry="2.0"
+        transform="rotate(-14 16.9 15.3)"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.24"
+        strokeWidth="1.9"
+      />
+    </svg>
+  );
+}
+
+export function CrayonUpload({ size = 15, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M12.1 15.2 L12.0 5.4"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7.6 9.5 C9.3 7.7, 10.8 6.2, 12.0 4.9 C13.4 6.4, 14.9 7.8, 16.6 9.6"
+        stroke="currentColor"
+        strokeWidth="2.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5.0 16.2 L5.3 19.0 C9.6 19.3, 14.4 19.2, 18.8 18.9 L19.1 16.1"
+        stroke="currentColor"
+        strokeWidth="2.0"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+

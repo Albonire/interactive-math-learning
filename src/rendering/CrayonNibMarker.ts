@@ -23,6 +23,8 @@ export class CrayonNibMarker {
   private hasTarget = false;
   private visibilityAlpha = 0;
   private liftOffset = 0.4;
+  private sketchClock = 0;
+  private readonly ringMesh: THREE.Mesh;
 
   constructor(theme: ThemeMode) {
     this.theme = theme;
@@ -63,31 +65,36 @@ export class CrayonNibMarker {
       transparent: true,
       opacity: 0,
       depthTest: false,
+      side: THREE.DoubleSide,
     });
 
     // Part 1: Tapered wax drawing point inverted so apex touches (0, 0, 0)
-    const tipGeo = new THREE.ConeGeometry(0.055, 0.22, 10);
+    const tipGeo = new THREE.ConeGeometry(0.068, 0.27, 12);
     tipGeo.rotateX(Math.PI);
-    tipGeo.translate(0, 0.11, 0);
+    tipGeo.translate(0, 0.135, 0);
     const tipMesh = new THREE.Mesh(tipGeo, this.tipMat);
 
     // Part 2: Paper-wrapped crayon barrel sleeve above the exposed wax cone
-    const barrelGeo = new THREE.CylinderGeometry(0.062, 0.058, 0.48, 12);
-    barrelGeo.translate(0, 0.45, 0);
+    const barrelGeo = new THREE.CylinderGeometry(0.074, 0.069, 0.56, 12);
+    barrelGeo.translate(0, 0.54, 0);
     const barrelMesh = new THREE.Mesh(barrelGeo, this.wrapperMat);
 
-    // Part 3: Hand-inked paper wrapper stripe + subtle active-tip contact halo
-    const bandGeo = new THREE.CylinderGeometry(0.065, 0.064, 0.06, 12);
-    bandGeo.translate(0, 0.28, 0);
+    // Part 3: Hand-inked paper wrapper stripe + exposed wax end-cap + contact smudge ring
+    const bandGeo = new THREE.CylinderGeometry(0.077, 0.075, 0.07, 12);
+    bandGeo.translate(0, 0.34, 0);
     const bandMesh = new THREE.Mesh(bandGeo, this.bandMat);
 
-    const ringGeo = new THREE.RingGeometry(0.032, 0.072, 16);
-    ringGeo.rotateX(-Math.PI / 2);
-    const ringMesh = new THREE.Mesh(ringGeo, this.ringMat);
-    ringMesh.position.y = 0.008;
+    const capGeo = new THREE.CylinderGeometry(0.068, 0.073, 0.1, 12);
+    capGeo.translate(0, 0.86, 0);
+    const capMesh = new THREE.Mesh(capGeo, this.tipMat);
 
-    this.bodyTilt.add(tipMesh, barrelMesh, bandMesh);
-    this.group.add(ringMesh);
+    const ringGeo = new THREE.RingGeometry(0.036, 0.088, 18);
+    ringGeo.rotateX(-Math.PI / 2);
+    this.ringMesh = new THREE.Mesh(ringGeo, this.ringMat);
+    this.ringMesh.position.y = 0.01;
+
+    this.bodyTilt.add(tipMesh, barrelMesh, bandMesh, capMesh);
+    this.group.add(this.ringMesh);
   }
 
   public setTheme(theme: ThemeMode): void {
@@ -119,7 +126,8 @@ export class CrayonNibMarker {
       crayon: CrayonToken;
     } | null,
     suppress: boolean,
-    paused: boolean
+    paused: boolean,
+    beatPulse = 0
   ): boolean {
     if (suppress) {
       this.visibilityAlpha = 0;
@@ -135,24 +143,28 @@ export class CrayonNibMarker {
         this.applyColors();
       }
       this.targetPos.set(activeTip.worldPos[0], activeTip.worldPos[1], activeTip.worldPos[2]);
+      const jumpDist = this.hasTarget ? this.group.position.distanceTo(this.targetPos) : 0;
       if (!this.hasTarget) {
         this.group.position.copy(this.targetPos);
         this.hasTarget = true;
       } else if (!paused) {
-        this.group.position.x = THREE.MathUtils.damp(this.group.position.x, this.targetPos.x, 18, dt);
-        this.group.position.y = THREE.MathUtils.damp(this.group.position.y, this.targetPos.y, 18, dt);
-        this.group.position.z = THREE.MathUtils.damp(this.group.position.z, this.targetPos.z, 18, dt);
+        this.group.position.x = THREE.MathUtils.damp(this.group.position.x, this.targetPos.x, 16, dt);
+        this.group.position.y = THREE.MathUtils.damp(this.group.position.y, this.targetPos.y, 16, dt);
+        this.group.position.z = THREE.MathUtils.damp(this.group.position.z, this.targetPos.z, 16, dt);
       }
 
       if (!paused) {
-        this.visibilityAlpha = THREE.MathUtils.damp(this.visibilityAlpha, 0.94, 14, dt);
-        this.liftOffset = THREE.MathUtils.damp(this.liftOffset, 0, 14, dt);
+        this.sketchClock += dt;
+        // Brief natural pen-lift hop when jumping between disconnected strokes
+        const hopLift = jumpDist > 0.55 ? Math.min(0.28, jumpDist * 0.14) : 0;
+        this.visibilityAlpha = THREE.MathUtils.damp(this.visibilityAlpha, 0.96, 14, dt);
+        this.liftOffset = THREE.MathUtils.damp(this.liftOffset, hopLift, 13, dt);
       }
       this.group.visible = true;
     } else {
       if (!paused) {
-        this.visibilityAlpha = THREE.MathUtils.damp(this.visibilityAlpha, 0, 10, dt);
-        this.liftOffset = THREE.MathUtils.damp(this.liftOffset, 0.42, 8, dt);
+        this.visibilityAlpha = THREE.MathUtils.damp(this.visibilityAlpha, 0, 9, dt);
+        this.liftOffset = THREE.MathUtils.damp(this.liftOffset, 0.45, 7, dt);
       }
       if (this.visibilityAlpha < 0.02) {
         this.visibilityAlpha = 0;
@@ -162,11 +174,24 @@ export class CrayonNibMarker {
       }
     }
 
-    this.bodyTilt.position.y = this.liftOffset;
+    // Subtle organic wrist micro-sway & pressure bobbing while actively sketching
+    const swayX = show && !paused ? Math.sin(this.sketchClock * 11.5) * 0.055 : 0;
+    const swayZ = show && !paused ? Math.cos(this.sketchClock * 9.2) * 0.065 : 0;
+    const pressureBob = show && !paused ? Math.abs(Math.sin(this.sketchClock * 13.0)) * 0.018 : 0;
+
+    this.bodyTilt.rotation.set(0.42 + swayX, 0.3, -0.46 + swayZ);
+    this.bodyTilt.position.y = this.liftOffset + pressureBob;
+
+    const pulseBoost = Math.max(0, Math.min(1, beatPulse)) * 0.24;
+    const pulseScale = show
+      ? 0.92 + Math.sin(this.sketchClock * 10.0) * 0.14 + pulseBoost
+      : 0.7;
+    this.ringMesh.scale.set(pulseScale, pulseScale, pulseScale);
+
     this.tipMat.opacity = this.visibilityAlpha;
     this.wrapperMat.opacity = this.visibilityAlpha * 0.95;
-    this.bandMat.opacity = this.visibilityAlpha * 0.85;
-    this.ringMat.opacity = this.visibilityAlpha * 0.36;
+    this.bandMat.opacity = this.visibilityAlpha * 0.88;
+    this.ringMat.opacity = this.visibilityAlpha * Math.min(0.72, 0.44 + pulseBoost * 0.7);
 
     return show || this.visibilityAlpha > 0.02;
   }

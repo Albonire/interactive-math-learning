@@ -169,27 +169,27 @@ export function computeProceduralStrokeTiming(opts: {
     ecoMode = false,
   } = opts;
 
-  const durationScale = isSprite ? 0.56 : isLine ? 1.12 : 1.18;
-  const durationMs = Math.max(240, Math.round(baseDurationMs * durationScale));
+  const durationScale = isSprite ? 0.62 : isLine ? 1.24 : 1.3;
+  const durationMs = Math.max(260, Math.round(baseDurationMs * durationScale));
 
   if (!staggerByLayer || (isDynamicReveal && layerId === 'error')) {
     return { delayMs: 0, durationMs };
   }
 
-  const pace = ecoMode ? 0.6 : 1.0;
+  const pace = ecoMode ? 0.58 : 1.0;
 
   if (isSprite) {
     // Labels are written last in sequence after the main geometry has taken shape
     const cappedIdx = Math.min(indexInLayer, 7);
-    const delayMs = Math.round((2560 + cappedIdx * 145) * pace);
+    const delayMs = Math.round((3100 + cappedIdx * 165) * pace);
     return { delayMs, durationMs };
   }
 
   const layerOrder = getAnatomyLayerDrawOrder(layerId);
-  // Layer stage start times: substrate(0ms) -> structure(~768ms) -> operator(~1536ms) -> invariant(~2112ms)
-  const layerBaseMs = layerOrder * 3200;
-  // Element-by-element cadence inside each layer so individual strokes read clearly
-  const stepMs = layerId === 'operator' || layerId === 'invariant' ? 175 : 130;
+  // Deliberate architectural cadence: substrate(0ms) -> structure(~912ms) -> operator(~1824ms) -> invariant(~2508ms)
+  const layerBaseMs = layerOrder * 3800;
+  // Clear element-by-element stroke rhythm inside each layer so each vector/curve reads individually
+  const stepMs = layerId === 'operator' || layerId === 'invariant' ? 215 : 155;
   const cappedIdx = Math.min(indexInLayer, 8);
   const delayMs = Math.round((layerBaseMs + cappedIdx * stepMs) * pace);
 

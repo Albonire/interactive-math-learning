@@ -328,15 +328,17 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
                 {lesson.nextSceneId && (
                   <button
                     type="button"
+                    data-testid="next-lesson-btn"
                     onClick={() => onSelectScene(lesson.nextSceneId!)}
                     aria-label="Siguiente lección"
                     title="Siguiente lección"
-                    className={`inline-flex items-center gap-1 cursor-pointer whitespace-nowrap transition-colors ${
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                       allStepsDone
                         ? 'font-display text-[17px] text-[var(--ui-accent)] underline decoration-2 underline-offset-4'
                         : 'hover:text-[var(--text-primary)]'
                     }`}
                   >
+                    <span className="hidden md:inline xl:hidden">Sig.</span>
                     <span className="hidden xl:inline">Siguiente</span>
                     <CrayonArrowRight size={16} />
                   </button>

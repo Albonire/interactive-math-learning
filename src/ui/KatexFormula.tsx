@@ -1,8 +1,46 @@
-import { useMemo, useRef, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import katex from 'katex';
 import type { SymbolicParameter, ThemeMode } from '../core/types';
 import { getCrayonCssVar } from '../core/palette';
 import { RoughUnderline } from './RoughElements';
+
+let katexFontsReady = false;
+let katexFontsPrimed = false;
+const katexFontListeners = new Set<() => void>();
+
+function notifyKatexFontListeners(): void {
+  katexFontsReady = true;
+  for (const fn of katexFontListeners) fn();
+}
+
+function ensureKatexFontsPrimed(): void {
+  if (katexFontsPrimed || typeof document === 'undefined' || !document.fonts) return;
+  katexFontsPrimed = true;
+
+  const fontQueries = [
+    '400 1em KaTeX_Main',
+    'italic 1em KaTeX_Math',
+    '400 1em KaTeX_Size1',
+    '400 1em KaTeX_Size2',
+    '400 1em KaTeX_AMS',
+  ];
+
+  Promise.allSettled(fontQueries.map((q) => document.fonts.load(q))).then(() => {
+    notifyKatexFontListeners();
+  });
+
+  document.fonts.ready.then(() => {
+    notifyKatexFontListeners();
+  });
+
+  document.fonts.addEventListener?.('loadingdone', () => {
+    notifyKatexFontListeners();
+  });
+}
+
+if (typeof document !== 'undefined') {
+  ensureKatexFontsPrimed();
+}
 
 export function KatexInline({
   latex,
@@ -11,12 +49,27 @@ export function KatexInline({
   latex: string;
   className?: string;
 }) {
+  const [fontRev, setFontRev] = useState(() => (katexFontsReady ? 1 : 0));
+
+  useEffect(() => {
+    ensureKatexFontsPrimed();
+    if (katexFontsReady) {
+      setFontRev((r) => (r === 0 ? 1 : r));
+    }
+    const onFonts = () => setFontRev((r) => r + 1);
+    katexFontListeners.add(onFonts);
+    return () => {
+      katexFontListeners.delete(onFonts);
+    };
+  }, []);
+
   const html = useMemo(() => {
     try {
       return katex.renderToString(latex, {
         throwOnError: false,
         displayMode: false,
         strict: false,
+        output: 'html',
       });
     } catch {
       return latex;
@@ -25,7 +78,9 @@ export function KatexInline({
 
   return (
     <span
-      className={className}
+      key={fontRev > 0 ? 'katex-ready' : 'katex-init'}
+      data-katex-ready={fontRev > 0 ? 'true' : 'false'}
+      className={`katex-crayon-inline ${className}`.trim()}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import rough from 'roughjs';
 import { getEcoSvgFilterParams } from '../core/ecoMode';
-import { globalFirstDrawRegistry } from '../core/firstDrawRegistry';
 import { getCrayonHex, getUiCrayonHex, THEME_PALETTES } from '../core/palette';
 import type { AutoDiffSnapshot, CrayonToken, ThemeMode } from '../core/types';
 import { animateSvgStrokesOnce } from './svgDrawAnimation';
@@ -275,6 +274,8 @@ export function CrayonButton({
   onClick,
   ariaExpanded,
   title,
+  disabled = false,
+  dataTestId,
 }: {
   crayon: CrayonToken;
   theme: ThemeMode;
@@ -285,6 +286,8 @@ export function CrayonButton({
   onClick: () => void;
   ariaExpanded?: boolean;
   title?: string;
+  disabled?: boolean;
+  dataTestId?: string;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -349,9 +352,11 @@ export function CrayonButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
+      data-testid={dataTestId}
       aria-expanded={ariaExpanded}
       title={title}
-      className={`relative inline-flex items-center justify-center gap-1.5 px-4 py-1.5 font-display text-[18px] leading-none whitespace-nowrap shrink-0 cursor-pointer transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] ${className}`}
+      className={`relative inline-flex items-center justify-center gap-1.5 px-4 py-1.5 font-display text-[18px] leading-none whitespace-nowrap shrink-0 cursor-pointer transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:scale-100 ${className}`}
       style={{ color: textColor }}
     >
       <svg
@@ -583,6 +588,32 @@ export function CrayonSlider({
     });
   }, [thumbX, crayon, theme, seed, ariaLabel, clampedGlow, isOptimal]);
 
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    const mult = e.shiftKey ? 5 : 1;
+    let next: number | null = null;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+      next = value + step * mult;
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+      next = value - step * mult;
+    } else if (e.key === 'PageUp') {
+      next = value + step * 10;
+    } else if (e.key === 'PageDown') {
+      next = value - step * 10;
+    } else if (e.key === 'Home') {
+      next = min;
+    } else if (e.key === 'End') {
+      next = max;
+    }
+    if (next === null) return;
+    e.preventDefault();
+    const clamped = Math.max(min, Math.min(max, next));
+    const snapped = Math.round((clamped - min) / step) * step + min;
+    const rounded = Number(Math.max(min, Math.min(max, snapped)).toFixed(4));
+    if (rounded !== value) {
+      onChange(rounded);
+    }
+  };
+
   return (
     <div
       data-optimal-glow={clampedGlow.toFixed(2)}
@@ -604,6 +635,7 @@ export function CrayonSlider({
         value={value}
         aria-label={ariaLabel}
         onChange={(e) => onChange(Number(e.target.value))}
+        onKeyDown={handleKeyDown}
         onPointerDown={onFocusStart}
         onPointerUp={onFocusEnd}
         onPointerCancel={onFocusEnd}
@@ -724,9 +756,20 @@ export function CrayonStepMarker({
   );
 }
 
+export const AUTODIFF_DAG_LAYOUT: Record<string, { x: number; y: number }> = {
+  x: { x: 40, y: 38 },
+  w: { x: 40, y: 118 },
+  y: { x: 40, y: 198 },
+  v1: { x: 146, y: 38 },
+  v2: { x: 146, y: 118 },
+  v3: { x: 146, y: 198 },
+  v4: { x: 252, y: 78 },
+  out: { x: 338, y: 138 },
+};
+
 /**
- * Hand-drawn Rough.js SVG computational DAG for Scene 2.2 (AutoDiff)
- * Animates every edge & node stroke sequentially on its FIRST appearance.
+ * Hand-drawn Rough.js SVG computational DAG for Scene 2.2 (AutoDiff).
+ * Renders all 8 nodes, directed crayon arrowheads, and live forward/backward values reliably.
  */
 export function AutoDiffRoughGraph({
   snapshot,
@@ -736,22 +779,10 @@ export function AutoDiffRoughGraph({
   theme: ThemeMode;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [labelsVisible, setLabelsVisible] = useState(() =>
-    globalFirstDrawRegistry.hasBeenDrawn('graph:autodiff-dag')
-  );
-
-  const layout: Record<string, { x: number; y: number }> = {
-    x: { x: 42, y: 36 },
-    w: { x: 42, y: 114 },
-    y: { x: 42, y: 192 },
-    v1: { x: 146, y: 36 },
-    v2: { x: 146, y: 114 },
-    v3: { x: 146, y: 192 },
-    v4: { x: 246, y: 74 },
-    out: { x: 318, y: 132 },
-  };
-  const boxW = 70;
-  const boxH = 40;
+  const viewW = 384;
+  const viewH = 236;
+  const boxW = 68;
+  const boxH = 42;
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -759,83 +790,111 @@ export function AutoDiffRoughGraph({
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     const rc = rough.svg(svg);
 
-    const edgeColor =
-      snapshot.activePass === 'backward'
-        ? getCrayonHex('vermilion', theme)
-        : snapshot.activePass === 'forward'
-          ? getCrayonHex('sage', theme)
-          : getCrayonHex('pencil', theme);
+    const isBackward = snapshot.activePass === 'backward';
+    const isForward = snapshot.activePass === 'forward';
+    const edgeColor = isBackward
+      ? getCrayonHex('vermilion', theme)
+      : isForward
+        ? getCrayonHex('sage', theme)
+        : getCrayonHex('pencil', theme);
 
+    // 1. Directed edges with hand-drawn arrowheads
     snapshot.nodes.forEach((node, idx) => {
-      const dst = layout[node.id];
+      const dst = AUTODIFF_DAG_LAYOUT[node.id];
       if (!dst) return;
       node.inputs.forEach((srcId, j) => {
-        const src = layout[srcId];
+        const src = AUTODIFF_DAG_LAYOUT[srcId];
         if (!src) return;
-        const line = rc.line(src.x + boxW / 2, src.y, dst.x - boxW / 2, dst.y, {
-          seed: 100 + idx * 13 + j * 7,
-          stroke: edgeColor,
-          strokeWidth: snapshot.activePass === 'idle' ? 1.4 : 2.1,
-          roughness: 1.25,
-        });
-        svg.appendChild(line);
+        const x1 = src.x + boxW / 2 + 2;
+        const y1 = src.y;
+        const x2 = dst.x - boxW / 2 - 3;
+        const y2 = dst.y;
+        svg.appendChild(
+          rc.line(x1, y1, x2, y2, {
+            seed: 100 + idx * 13 + j * 7,
+            stroke: edgeColor,
+            strokeWidth: snapshot.activePass === 'idle' ? 1.5 : 2.1,
+            roughness: 1.15,
+          })
+        );
+
+        // Hand-sketched arrowhead pointing right on Forward/Idle, left on Backward
+        const tipX = isBackward ? x1 + 4 : x2;
+        const tipY = isBackward ? y1 : y2;
+        const fromX = isBackward ? x2 : x1;
+        const fromY = isBackward ? y2 : y1;
+        const ang = Math.atan2(tipY - fromY, tipX - fromX);
+        const headLen = 7;
+        const wingA: [number, number] = [
+          tipX - headLen * Math.cos(ang - 0.45),
+          tipY - headLen * Math.sin(ang - 0.45),
+        ];
+        const wingB: [number, number] = [
+          tipX - headLen * Math.cos(ang + 0.45),
+          tipY - headLen * Math.sin(ang + 0.45),
+        ];
+        svg.appendChild(
+          rc.linearPath([wingA, [tipX, tipY], wingB], {
+            seed: 160 + idx * 11 + j * 5,
+            stroke: edgeColor,
+            strokeWidth: 1.8,
+            roughness: 0.85,
+          })
+        );
       });
     });
 
+    // 2. Node boxes with crisp artisanal border + solid paper/chalk fill
     snapshot.nodes.forEach((node, idx) => {
-      const pos = layout[node.id];
+      const pos = AUTODIFF_DAG_LAYOUT[node.id];
       if (!pos) return;
       const stroke = getCrayonHex(node.crayon, theme);
       const rect = rc.rectangle(pos.x - boxW / 2, pos.y - boxH / 2, boxW, boxH, {
         seed: 300 + idx * 17,
         stroke,
-        strokeWidth: 1.8,
+        strokeWidth: 2.0,
         fill: THEME_PALETTES[theme].surfaceBg,
         fillStyle: 'solid',
-        roughness: 1.35,
+        roughness: 1.25,
       });
       svg.appendChild(rect);
     });
 
-    const animated = animateSvgStrokesOnce(svg, 'graph:autodiff-dag', {
-      durationMs: 620,
-      staggerMs: 55,
-      maxTotalStaggerMs: 780,
-      onComplete: () => setLabelsVisible(true),
+    animateSvgStrokesOnce(svg, 'graph:autodiff-dag', {
+      durationMs: 360,
+      staggerMs: 22,
+      maxTotalStaggerMs: 260,
     });
-    if (animated) {
-      setLabelsVisible(false);
-    }
   }, [snapshot, theme]);
 
   return (
     <div
-      className="relative w-full aspect-[360/228] select-none"
+      data-testid="autodiff-dag-graph"
+      data-node-count={snapshot.nodes.length}
+      data-pass={snapshot.activePass}
+      className="relative w-full aspect-[384/236] select-none"
       aria-label="Grafo computacional AutoDiff"
     >
       <svg
         ref={svgRef}
-        viewBox="0 0 360 228"
+        viewBox={`0 0 ${viewW} ${viewH}`}
         className="w-full h-full block crayon-stroke-svg"
       />
       <div className="absolute inset-0 pointer-events-none">
-        {snapshot.nodes.map((node, i) => {
-          const pos = layout[node.id];
+        {snapshot.nodes.map((node) => {
+          const pos = AUTODIFF_DAG_LAYOUT[node.id];
           if (!pos) return null;
           return (
             <div
               key={node.id}
+              data-testid={`autodiff-node-${node.id}`}
               style={{
-                left: `${(pos.x / 360) * 100}%`,
-                top: `${(pos.y / 228) * 100}%`,
-                opacity: labelsVisible ? 1 : 0,
-                animationDelay: labelsVisible ? `${i * 30}ms` : undefined,
+                left: `${(pos.x / viewW) * 100}%`,
+                top: `${(pos.y / viewH) * 100}%`,
               }}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 text-center leading-tight transition-opacity duration-300 ${
-                labelsVisible ? 'crayon-label-reveal' : ''
-              }`}
+              className="absolute -translate-x-1/2 -translate-y-1/2 text-center leading-tight"
             >
-              <div className="text-[12px] font-hand text-[var(--text-primary)] whitespace-nowrap">
+              <div className="text-[11.5px] font-hand font-semibold text-[var(--text-primary)] whitespace-nowrap">
                 {node.label}
               </div>
               <div className="text-[10px] font-mono-math tabular-nums flex items-center justify-center gap-0.5 whitespace-nowrap">
@@ -854,14 +913,19 @@ export function AutoDiffRoughGraph({
 }
 
 /**
- * Graceful Rough.js technical fallback when WebGL 2 is unavailable or context lost
+ * Graceful Rough.js technical fallback when WebGL 2 is unavailable or context lost.
+ * Responds visually to both "Separar vista" (exploded layers) and "Leyenda" (2D annotations).
  */
 export function WebGLFallbackSvg({
   title,
   theme,
+  exploded = false,
+  legendOpen = false,
 }: {
   title: string;
   theme: ThemeMode;
+  exploded?: boolean;
+  legendOpen?: boolean;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
 
@@ -874,38 +938,147 @@ export function WebGLFallbackSvg({
     const c = getCrayonHex('cobalt', theme);
     const v = getCrayonHex('vermilion', theme);
     const o = getCrayonHex('ochre', theme);
+    const s = getCrayonHex('sage', theme);
 
-    svg.appendChild(rc.line(70, 220, 350, 220, { seed: 1, stroke: g, strokeWidth: 1.8, roughness: 1.4 }));
-    svg.appendChild(rc.line(180, 250, 180, 60, { seed: 2, stroke: g, strokeWidth: 1.8, roughness: 1.4 }));
-    svg.appendChild(rc.line(180, 220, 310, 165, { seed: 3, stroke: c, strokeWidth: 3.0, roughness: 1.5 }));
-    svg.appendChild(rc.line(180, 220, 235, 95, { seed: 4, stroke: v, strokeWidth: 3.0, roughness: 1.5 }));
-    svg.appendChild(rc.line(180, 220, 110, 145, { seed: 5, stroke: o, strokeWidth: 3.0, roughness: 1.5 }));
+    const floorShift = exploded ? 30 : 0;
+    const vecShift = exploded ? -22 : 0;
+    const planeShift = exploded ? -46 : 0;
+
+    if (exploded) {
+      svg.appendChild(
+        rc.line(180, 245, 180, 48, {
+          seed: 91,
+          stroke: g,
+          strokeWidth: 1.1,
+          strokeLineDash: [5, 5],
+          roughness: 0.9,
+        })
+      );
+      svg.appendChild(
+        rc.line(310, 220, 310, 88, {
+          seed: 92,
+          stroke: g,
+          strokeWidth: 1.0,
+          strokeLineDash: [5, 5],
+          roughness: 0.9,
+        })
+      );
+    }
+
+    // Layer 1: Substrate axes
+    svg.appendChild(
+      rc.line(70, 220 + floorShift, 350, 220 + floorShift, {
+        seed: 1,
+        stroke: g,
+        strokeWidth: 1.8,
+        roughness: 1.4,
+      })
+    );
+    svg.appendChild(
+      rc.line(180, 250 + floorShift, 180, 125 + floorShift, {
+        seed: 2,
+        stroke: g,
+        strokeWidth: 1.8,
+        roughness: 1.4,
+      })
+    );
+
+    // Layer 2: Span / Surface polygon
     svg.appendChild(
       rc.polygon(
         [
-          [180, 220],
-          [310, 165],
-          [365, 40],
-          [235, 95],
+          [180, 220 + planeShift],
+          [310, 165 + planeShift],
+          [365, 65 + planeShift],
+          [235, 120 + planeShift],
         ],
-        { seed: 6, stroke: c, fill: c, fillStyle: 'hachure', hachureGap: 6, strokeWidth: 1.5, roughness: 1.5 }
+        {
+          seed: 6,
+          stroke: s,
+          fill: s,
+          fillStyle: 'hachure',
+          hachureGap: 6,
+          strokeWidth: 1.5,
+          roughness: 1.5,
+        }
       )
     );
 
+    // Layer 3: Vectors / Operators
+    svg.appendChild(
+      rc.line(180, 220 + vecShift, 310, 165 + vecShift, {
+        seed: 3,
+        stroke: c,
+        strokeWidth: 3.0,
+        roughness: 1.5,
+      })
+    );
+    svg.appendChild(
+      rc.line(180, 220 + vecShift, 235, 105 + vecShift, {
+        seed: 4,
+        stroke: v,
+        strokeWidth: 3.0,
+        roughness: 1.5,
+      })
+    );
+    svg.appendChild(
+      rc.line(180, 220 + vecShift, 110, 148 + vecShift, {
+        seed: 5,
+        stroke: o,
+        strokeWidth: 3.0,
+        roughness: 1.5,
+      })
+    );
+
     animateSvgStrokesOnce(svg, 'fallback:webgl-diagram', {
-      durationMs: 700,
-      staggerMs: 85,
-      maxTotalStaggerMs: 750,
+      durationMs: 520,
+      staggerMs: 65,
+      maxTotalStaggerMs: 420,
     });
-  }, [theme]);
+  }, [theme, exploded]);
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center px-6 text-center notebook-paper-bg">
-      <svg ref={svgRef} viewBox="0 0 420 280" className="w-full max-w-md h-auto mb-4 crayon-stroke-svg" />
+    <div
+      data-testid="webgl-fallback-2d"
+      data-exploded={exploded ? 'true' : 'false'}
+      data-legend={legendOpen ? 'true' : 'false'}
+      className="w-full h-full flex flex-col items-center justify-center px-6 text-center notebook-paper-bg"
+    >
+      <div className="relative w-full max-w-md mb-4">
+        <svg
+          ref={svgRef}
+          viewBox="0 0 420 290"
+          className="w-full h-auto crayon-stroke-svg"
+        />
+        {(legendOpen || exploded) && (
+          <div className="pointer-events-none absolute inset-0 text-left font-display text-[13.5px]">
+            <span
+              className="absolute px-1.5 py-0.5 rounded bg-[var(--bg-paper-wash)] border border-dashed border-[var(--hairline-strong)] text-[var(--crayon-sage)]"
+              style={{ right: '8%', top: exploded ? '8%' : '20%' }}
+            >
+              Volumen / Superficie
+            </span>
+            <span
+              className="absolute px-1.5 py-0.5 rounded bg-[var(--bg-paper-wash)] border border-dashed border-[var(--hairline-strong)] text-[var(--crayon-cobalt)]"
+              style={{ left: '10%', top: exploded ? '36%' : '44%' }}
+            >
+              Vectores base (v₁, v₂, v₃)
+            </span>
+            <span
+              className="absolute px-1.5 py-0.5 rounded bg-[var(--bg-paper-wash)] border border-dashed border-[var(--hairline-strong)] text-[var(--text-secondary)]"
+              style={{ right: '14%', bottom: exploded ? '2%' : '12%' }}
+            >
+              Sustrato de ejes
+            </span>
+          </div>
+        )}
+      </div>
       <p className="font-display text-2xl text-[var(--text-primary)] crayon-ink">{title}</p>
-      <p className="text-[16px] text-[var(--text-secondary)] max-w-md mt-1">
-        El contexto WebGL 2 no está activo en este navegador. La ecuación interactiva y el plano
-        computacional continúan completamente operativos.
+      <p className="text-[15.5px] text-[var(--text-secondary)] max-w-md mt-1">
+        Vista esquemática 2D activa (sin WebGL 2).{' '}
+        {exploded ? 'Capas anatómicas separadas verticalmente. ' : ''}
+        {legendOpen ? 'Leyenda artesanal visible. ' : ''}
+        La ecuación interactiva, Simbólico y CodeLab siguen operando normalmente.
       </p>
     </div>
   );

@@ -213,8 +213,8 @@ export function SymbolicWorkspace({
                         />
                       </div>
 
-                      <div className="min-w-0 space-y-1">
-                        <div className="text-[17px] sm:text-[18.5px] text-[var(--text-primary)] overflow-x-auto">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="text-[15.5px] sm:text-[17px] leading-relaxed text-[var(--text-primary)] break-words">
                           <KatexInline latex={block.latex} />
                         </div>
                         <p className="text-[13.5px] text-[var(--text-secondary)] leading-snug">

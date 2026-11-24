@@ -464,9 +464,17 @@ select:focus-visible,
 }
 
 /* KaTeX integrado armónicamente con el trazo manual */
+.katex-crayon-inline {
+  position: relative;
+  z-index: 1;
+  display: inline-block;
+  color: inherit;
+}
+
 .katex {
   font-size: 1.08em;
   color: inherit;
+  line-height: 1.25;
 }
 
 /* Scrollbar discreta para panel deslizable y mapa */

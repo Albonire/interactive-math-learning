@@ -10,8 +10,11 @@ export interface PersistedAiData {
   bkt: Record<SkillId, BktSkillState>;
   bandit: LinUcbState;
   lastErrorBySkill: Partial<Record<SkillId, number>>;
+  completed3DChallengeScenes: SceneId[];
   completedSymbolicScenes: SceneId[];
   completedCodeLabScenes: SceneId[];
+  lastSceneId?: SceneId;
+  seenIntroScenes: SceneId[];
   updatedAt: number;
 }
 
@@ -23,14 +26,28 @@ export interface PortableProgressBundle {
   completedStepIds: string[];
 }
 
+const VALID_SCENE_IDS: ReadonlySet<string> = new Set<SceneId>([
+  'lin-span',
+  'lin-svd',
+  'lin-eigen',
+  'lin-manifold',
+  'calc-partials',
+  'calc-autodiff',
+  'calc-optimizers',
+  'calc-symbolic',
+]);
+
 export function createDefaultPersistedData(): PersistedAiData {
   return {
     version: 3,
     bkt: createInitialBktMap(),
     bandit: createInitialBanditState(),
     lastErrorBySkill: {},
+    completed3DChallengeScenes: [],
     completedSymbolicScenes: [],
     completedCodeLabScenes: [],
+    lastSceneId: undefined,
+    seenIntroScenes: [],
     updatedAt: Date.now(),
   };
 }
@@ -65,7 +82,18 @@ export function migratePersistedAiData(raw: unknown): PersistedAiData {
   }
 
   const validScenes = (val: unknown): SceneId[] =>
-    Array.isArray(val) ? (val.filter((x) => typeof x === 'string') as SceneId[]) : [];
+    Array.isArray(val)
+      ? Array.from(
+          new Set(
+            val.filter((x): x is SceneId => typeof x === 'string' && VALID_SCENE_IDS.has(x))
+          )
+        )
+      : [];
+
+  const lastSceneId =
+    typeof obj.lastSceneId === 'string' && VALID_SCENE_IDS.has(obj.lastSceneId)
+      ? (obj.lastSceneId as SceneId)
+      : undefined;
 
   return {
     version: 3,
@@ -75,8 +103,11 @@ export function migratePersistedAiData(raw: unknown): PersistedAiData {
       obj.lastErrorBySkill && typeof obj.lastErrorBySkill === 'object'
         ? (obj.lastErrorBySkill as Partial<Record<SkillId, number>>)
         : {},
+    completed3DChallengeScenes: validScenes(obj.completed3DChallengeScenes),
     completedSymbolicScenes: validScenes(obj.completedSymbolicScenes),
     completedCodeLabScenes: validScenes(obj.completedCodeLabScenes),
+    lastSceneId,
+    seenIntroScenes: validScenes(obj.seenIntroScenes),
     updatedAt: typeof obj.updatedAt === 'number' ? obj.updatedAt : Date.now(),
   };
 }

@@ -4,6 +4,7 @@ import type { SceneId, ThemeMode } from '../core/types';
 import {
   CrayonLeaf,
   CrayonMoon,
+  CrayonMusicNote,
   CrayonSoundOff,
   CrayonSoundOn,
   CrayonSun,
@@ -14,6 +15,9 @@ interface TopBarProps {
   activeSceneId: SceneId;
   drawerMode: 'closed' | 'computational' | 'challenge';
   mapOpen: boolean;
+  rhythmOpen: boolean;
+  rhythmPlaying: boolean;
+  rhythmBpm: number | null;
   theme: ThemeMode;
   ecoMode: boolean;
   audioEnabled: boolean;
@@ -23,6 +27,7 @@ interface TopBarProps {
   onToggleTheme: () => void;
   onToggleEcoMode: () => void;
   onToggleAudio: () => void;
+  onToggleRhythm: () => void;
 }
 
 /**
@@ -35,6 +40,9 @@ export function TopBar({
   activeSceneId,
   drawerMode,
   mapOpen,
+  rhythmOpen,
+  rhythmPlaying,
+  rhythmBpm,
   theme,
   ecoMode,
   audioEnabled,
@@ -44,6 +52,7 @@ export function TopBar({
   onToggleTheme,
   onToggleEcoMode,
   onToggleAudio,
+  onToggleRhythm,
 }: TopBarProps) {
   const meta = SCENES[activeSceneId];
   const lesson = GUIDED_LESSONS[activeSceneId];
@@ -127,6 +136,40 @@ export function TopBar({
 
         {/* Zone 3: Quiet Environment Switches */}
         <div className="flex items-center gap-3.5 sm:gap-5 shrink-0">
+          <button
+            type="button"
+            data-testid="toggle-rhythm-btn"
+            onClick={onToggleRhythm}
+            aria-expanded={rhythmOpen}
+            aria-label={
+              rhythmPlaying && rhythmBpm
+                ? `Ritmo activo a ${Math.round(rhythmBpm)} BPM (abrir panel de música)`
+                : 'Abrir música de fondo y sincronización de trazos'
+            }
+            title="Música de estudio con detector de tempo y sincronización sutil de trazos"
+            className={`relative py-1 inline-flex items-center gap-1 text-[15px] whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
+              ecoMode
+                ? 'text-[var(--text-muted)] opacity-60 hover:opacity-85'
+                : rhythmPlaying || rhythmOpen
+                  ? 'text-[var(--ui-accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            <CrayonMusicNote size={15} />
+            <span className="hidden md:inline">
+              {rhythmPlaying && rhythmBpm && !ecoMode ? `${Math.round(rhythmBpm)} BPM` : 'Ritmo'}
+            </span>
+            {(rhythmOpen || (rhythmPlaying && !ecoMode)) && (
+              <span className="absolute left-0 right-0 -bottom-1">
+                <RoughUnderline
+                  crayon={rhythmPlaying && !ecoMode ? 'sage' : 'cobalt'}
+                  theme={theme}
+                  seed={63}
+                />
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             data-testid="toggle-audio-btn"

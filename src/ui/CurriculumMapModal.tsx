@@ -3,7 +3,6 @@ import rough from 'roughjs';
 import { CrayonArrowRight, CrayonClose, CrayonReset } from './CrayonIcons';
 import { computeDecayedMastery, needsSpacedReview } from '../ai/bktEngine';
 import { CURRICULUM_BLOCKS, SCENES } from '../core/curriculum';
-import { globalFirstDrawRegistry } from '../core/firstDrawRegistry';
 import { GUIDED_LESSONS } from '../core/lessons';
 import { ROADMAP_TIERS } from '../core/lessonSpecs';
 import { getUiCrayonHex } from '../core/palette';
@@ -16,6 +15,7 @@ interface CurriculumMapModalProps {
   activeSceneId: SceneId;
   bktMap: Record<SkillId, BktSkillState>;
   completedStepIds: ReadonlySet<string>;
+  completed3DChallengeScenes?: ReadonlyArray<SceneId>;
   completedSymbolicScenes?: ReadonlyArray<SceneId>;
   completedCodeLabScenes?: ReadonlyArray<SceneId>;
   theme: ThemeMode;
@@ -28,7 +28,7 @@ interface CurriculumMapModalProps {
 
 /**
  * Hand-drawn Rough.js course map connecting the 6 curriculum blocks as a visual index.
- * Uses the converged graphite + cobalt UI palette so it reads calmly and cohesively.
+ * Labels are placed cleanly above top-row nodes and below bottom-row nodes with zero overlap.
  */
 function CurriculumDagDiagram({
   theme,
@@ -38,17 +38,16 @@ function CurriculumDagDiagram({
   onJumpToBlock: (blockId: string) => void;
 }) {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [labelsVisible, setLabelsVisible] = useState(() =>
-    globalFirstDrawRegistry.hasBeenDrawn('graph:curriculum-dag')
-  );
+  const viewW = 840;
+  const viewH = 186;
 
   const nodes = [
-    { id: 'block-1', num: '01', name: 'Álgebra Lineal', x: 80, y: 68, active: true, crayon: 'cobalt' as const },
-    { id: 'block-2', num: '02', name: 'Cálculo Multi.', x: 300, y: 34, active: true, crayon: 'cobalt' as const },
-    { id: 'block-3', num: '03', name: 'Cálculo Aplic.', x: 300, y: 102, active: false, crayon: 'pencil' as const },
-    { id: 'block-4', num: '04', name: 'Mét. Numéricos', x: 525, y: 34, active: false, crayon: 'pencil' as const },
-    { id: 'block-5', num: '05', name: 'Discretas y Grafos', x: 525, y: 102, active: false, crayon: 'pencil' as const },
-    { id: 'block-6', num: '06', name: 'Probabilidad / TI', x: 745, y: 68, active: false, crayon: 'pencil' as const },
+    { id: 'block-1', num: '01', name: 'Álgebra Lineal', x: 84, y: 92, labelY: 132, active: true, crayon: 'cobalt' as const },
+    { id: 'block-2', num: '02', name: 'Cálculo Multi.', x: 304, y: 54, labelY: 18, active: true, crayon: 'cobalt' as const },
+    { id: 'block-3', num: '03', name: 'Cálculo Aplic.', x: 304, y: 130, labelY: 168, active: false, crayon: 'pencil' as const },
+    { id: 'block-4', num: '04', name: 'Mét. Numéricos', x: 536, y: 54, labelY: 18, active: false, crayon: 'pencil' as const },
+    { id: 'block-5', num: '05', name: 'Discretas y Grafos', x: 536, y: 130, labelY: 168, active: false, crayon: 'pencil' as const },
+    { id: 'block-6', num: '06', name: 'Probabilidad / TI', x: 756, y: 92, labelY: 132, active: false, crayon: 'pencil' as const },
   ];
 
   useEffect(() => {
@@ -57,89 +56,107 @@ function CurriculumDagDiagram({
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     const rc = rough.svg(svg);
 
-    const edges: Array<[number, number]> = [
+    const straightEdges: Array<[number, number]> = [
       [0, 1],
       [0, 2],
       [1, 3],
       [2, 3],
-      [0, 4],
       [1, 5],
       [4, 5],
     ];
 
     const linkStroke = getUiCrayonHex('pencil', theme);
-    edges.forEach(([a, b], i) => {
+    straightEdges.forEach(([a, b], i) => {
       const nA = nodes[a];
       const nB = nodes[b];
       svg.appendChild(
-        rc.line(nA.x + 21, nA.y, nB.x - 21, nB.y, {
+        rc.line(nA.x + 22, nA.y, nB.x - 22, nB.y, {
           seed: 70 + i * 11,
           stroke: linkStroke,
           strokeWidth: 1.5,
+          roughness: 1.25,
+        })
+      );
+    });
+
+    // Gentle mid-lane curve from 01 -> 05 so it never crosses 03 or its label
+    svg.appendChild(
+      rc.curve(
+        [
+          [nodes[0].x + 22, nodes[0].y + 4],
+          [304, 92],
+          [nodes[4].x - 22, nodes[4].y - 6],
+        ],
+        {
+          seed: 147,
+          stroke: linkStroke,
+          strokeWidth: 1.4,
+          roughness: 1.15,
+        }
+      )
+    );
+
+    nodes.forEach((n, i) => {
+      const col = getUiCrayonHex(n.crayon, theme);
+      svg.appendChild(
+        rc.circle(n.x, n.y, 40, {
+          seed: 20 + i * 9,
+          stroke: col,
+          strokeWidth: n.active ? 2.4 : 1.6,
+          fill: n.active ? col : undefined,
+          fillStyle: 'hachure',
+          hachureGap: 6.5,
+          fillWeight: 0.65,
           roughness: 1.35,
         })
       );
     });
 
-    nodes.forEach((n, i) => {
-      const col = getUiCrayonHex(n.crayon, theme);
-      svg.appendChild(
-        rc.circle(n.x, n.y, 38, {
-          seed: 20 + i * 9,
-          stroke: col,
-          strokeWidth: n.active ? 2.4 : 1.45,
-          fill: n.active ? col : undefined,
-          fillStyle: 'hachure',
-          hachureGap: 6.5,
-          fillWeight: 0.65,
-          roughness: 1.45,
-        })
-      );
+    animateSvgStrokesOnce(svg, 'graph:curriculum-dag', {
+      durationMs: 360,
+      staggerMs: 28,
+      maxTotalStaggerMs: 240,
     });
-
-    const animated = animateSvgStrokesOnce(svg, 'graph:curriculum-dag', {
-      durationMs: 420,
-      staggerMs: 35,
-      maxTotalStaggerMs: 340,
-      onComplete: () => setLabelsVisible(true),
-    });
-    if (animated) {
-      setLabelsVisible(false);
-    }
   }, [theme]);
 
   return (
-    <div className="relative w-full max-w-[825px] mx-auto aspect-[825/146] hidden md:block select-none">
-      <svg ref={svgRef} viewBox="0 0 825 146" className="w-full h-full block crayon-stroke-svg" />
+    <div
+      data-testid="curriculum-dag-diagram"
+      className="relative w-full max-w-[840px] mx-auto aspect-[840/186] hidden md:block select-none"
+    >
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${viewW} ${viewH}`}
+        className="w-full h-full block crayon-stroke-svg"
+      />
       <div className="absolute inset-0">
-        {nodes.map((n, i) => (
+        {nodes.map((n) => (
           <div key={n.num}>
             <button
               type="button"
               onClick={() => n.active && onJumpToBlock(n.id)}
               disabled={!n.active}
               style={{
-                left: `${(n.x / 825) * 100}%`,
-                top: `${(n.y / 146) * 100}%`,
-                opacity: labelsVisible ? 1 : 0,
-                animationDelay: labelsVisible ? `${i * 35}ms` : undefined,
+                left: `${(n.x / viewW) * 100}%`,
+                top: `${(n.y / viewH) * 100}%`,
               }}
               aria-label={`Ir al bloque ${n.num}: ${n.name}`}
-              className={`absolute -translate-x-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center font-display text-[17px] text-[var(--text-primary)] transition-opacity duration-300 ${
-                n.active ? 'cursor-pointer hover:scale-105' : 'cursor-default'
-              } ${labelsVisible ? 'crayon-label-reveal' : ''}`}
+              className={`absolute -translate-x-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center font-display text-[17px] text-[var(--text-primary)] ${
+                n.active ? 'cursor-pointer hover:scale-105' : 'cursor-default opacity-85'
+              }`}
             >
               {n.num}
             </button>
             <span
+              data-testid={`dag-label-${n.num}`}
               style={{
-                left: `${(n.x / 825) * 100}%`,
-                top: `${((n.y + 29) / 146) * 100}%`,
-                opacity: labelsVisible ? 1 : 0,
-                animationDelay: labelsVisible ? `${i * 35 + 60}ms` : undefined,
+                left: `${(n.x / viewW) * 100}%`,
+                top: `${(n.labelY / viewH) * 100}%`,
               }}
-              className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 text-[14px] text-[var(--text-secondary)] whitespace-nowrap transition-opacity duration-300 ${
-                labelsVisible ? 'crayon-label-reveal' : ''
+              className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 px-1.5 rounded bg-[var(--bg-paper-wash)] text-[14px] whitespace-nowrap ${
+                n.active
+                  ? 'font-display text-[15px] text-[var(--text-primary)]'
+                  : 'text-[var(--text-secondary)]'
               }`}
             >
               {n.name}
@@ -156,6 +173,7 @@ export function CurriculumMapModal({
   activeSceneId,
   bktMap,
   completedStepIds,
+  completed3DChallengeScenes = [],
   completedSymbolicScenes = [],
   completedCodeLabScenes = [],
   theme,
@@ -166,7 +184,19 @@ export function CurriculumMapModal({
   onImportProgress,
 }: CurriculumMapModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [transferNotice, setTransferNotice] = useState<{ ok: boolean; text: string } | null>(null);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  // Always open at the top of the Course Index and clear transient confirmation state
+  useEffect(() => {
+    if (open) {
+      setConfirmingReset(false);
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+    }
+  }, [open]);
 
   if (!open) return null;
 
@@ -243,7 +273,11 @@ export function CurriculumMapModal({
 
       <RoughDivider theme={theme} seed={401} />
 
-      <div className="flex-1 overflow-y-auto notebook-scroll px-6 md:px-10 py-6">
+      <div
+        ref={scrollContainerRef}
+        data-testid="curriculum-modal-scroll"
+        className="flex-1 overflow-y-auto notebook-scroll px-6 md:px-10 py-6"
+      >
         <div className="max-w-[1100px] mx-auto space-y-8">
           {/* Hand-drawn visual curriculum map acting as interactive index overview */}
           <CurriculumDagDiagram theme={theme} onJumpToBlock={jumpToBlock} />
@@ -279,6 +313,8 @@ export function CurriculumMapModal({
                       const stepsDone = lesson.steps.filter((s) =>
                         completedStepIds.has(s.id)
                       ).length;
+                      const threeDDone =
+                        completed3DChallengeScenes.includes(scene.id) || stepsDone === 3;
                       const symDone = completedSymbolicScenes.includes(scene.id);
                       const codeDone = completedCodeLabScenes.includes(scene.id);
                       const isCurrent = scene.id === activeSceneId;
@@ -286,6 +322,7 @@ export function CurriculumMapModal({
                       return (
                         <div
                           key={scene.id}
+                          data-testid={`index-lesson-${scene.id}`}
                           className="py-3.5 flex items-start justify-between gap-4 group"
                         >
                           <button
@@ -313,8 +350,12 @@ export function CurriculumMapModal({
                             <p className="text-[14.5px] text-[var(--text-secondary)] pl-7">
                               {scene.subtitle}
                             </p>
-                            <p className="text-[12.5px] text-[var(--text-muted)] pl-7 pt-0.5">
-                              3D · Simbólico{symDone ? ' ✓' : ''} · CodeLab{codeDone ? ' ✓' : ''}
+                            <p
+                              data-testid={`index-badges-${scene.id}`}
+                              className="text-[12.5px] text-[var(--text-muted)] pl-7 pt-0.5"
+                            >
+                              3D{threeDDone ? ' ✓' : ''} · Simbólico{symDone ? ' ✓' : ''} · CodeLab
+                              {codeDone ? ' ✓' : ''}
                               {reviewDue ? ' · Repaso sugerido' : ''}
                             </p>
                           </button>
@@ -447,14 +488,44 @@ export function CurriculumMapModal({
                   </button>
                 </>
               )}
-              <button
-                type="button"
-                onClick={onResetProgress}
-                className="inline-flex items-center gap-1.5 text-[15px] text-[var(--text-muted)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
-              >
-                <CrayonReset size={15} />
-                <span>Reiniciar progreso</span>
-              </button>
+              {!confirmingReset ? (
+                <button
+                  type="button"
+                  data-testid="reset-progress-btn"
+                  onClick={() => setConfirmingReset(true)}
+                  className="inline-flex items-center gap-1.5 text-[15px] text-[var(--text-muted)] hover:text-[var(--ui-warning)] cursor-pointer whitespace-nowrap transition-colors"
+                >
+                  <CrayonReset size={15} />
+                  <span>Reiniciar progreso</span>
+                </button>
+              ) : (
+                <div
+                  data-testid="reset-progress-confirm"
+                  className="inline-flex items-center gap-3 px-3 py-1 rounded border border-dashed border-[var(--ui-warning)] bg-[var(--bg-paper)] text-[14px]"
+                >
+                  <span className="text-[var(--text-primary)]">¿Borrar todo tu avance?</span>
+                  <button
+                    type="button"
+                    data-testid="confirm-reset-progress-btn"
+                    onClick={() => {
+                      onResetProgress();
+                      setConfirmingReset(false);
+                      setTransferNotice({ ok: true, text: 'Progreso reiniciado a 0 pasos.' });
+                    }}
+                    className="font-display text-[16px] text-[var(--ui-warning)] hover:underline cursor-pointer whitespace-nowrap"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="cancel-reset-progress-btn"
+                    onClick={() => setConfirmingReset(false)}
+                    className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

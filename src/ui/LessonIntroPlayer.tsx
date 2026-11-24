@@ -6,9 +6,10 @@ import {
   CrayonArrowRight,
   CrayonPause,
   CrayonPlay,
+  CrayonReset,
 } from './CrayonIcons';
 import { KatexInline } from './KatexFormula';
-import { CrayonButton, CrayonSwatch } from './RoughElements';
+import { CrayonButton, CrayonSwatch, RoughUnderline } from './RoughElements';
 
 interface LessonIntroPlayerProps {
   intro: LessonIntroSpec;
@@ -17,6 +18,7 @@ interface LessonIntroPlayerProps {
   onChangeBeat: (nextIndex: number) => void;
   onFinish: () => void;
   onPlayingChange?: (playing: boolean) => void;
+  onReplaySketch?: () => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export function LessonIntroPlayer({
   onChangeBeat,
   onFinish,
   onPlayingChange,
+  onReplaySketch,
 }: LessonIntroPlayerProps) {
   const beats = intro.beats;
   const beat = beats[beatIndex] ?? beats[0];
@@ -217,13 +220,16 @@ export function LessonIntroPlayer({
       >
         <div className="max-w-[920px] mx-auto space-y-3.5">
           {/* Active narration beat text */}
-          <div key={beat.id} className="space-y-1 crayon-label-reveal">
-            <div className="flex items-baseline gap-3">
+          <div key={beat.id} className="space-y-1.5 crayon-label-reveal">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <span className="font-display text-[17px] text-[var(--ui-accent)] whitespace-nowrap">
                 {beat.tag}
               </span>
-              <h2 className="font-display crayon-ink text-[24px] sm:text-[28px] leading-tight text-[var(--text-primary)]">
+              <h2 className="relative inline-block font-display crayon-ink text-[24px] sm:text-[28px] leading-tight text-[var(--text-primary)] pb-1">
                 {beat.headline}
+                <span className="block w-full mt-0.5">
+                  <RoughUnderline crayon="cobalt" theme={theme} seed={641 + beatIndex * 23} />
+                </span>
               </h2>
             </div>
             <p className="text-[17px] sm:text-[18.5px] leading-[1.42] text-[var(--text-primary)] max-w-[78ch]">
@@ -301,6 +307,21 @@ export function LessonIntroPlayer({
                 {playing ? <CrayonPause size={16} /> : <CrayonPlay size={16} />}
                 <span>{playing ? 'Pausar' : 'Reproducir'}</span>
               </button>
+
+              {onReplaySketch && (
+                <button
+                  type="button"
+                  data-testid="intro-replay-sketch-btn"
+                  onClick={() => {
+                    setPlaying(true);
+                    onReplaySketch();
+                  }}
+                  className="inline-flex items-center gap-1.5 text-[15px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap transition-colors"
+                >
+                  <CrayonReset size={14} />
+                  <span>Volver a trazar</span>
+                </button>
+              )}
 
               {beatIndex > 0 && (
                 <button

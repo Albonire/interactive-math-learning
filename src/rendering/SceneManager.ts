@@ -112,6 +112,7 @@ export class SceneManager {
   private dustPoints: CrayonDustPoints;
   private dustAnimating = false;
   private nibMarker: CrayonNibMarker;
+  private rhythmBeatPulse = 0;
 
   // Subtle architectural dashed vertical alignment rails visible while "Separar vista" is active
   private explodeGuides: THREE.LineSegments;
@@ -532,7 +533,7 @@ export class SceneManager {
         this.drawProgress = 0.02;
         this.drawAnimating = true;
         this.drawStartTime = performance.now();
-        this.drawDurationMs = this.isSoftwareGl ? 1350 : this.ecoMode ? 1950 : 3350;
+        this.drawDurationMs = this.isSoftwareGl ? 1450 : this.ecoMode ? 2100 : 4100;
       } else {
         this.drawProgress = 1.0;
         this.drawAnimating = false;
@@ -579,7 +580,7 @@ export class SceneManager {
         this.controller.root,
         now,
         {
-          durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1180,
+          durationMs: this.isSoftwareGl ? 720 : this.ecoMode ? 820 : 1280,
           reducedMotion: this.prefersReducedMotion(),
           staggerByLayer: true,
           ecoMode: this.ecoMode,
@@ -747,13 +748,13 @@ export class SceneManager {
     this.drawProgress = 0.02;
     this.drawAnimating = true;
     this.drawStartTime = now;
-    this.drawDurationMs = this.isSoftwareGl ? 1350 : this.ecoMode ? 1950 : 3350;
+    this.drawDurationMs = this.isSoftwareGl ? 1450 : this.ecoMode ? 2100 : 4100;
     this.sketchAnimating = this.sketchAnimator.updateObjectTree(
       this.activeSceneId,
       this.controller.root,
       now,
       {
-        durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1120,
+        durationMs: this.isSoftwareGl ? 720 : this.ecoMode ? 820 : 1280,
         reducedMotion: false,
         staggerByLayer: true,
         ecoMode: this.ecoMode,
@@ -804,7 +805,7 @@ export class SceneManager {
         this.controller.root,
         now,
         {
-          durationMs: this.isSoftwareGl ? 680 : this.ecoMode ? 780 : 1180,
+          durationMs: this.isSoftwareGl ? 720 : this.ecoMode ? 820 : 1280,
           reducedMotion: this.prefersReducedMotion(),
           staggerByLayer: true,
           ecoMode: this.ecoMode,
@@ -883,7 +884,13 @@ export class SceneManager {
     const activeTip = this.sketchAnimator.getActiveStrokeTip();
     const suppressNib = this.ecoMode || this.prefersReducedMotion();
     const prevNibVisible = this.nibMarker.isVisible();
-    this.nibAnimating = this.nibMarker.update(dt, activeTip, suppressNib, this.constructionPaused);
+    this.nibAnimating = this.nibMarker.update(
+      dt,
+      activeTip,
+      suppressNib,
+      this.constructionPaused,
+      this.rhythmBeatPulse
+    );
     if (this.nibAnimating && !this.constructionPaused) {
       stillMoving = true;
     }
@@ -892,10 +899,10 @@ export class SceneManager {
       !suppressNib &&
       !this.isSoftwareGl &&
       !this.constructionPaused &&
-      now - this.lastNibDustMs >= 165
+      now - this.lastNibDustMs >= 120
     ) {
       this.lastNibDustMs = now;
-      this.dustPoints.emit(activeTip.worldPos, activeTip.crayon, 0.24, false);
+      this.dustPoints.emit(activeTip.worldPos, activeTip.crayon, 0.3, false);
       this.dustAnimating = true;
     }
 
@@ -1011,6 +1018,10 @@ export class SceneManager {
           : this.ecoProfile.softwareCooldownMs
       );
     });
+  }
+
+  public setBeatPulse(pulse: number): void {
+    this.rhythmBeatPulse = Math.max(0, Math.min(1, Number.isFinite(pulse) ? pulse : 0));
   }
 
   public dispose(): void {

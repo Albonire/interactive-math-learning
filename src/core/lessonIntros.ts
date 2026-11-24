@@ -83,7 +83,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
         stageState: {
           params: { c1: 1.65, c2: 1.45, v3y: 1.15 },
           exploded: false,
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {
@@ -157,7 +157,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
         ],
         stageState: {
           params: { a11: 1.5, a12: 0.6, a21: 0.2, a22: 1.1, a33: 1.0, svdStage: 1.7 },
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {
@@ -231,7 +231,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
         stageState: {
           params: { a: 1.5, b: 0.5, c: 0.3, d: 0.9, probeAngle: 0.85 },
           exploded: false,
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {
@@ -309,7 +309,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
           activation: 'linear',
           dataset: 'rings',
           params: { weight: 1.4, bias: 0.0, fold: 1.0 },
-          focusedLayerId: null,
+          focusedLayerId: 'structure',
         },
       },
       {
@@ -387,7 +387,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
         stageState: {
           params: { x0: 0.75, y0: 0.45, freq: 1.0 },
           exploded: false,
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {
@@ -463,7 +463,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
         stageState: {
           params: { x: 0.7, y: 0.6, w: 1.6 },
           autoDiffPass: 'forward',
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {
@@ -541,7 +541,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
           landscape: 'rosenbrock',
           params: { lr: 0.06, beta: 0.82 },
           startOptimizer: false,
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {
@@ -619,7 +619,7 @@ export const LESSON_INTROS: Record<SceneId, LessonIntroSpec> = {
         stageState: {
           params: { wSin: 0.45, wCos: 0.35, wQuad: 0.0, wCross: 0.0, wGauss: 0.3 },
           exploded: false,
-          focusedLayerId: null,
+          focusedLayerId: 'operator',
         },
       },
       {

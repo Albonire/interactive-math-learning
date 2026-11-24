@@ -1,4 +1,19 @@
 import type { ThemeMode } from '../core/types';
+import {
+  computeTempoSyncedIntroDelays,
+  type CrayonSyncKind,
+  type RhythmSyncAdjustment,
+} from './tempoDetector';
+
+export interface RhythmTempoSource {
+  getSyncAdjustment(kind: CrayonSyncKind, audioNowSec: number): RhythmSyncAdjustment;
+  getTempoMeta(): {
+    beatPeriodSec: number | null;
+    confidence: number;
+    syncStrength: number;
+    syncEnabled: boolean;
+  };
+}
 
 export const AUDIO_STORAGE_KEY = 'bibifold_crayon_audio_v1';
 
@@ -38,6 +53,7 @@ export interface CrayonAudioStats {
   dustPlays: number;
   introPlays: number;
   annotationPlays: number;
+  syncedPlays: number;
   unlocked: boolean;
 }
 
@@ -283,6 +299,7 @@ export class CrayonAudioEngine {
   private dustPlays = 0;
   private introPlays = 0;
   private annotationPlays = 0;
+  private syncedPlays = 0;
   private initialized = false;
   private disposed = false;
   private hasUserGesture = false;
@@ -291,6 +308,7 @@ export class CrayonAudioEngine {
   private activePhraseSources = new Set<AudioBufferSourceNode>();
   private gestureListenersBound = false;
   private onStatsChange?: (stats: CrayonAudioStats) => void;
+  private rhythmSource: RhythmTempoSource | null = null;
 
   private readonly handleUserGesture = () => {
     this.hasUserGesture = true;
@@ -352,6 +370,14 @@ export class CrayonAudioEngine {
     return !this.disposed && shouldPlayCrayonAudio({ enabled: this.enabled, ecoMode: this.ecoMode });
   }
 
+  public setRhythmSource(source: RhythmTempoSource | null): void {
+    this.rhythmSource = source;
+  }
+
+  public ensureSharedContext(): AudioContext | null {
+    return this.ensureContext();
+  }
+
   public getStats(): CrayonAudioStats {
     const state = this.ctx ? this.ctx.state : 'uninitialized';
     return {
@@ -360,6 +386,7 @@ export class CrayonAudioEngine {
       dustPlays: this.dustPlays,
       introPlays: this.introPlays,
       annotationPlays: this.annotationPlays,
+      syncedPlays: this.syncedPlays,
       unlocked: state === 'running',
     };
   }
@@ -544,7 +571,8 @@ export class CrayonAudioEngine {
     delaySec: number,
     gainScale: number,
     kind: 'stroke' | 'dust' | 'intro' | 'annotation',
-    trackInPhrase = false
+    trackInPhrase = false,
+    pitchMultiplier = 1
   ): void {
     if (this.disposed || !this.isActive() || !this.noiseBuffer || !this.masterGain) return;
 
@@ -564,7 +592,7 @@ export class CrayonAudioEngine {
     const warmthFilter = ctx.createBiquadFilter();
     warmthFilter.type = 'bandpass';
     warmthFilter.frequency.setValueAtTime(
-      kind === 'dust' ? 520 : Math.max(260, params.bodyFreqHz * 0.52),
+      kind === 'dust' ? 520 : Math.max(260, params.bodyFreqHz * 0.52 * pitchMultiplier),
       now
     );
     warmthFilter.Q.setValueAtTime(0.68, now);
@@ -576,7 +604,10 @@ export class CrayonAudioEngine {
     bodyFilter.type = 'bandpass';
     const bodyFreq = Math.max(
       260,
-      Math.min(2600, params.bodyFreqHz * (1 + (Math.random() - 0.5) * pitchJitter * 0.6))
+      Math.min(
+        2600,
+        params.bodyFreqHz * pitchMultiplier * (1 + (Math.random() - 0.5) * pitchJitter * 0.6)
+      )
     );
     bodyFilter.frequency.setValueAtTime(bodyFreq, now);
     bodyFilter.frequency.exponentialRampToValueAtTime(
@@ -593,7 +624,10 @@ export class CrayonAudioEngine {
     raspFilter.type = 'bandpass';
     const raspFreq = Math.max(
       620,
-      Math.min(6200, params.centerFreqHz * (1 + (Math.random() - 0.5) * pitchJitter))
+      Math.min(
+        6200,
+        params.centerFreqHz * pitchMultiplier * (1 + (Math.random() - 0.5) * pitchJitter)
+      )
     );
     raspFilter.frequency.setValueAtTime(raspFreq, now);
     raspFilter.frequency.exponentialRampToValueAtTime(
@@ -668,6 +702,20 @@ export class CrayonAudioEngine {
     }
   }
 
+  private resolveRhythmSync(kind: CrayonSyncKind, ctx: AudioContext): RhythmSyncAdjustment {
+    if (!this.rhythmSource) {
+      return {
+        delaySec: 0,
+        gainMultiplier: 1,
+        pitchMultiplier: 1,
+        beatPhase: 0,
+        beatIndex: 0,
+        lockedToBeat: false,
+      };
+    }
+    return this.rhythmSource.getSyncAdjustment(kind, ctx.currentTime);
+  }
+
   /**
    * Tactile wax-crayon stroke sound when the user nudges or drags a parameter control.
    */
@@ -678,8 +726,19 @@ export class CrayonAudioEngine {
 
     const params = computeStrokeSoundParams(normDelta, theme);
     this.playOrResumeThen((ctx) => {
-      this.scheduleWarmCrayonGrain(ctx, params, 0.2, 0, 1.0, 'stroke');
+      const sync = this.resolveRhythmSync('stroke', ctx);
+      this.scheduleWarmCrayonGrain(
+        ctx,
+        params,
+        0.2,
+        sync.delaySec,
+        sync.gainMultiplier,
+        'stroke',
+        false,
+        sync.pitchMultiplier
+      );
       this.strokePlays++;
+      if (sync.lockedToBeat) this.syncedPlays++;
       this.emitStats();
     });
     return true;
@@ -695,12 +754,23 @@ export class CrayonAudioEngine {
 
     const params = computeDustSoundParams(intensity, theme);
     this.playOrResumeThen((ctx) => {
+      const sync = this.resolveRhythmSync('dust', ctx);
       for (let g = 0; g < params.grainCount; g++) {
-        const delaySec = g * 0.028 + Math.random() * 0.008;
-        const scale = g === 0 ? 1.0 : 0.78 - g * 0.14;
-        this.scheduleWarmCrayonGrain(ctx, params, 0.28, delaySec, Math.max(0.4, scale), 'dust');
+        const delaySec = sync.delaySec + g * 0.028 + Math.random() * 0.008;
+        const scale = (g === 0 ? 1.0 : 0.78 - g * 0.14) * sync.gainMultiplier;
+        this.scheduleWarmCrayonGrain(
+          ctx,
+          params,
+          0.28,
+          delaySec,
+          Math.max(0.4, scale),
+          'dust',
+          false,
+          sync.pitchMultiplier
+        );
       }
       this.dustPlays++;
+      if (sync.lockedToBeat) this.syncedPlays++;
       this.emitStats();
     });
     return true;
@@ -716,17 +786,29 @@ export class CrayonAudioEngine {
 
     const params = computeIntroSketchParams(theme);
     this.playOrResumeThen((ctx) => {
-      this.scheduleWarmCrayonGrain(ctx, params, 0.14, 0, 0.92, 'intro', true);
+      const sync = this.resolveRhythmSync('intro', ctx);
+      this.scheduleWarmCrayonGrain(
+        ctx,
+        params,
+        0.14,
+        sync.delaySec,
+        0.92 * sync.gainMultiplier,
+        'intro',
+        true,
+        sync.pitchMultiplier
+      );
       this.scheduleWarmCrayonGrain(
         ctx,
         { ...params, durationSec: 0.34, centerFreqHz: Math.round(params.centerFreqHz * 1.1) },
         0.16,
-        0.34,
-        0.74,
+        sync.delaySec + 0.34,
+        0.74 * sync.gainMultiplier,
         'intro',
-        true
+        true,
+        sync.pitchMultiplier
       );
       this.introPlays++;
+      if (sync.lockedToBeat) this.syncedPlays++;
       this.emitStats();
     });
     return true;
@@ -734,6 +816,7 @@ export class CrayonAudioEngine {
 
   /**
    * Warm, continuous 4-stroke crayon sketching phrase spanning ~2.2s across slow intro choreography.
+   * Gently adapts its cadence to the active background music tempo when rhythm sync is enabled.
    */
   public playIntroPhrase(
     theme: ThemeMode,
@@ -747,10 +830,32 @@ export class CrayonAudioEngine {
     const strokes = computeIntroPhraseStrokes(theme, beatIndex);
     this.stopIntroPhrase();
     this.playOrResumeThen((ctx) => {
-      for (const s of strokes) {
-        this.scheduleWarmCrayonGrain(ctx, s.params, 0.14, s.delaySec, s.gainScale, 'intro', true);
-      }
+      const sync = this.resolveRhythmSync('intro', ctx);
+      const tempoMeta = this.rhythmSource?.getTempoMeta();
+      const syncedDelays =
+        tempoMeta && tempoMeta.syncEnabled
+          ? computeTempoSyncedIntroDelays(
+              strokes.map((s) => s.delaySec),
+              tempoMeta.beatPeriodSec,
+              tempoMeta.confidence,
+              tempoMeta.syncStrength
+            )
+          : strokes.map((s) => s.delaySec);
+
+      strokes.forEach((s, idx) => {
+        this.scheduleWarmCrayonGrain(
+          ctx,
+          s.params,
+          0.14,
+          sync.delaySec + syncedDelays[idx],
+          s.gainScale * sync.gainMultiplier,
+          'intro',
+          true,
+          sync.pitchMultiplier
+        );
+      });
       this.introPlays++;
+      if (sync.lockedToBeat) this.syncedPlays++;
       this.emitStats();
     }, false);
     return true;
@@ -772,8 +877,19 @@ export class CrayonAudioEngine {
 
     const params = computeConstructionStrokeParams(layerId, theme, isSprite);
     this.playOrResumeThen((ctx) => {
-      this.scheduleWarmCrayonGrain(ctx, params, 0.15, 0, 0.88, 'intro', true);
+      const sync = this.resolveRhythmSync('construction', ctx);
+      this.scheduleWarmCrayonGrain(
+        ctx,
+        params,
+        0.15,
+        sync.delaySec,
+        0.88 * sync.gainMultiplier,
+        'intro',
+        true,
+        sync.pitchMultiplier
+      );
       this.introPlays++;
+      if (sync.lockedToBeat) this.syncedPlays++;
       this.emitStats();
     }, false);
     return true;
@@ -789,8 +905,19 @@ export class CrayonAudioEngine {
 
     const params = computeAnnotationSketchParams(theme);
     this.playOrResumeThen((ctx) => {
-      this.scheduleWarmCrayonGrain(ctx, params, 0.14, 0, 0.92, 'annotation');
+      const sync = this.resolveRhythmSync('annotation', ctx);
+      this.scheduleWarmCrayonGrain(
+        ctx,
+        params,
+        0.14,
+        sync.delaySec,
+        0.92 * sync.gainMultiplier,
+        'annotation',
+        false,
+        sync.pitchMultiplier
+      );
       this.annotationPlays++;
+      if (sync.lockedToBeat) this.syncedPlays++;
       this.emitStats();
     });
     return true;

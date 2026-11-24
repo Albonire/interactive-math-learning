@@ -107,23 +107,29 @@ export function animateSvgStrokesOnce(
     shape.style.strokeDashoffset = `${len}`;
 
     if (typeof shape.animate === 'function') {
-      const anim = shape.animate(
-        [
-          { strokeDashoffset: len, opacity: 0.25 },
-          { strokeDashoffset: len * 0.85, opacity: 1, offset: 0.14 },
-          { strokeDashoffset: 0, opacity: 1 },
-        ],
-        {
-          duration: strokeDur,
-          delay,
-          easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-          fill: 'both',
-        }
-      );
-      anim.onfinish = () => {
+      const clearDash = () => {
         shape.style.strokeDasharray = '';
         shape.style.strokeDashoffset = '';
       };
+      try {
+        const anim = shape.animate(
+          [
+            { strokeDashoffset: len, opacity: 0.35 },
+            { strokeDashoffset: len * 0.78, opacity: 1, offset: 0.16 },
+            { strokeDashoffset: 0, opacity: 1 },
+          ],
+          {
+            duration: strokeDur,
+            delay,
+            easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+            fill: 'backwards',
+          }
+        );
+        anim.onfinish = clearDash;
+        anim.oncancel = clearDash;
+      } catch {
+        clearDash();
+      }
     } else {
       shape.style.strokeDasharray = '';
       shape.style.strokeDashoffset = '';
@@ -131,6 +137,10 @@ export function animateSvgStrokesOnce(
   });
 
   window.setTimeout(() => {
+    shapes.forEach((shape) => {
+      shape.style.strokeDasharray = '';
+      shape.style.strokeDashoffset = '';
+    });
     if (svg.dataset.firstDrawAnimated === 'drawing') {
       svg.dataset.firstDrawAnimated = 'true';
     }
