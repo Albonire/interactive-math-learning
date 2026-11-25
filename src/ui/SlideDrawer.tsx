@@ -90,14 +90,14 @@ export function SlideDrawer({
       className="absolute top-0 right-0 bottom-0 z-[25] w-full max-w-[400px] crayon-surface crayon-ink-drawer flex flex-col"
     >
       {/* Clean unboxed crayon tab header */}
-      <div className="px-6 pt-4 pb-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-6" role="tablist">
+      <div className="px-4 sm:px-6 pt-3.5 sm:pt-4 pb-2.5 sm:pb-3 flex items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-4 sm:gap-6" role="tablist">
           <button
             type="button"
             role="tab"
             aria-selected={mode === 'computational'}
             onClick={() => onChangeMode('computational')}
-            className={`relative font-display text-[19px] leading-none cursor-pointer whitespace-nowrap pb-1.5 transition-colors ${
+            className={`relative font-display text-[17px] sm:text-[19px] leading-none cursor-pointer whitespace-nowrap pb-1.5 transition-colors ${
               mode === 'computational'
                 ? 'text-[var(--text-primary)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -116,7 +116,7 @@ export function SlideDrawer({
             role="tab"
             aria-selected={mode === 'challenge'}
             onClick={() => onChangeMode('challenge')}
-            className={`relative font-display text-[19px] leading-none cursor-pointer whitespace-nowrap pb-1.5 transition-colors ${
+            className={`relative font-display text-[17px] sm:text-[19px] leading-none cursor-pointer whitespace-nowrap pb-1.5 transition-colors ${
               mode === 'challenge'
                 ? 'text-[var(--text-primary)]'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
@@ -143,7 +143,7 @@ export function SlideDrawer({
 
       <RoughDivider theme={theme} seed={313} />
 
-      <div className="flex-1 overflow-y-auto notebook-scroll px-5 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto notebook-scroll px-4 sm:px-5 py-4 space-y-4">
         {mode === 'computational' ? (
           <>
             {sceneId === 'calc-autodiff' && autoDiffSnapshot && (

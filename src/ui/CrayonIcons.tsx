@@ -557,3 +557,135 @@ export function CrayonUpload({ size = 15, className = '', ...rest }: IconProps) 
   );
 }
 
+export function CrayonPencil({ size = 15, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M4.6 19.4 L6.0 14.4 L16.2 4.4 C17.1 3.7, 18.5 3.8, 19.4 4.7 C20.3 5.6, 20.3 7.0, 19.5 7.9 L9.4 18.1 Z"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.18"
+        strokeWidth="1.95"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M14.1 6.5 L17.4 9.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function CrayonEraser({ size = 15, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M4.8 15.6 L12.9 6.8 C13.8 5.9, 15.3 5.9, 16.2 6.8 L19.5 10.1 C20.4 11.0, 20.4 12.4, 19.5 13.3 L13.8 19.1 L8.2 19.2 L4.8 15.6 Z"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.16"
+        strokeWidth="1.95"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.6 10.6 L15.4 16.4 M4.4 19.3 L19.8 19.2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function CrayonLightbulb({ size = 15, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <path
+        d="M8.8 15.6 C6.9 14.1, 6.2 11.4, 7.2 8.9 C8.2 6.4, 10.8 5.1, 13.5 5.6 C16.3 6.2, 18.0 8.8, 17.4 11.6 C17.0 13.4, 16.0 14.6, 14.9 15.6 L14.5 18.2 L9.3 18.2 Z"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.2"
+        strokeWidth="1.95"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.7 20.6 L14.2 20.6"
+        stroke="currentColor"
+        strokeWidth="2.0"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export function CrayonOrbit({ size = 15, className = '', ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className={`inline-block shrink-0 crayon-stroke-svg ${className}`}
+      {...rest}
+    >
+      <ellipse
+        cx="12"
+        cy="12"
+        rx="8.5"
+        ry="4.2"
+        transform="rotate(-24 12 12)"
+        stroke="currentColor"
+        strokeWidth="1.85"
+        strokeLinecap="round"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="2.2"
+        stroke="currentColor"
+        fill="currentColor"
+        fillOpacity="0.28"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M17.2 6.8 L20.1 8.4 L17.9 10.8"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+

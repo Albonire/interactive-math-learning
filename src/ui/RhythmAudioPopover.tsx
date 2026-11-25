@@ -107,7 +107,7 @@ export function RhythmAudioPopover({
       role="dialog"
       aria-label="Música de fondo y sincronización de trazos"
       data-testid="rhythm-audio-popover"
-      className="fixed top-[60px] right-3 sm:right-6 z-40 w-[330px] max-w-[calc(100vw-24px)] bg-[var(--bg-paper)] crayon-ink-panel p-4 shadow-[0_14px_34px_rgba(24,25,29,0.16)]"
+      className="fixed top-[54px] sm:top-[60px] right-3 sm:right-6 z-40 w-[330px] max-w-[calc(100vw-24px)] max-h-[calc(100dvh-68px)] overflow-y-auto notebook-scroll bg-[var(--bg-paper)] crayon-ink-panel p-4 shadow-[0_14px_34px_rgba(24,25,29,0.16)]"
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">

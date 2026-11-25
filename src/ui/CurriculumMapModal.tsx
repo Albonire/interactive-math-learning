@@ -251,12 +251,12 @@ export function CurriculumMapModal({
       className="fixed inset-0 z-40 notebook-paper-bg flex flex-col"
     >
       {/* Clean Top Index Header */}
-      <div className="relative px-6 md:px-10 h-[60px] flex items-center justify-between gap-6 shrink-0 crayon-surface">
-        <div className="flex items-baseline gap-4">
-          <h2 className="font-display crayon-ink text-[26px] sm:text-[28px] leading-none text-[var(--text-primary)]">
+      <div className="relative px-4 sm:px-6 md:px-10 h-[54px] sm:h-[60px] flex items-center justify-between gap-3 sm:gap-6 shrink-0 crayon-surface">
+        <div className="flex items-baseline gap-3 sm:gap-4 min-w-0">
+          <h2 className="font-display crayon-ink text-[22px] sm:text-[28px] leading-none text-[var(--text-primary)] truncate">
             Índice del Curso
           </h2>
-          <span className="hidden sm:inline text-[15px] text-[var(--text-muted)]">
+          <span className="hidden sm:inline text-[15px] text-[var(--text-muted)] whitespace-nowrap">
             {doneSteps} de {totalSteps} pasos completados
           </span>
         </div>
@@ -264,9 +264,10 @@ export function CurriculumMapModal({
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex items-center gap-1.5 font-display text-[19px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap"
+          className="inline-flex items-center gap-1.5 font-display text-[17px] sm:text-[19px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap shrink-0"
         >
-          <span>Volver a la lección</span>
+          <span className="sm:hidden">Volver</span>
+          <span className="hidden sm:inline">Volver a la lección</span>
           <CrayonClose size={18} />
         </button>
       </div>
@@ -276,7 +277,7 @@ export function CurriculumMapModal({
       <div
         ref={scrollContainerRef}
         data-testid="curriculum-modal-scroll"
-        className="flex-1 overflow-y-auto notebook-scroll px-6 md:px-10 py-6"
+        className="flex-1 overflow-y-auto notebook-scroll px-4 sm:px-6 md:px-10 py-5 sm:py-6"
       >
         <div className="max-w-[1100px] mx-auto space-y-8">
           {/* Hand-drawn visual curriculum map acting as interactive index overview */}
@@ -323,7 +324,7 @@ export function CurriculumMapModal({
                         <div
                           key={scene.id}
                           data-testid={`index-lesson-${scene.id}`}
-                          className="py-3.5 flex items-start justify-between gap-4 group"
+                          className="py-3.5 flex items-start justify-between gap-2.5 sm:gap-4 group"
                         >
                           <button
                             type="button"
@@ -331,14 +332,14 @@ export function CurriculumMapModal({
                               onSelectScene(scene.id);
                               onClose();
                             }}
-                            className="flex-1 text-left space-y-0.5 cursor-pointer"
+                            className="flex-1 min-w-0 text-left space-y-0.5 cursor-pointer"
                           >
-                            <div className="flex items-baseline gap-2.5">
-                              <span className="font-display text-[16px] text-[var(--text-muted)]">
+                            <div className="flex items-baseline gap-2 sm:gap-2.5">
+                              <span className="font-display text-[15px] sm:text-[16px] text-[var(--text-muted)] shrink-0">
                                 0{lesson.lessonNumber}
                               </span>
                               <span
-                                className={`font-display text-[21px] leading-tight transition-colors ${
+                                className={`font-display text-[18.5px] sm:text-[21px] leading-tight transition-colors ${
                                   isCurrent
                                     ? 'text-[var(--ui-accent)] underline decoration-2 underline-offset-4'
                                     : 'text-[var(--text-primary)] group-hover:text-[var(--ui-accent)]'
@@ -347,7 +348,7 @@ export function CurriculumMapModal({
                                 {scene.title}
                               </span>
                             </div>
-                            <p className="text-[14.5px] text-[var(--text-secondary)] pl-7">
+                            <p className="text-[14px] sm:text-[14.5px] text-[var(--text-secondary)] pl-6 sm:pl-7">
                               {scene.subtitle}
                             </p>
                             <p

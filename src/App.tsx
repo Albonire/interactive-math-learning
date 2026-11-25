@@ -31,6 +31,18 @@ import {
 import { evaluateChallengeAttempt, generateChallengeForScene } from './ai/challengeGenerator';
 import { computeChallengeParamProximity } from './ai/challengeProximity';
 import {
+  analyzeUserInteractionsForAiHint,
+  computeSceneObjectiveError,
+  type AiHintSuggestion,
+  type ParamInteractionSample,
+} from './ai/aiHintEngine';
+import {
+  loadAllFreehandStrokes,
+  saveSceneFreehandStrokes,
+  type FreehandStoreMap,
+  type FreehandStroke,
+} from './sketch/freehandStorage';
+import {
   CrayonAudioEngine,
   loadInitialAudioEnabled,
   saveAudioEnabled,
@@ -71,6 +83,8 @@ import { LessonIntroPlayer } from './ui/LessonIntroPlayer';
 import { CrayonStamp } from './ui/CrayonStamp';
 import { SketchAnimationWrapper } from './ui/SketchAnimationWrapper';
 import { ViewportAnnotationsOverlay } from './ui/ViewportAnnotationsOverlay';
+import { FreehandCanvasOverlay } from './ui/FreehandCanvasOverlay';
+import { AiHintToast } from './ui/AiHintToast';
 import { SymbolicWorkspace } from './ui/SymbolicWorkspace';
 import { CodeLabWorkspace } from './ui/CodeLabWorkspace';
 import { CrayonSvgDefs, RoughUnderline, WebGLFallbackSvg } from './ui/RoughElements';
@@ -175,6 +189,18 @@ export default function App() {
   const [idleGuideActive, setIdleGuideActive] = useState<boolean>(false);
   const [projectedAnnotations, setProjectedAnnotations] = useState<ProjectedAnnotation[]>([]);
   const dustEnergyRef = useRef<ParameterEnergyTracker>(new ParameterEnergyTracker());
+
+  // Modo 'Escritura Libre' (Freehand Crayon Canvas Overlay persisted per lesson in LocalStorage)
+  const [freehandStore, setFreehandStore] = useState<FreehandStoreMap>(() =>
+    loadAllFreehandStrokes()
+  );
+  const [freehandActive, setFreehandActive] = useState<boolean>(false);
+  const [freehandVisible, setFreehandVisible] = useState<boolean>(true);
+
+  // Sistema de 'Pistas de IA' (Real-Time Parameter Stagnation & Divergence Coach)
+  const [activeAiHint, setActiveAiHint] = useState<AiHintSuggestion | null>(null);
+  const interactionHistoryRef = useRef<ParamInteractionSample[]>([]);
+  const dismissedHintIdsRef = useRef<Set<string>>(new Set());
 
   // Guided Interactive Course State
   const [completedStepIds, setCompletedStepIds] = useState<Set<string>>(() =>
@@ -430,6 +456,10 @@ export default function App() {
       setCelebrationStamp(null);
       setDrawerMode('closed');
       setMapOpen(false);
+      setFreehandActive(false);
+      setActiveAiHint(null);
+      interactionHistoryRef.current = [];
+      dismissedHintIdsRef.current.clear();
       setWorkspaceMode('webgl3d');
       setIntroPlaying(true);
       managerRef.current?.setConstructionPaused(false);
@@ -522,12 +552,13 @@ export default function App() {
     };
   }, [introOpen, sceneId, introBeatIdx, steadyStrokes, cancelParamAnim, theme]);
 
-  // Synchronize LessonIntroPlayer Play/Pause with SceneManager segmented stroke construction
+  // Synchronize LessonIntroPlayer Pausa Narrativa with SceneManager stroke construction & camera freedom
   useEffect(() => {
     const paused = introOpen && !introPlaying;
     managerRef.current?.setConstructionPaused(paused);
     if (paused) {
       cancelParamAnim();
+      managerRef.current?.cancelCameraTransition();
       audioEngineRef.current?.stopIntroPhrase();
     }
   }, [introOpen, introPlaying, cancelParamAnim]);
@@ -552,13 +583,16 @@ export default function App() {
     setSymbolicAiFormula('En espera');
     setSymbolicAiMse(99);
     setAiSymbolicGrid(null);
+    setActiveAiHint(null);
+    interactionHistoryRef.current = [];
+    dismissedHintIdsRef.current.clear();
     persistSessionLesson(sceneId, true);
     setIntroOpen(false);
   }, [cancelParamAnim, persistSessionLesson, sceneId, stopSymbolicWorker]);
 
-  // Optimizer race animation loop (Scene 2.3) — respects Eco Mode interval
+  // Optimizer race animation loop (Scene 2.3) — respects Eco Mode interval & Pausa Narrativa
   useEffect(() => {
-    if (!optimizerRunning || sceneId !== 'calc-optimizers') return;
+    if (!optimizerRunning || sceneId !== 'calc-optimizers' || (introOpen && !introPlaying)) return;
     const intervalMs = getEcoRenderProfile(ecoMode, false).optimizerIntervalMs;
     const id = window.setInterval(() => {
       setOptimizerProbes((prev) =>
@@ -573,7 +607,51 @@ export default function App() {
       );
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [optimizerRunning, sceneId, landscape, paramValues.lr, paramValues.beta, ecoMode]);
+  }, [optimizerRunning, sceneId, landscape, paramValues.lr, paramValues.beta, ecoMode, introOpen, introPlaying]);
+
+  // Real-time AI Hint detector for Lesson 7 optimizer divergence or vanishing-step stagnation
+  useEffect(() => {
+    if (introOpen || workspaceMode !== 'webgl3d' || drawerMode !== 'closed') return;
+    if (sceneId !== 'calc-optimizers') return;
+
+    const hint = analyzeUserInteractionsForAiHint({
+      sceneId,
+      params: paramValues,
+      history: interactionHistoryRef.current,
+      activeChallenge,
+      activation,
+      dataset,
+      landscape,
+      optimizerProbes,
+      optimizerRunning,
+      autoDiffPass,
+      symbolicTargetIdx,
+    });
+    if (hint && !dismissedHintIdsRef.current.has(hint.id)) {
+      setActiveAiHint((prev) => (prev?.id === hint.id ? prev : hint));
+    }
+  }, [
+    introOpen,
+    workspaceMode,
+    drawerMode,
+    sceneId,
+    paramValues,
+    activeChallenge,
+    activation,
+    dataset,
+    landscape,
+    optimizerProbes,
+    optimizerRunning,
+    autoDiffPass,
+    symbolicTargetIdx,
+  ]);
+
+  // Auto-exit freehand capture when switching away from open 3D practice
+  useEffect(() => {
+    if (introOpen || workspaceMode !== 'webgl3d' || drawerMode !== 'closed' || mapOpen) {
+      setFreehandActive(false);
+    }
+  }, [introOpen, workspaceMode, drawerMode, mapOpen]);
 
   // Live mathematical evaluation for Guided Course steps (paused while watching theory intro)
   const adamProbe = optimizerProbes[2];
@@ -750,7 +828,7 @@ export default function App() {
     managerRef.current?.setViewportOffset(hasLeftCard ? -0.055 : 0, 0.068);
   }, [introOpen, sceneId, introBeatIdx]);
 
-  // Keyboard shortcuts: H collapses bottom practice bar, L toggles 3D Legend, Escape closes index/drawer
+  // Keyboard shortcuts: H collapses bottom practice bar, L toggles 3D Legend, D toggles Escritura Libre, Escape closes overlays
   useEffect(() => {
     if (introOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -766,14 +844,24 @@ export default function App() {
           }
           return next;
         });
+      } else if (
+        (e.key === 'd' || e.key === 'D') &&
+        workspaceMode === 'webgl3d' &&
+        !mapOpen &&
+        drawerMode === 'closed'
+      ) {
+        audioEngineRef.current?.unlock();
+        setFreehandActive((v) => !v);
       } else if (e.key === 'Escape') {
         if (mapOpen) setMapOpen(false);
         else if (drawerMode !== 'closed') setDrawerMode('closed');
+        else if (freehandActive) setFreehandActive(false);
+        else if (activeAiHint) setActiveAiHint(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [introOpen, mapOpen, drawerMode, theme]);
+  }, [introOpen, mapOpen, drawerMode, workspaceMode, freehandActive, activeAiHint, theme]);
 
   const handleParamChange = useCallback(
     (id: string, nextVal: number) => {
@@ -820,6 +908,8 @@ export default function App() {
         }
       }
 
+      const nextParams = { ...paramValuesRef.current, [id]: nextVal };
+
       setParamValues((prev) => {
         const prevVal = prev[id] ?? nextVal;
         const sign = Math.sign(nextVal - prevVal);
@@ -832,6 +922,45 @@ export default function App() {
         }
         return { ...prev, [id]: nextVal };
       });
+
+      // Record interaction sample & run real-time AI Hint stagnation/divergence analysis
+      if (Math.abs(nextVal - oldVal) > 1e-6) {
+        const errorMetric = computeSceneObjectiveError(sceneId, nextParams, {
+          activeChallenge,
+          activation,
+          dataset,
+          landscape,
+          optimizerProbes,
+          symbolicTargetIdx,
+        });
+        const nextHistory = [
+          ...interactionHistoryRef.current.slice(-19),
+          {
+            timestampMs: performance.now(),
+            paramId: id,
+            value: nextVal,
+            errorMetric,
+          },
+        ];
+        interactionHistoryRef.current = nextHistory;
+
+        const hint = analyzeUserInteractionsForAiHint({
+          sceneId,
+          params: nextParams,
+          history: nextHistory,
+          activeChallenge,
+          activation,
+          dataset,
+          landscape,
+          optimizerProbes,
+          optimizerRunning,
+          autoDiffPass,
+          symbolicTargetIdx,
+        });
+        if (hint && !dismissedHintIdsRef.current.has(hint.id)) {
+          setActiveAiHint((prev) => (prev?.id === hint.id ? prev : hint));
+        }
+      }
     },
     [
       cancelParamAnim,
@@ -842,11 +971,94 @@ export default function App() {
       landscape,
       autoDiffPass,
       optimizerProbes,
+      optimizerRunning,
       symbolicTargetIdx,
       aiSymbolicGrid,
+      activeChallenge,
       layers,
       exploded,
     ]
+  );
+
+  const handleChangeFreehandStrokes = useCallback(
+    (nextStrokes: FreehandStroke[]) => {
+      setFreehandStore((prev) => ({ ...prev, [sceneId]: nextStrokes }));
+      saveSceneFreehandStrokes(sceneId, nextStrokes);
+    },
+    [sceneId]
+  );
+
+  const handleRequestAiHint = useCallback(() => {
+    audioEngineRef.current?.unlock();
+    if (activeAiHint) {
+      setActiveAiHint(null);
+      return;
+    }
+    const hint = analyzeUserInteractionsForAiHint({
+      sceneId,
+      params: paramValuesRef.current,
+      history: interactionHistoryRef.current,
+      activeChallenge,
+      activation,
+      dataset,
+      landscape,
+      optimizerProbes,
+      optimizerRunning,
+      autoDiffPass,
+      symbolicTargetIdx,
+      forceAdvice: true,
+    });
+    if (hint) {
+      audioEngineRef.current?.playAnnotationSketch(theme, performance.now());
+      setActiveAiHint(hint);
+    }
+  }, [
+    activeAiHint,
+    sceneId,
+    activeChallenge,
+    activation,
+    dataset,
+    landscape,
+    optimizerProbes,
+    optimizerRunning,
+    autoDiffPass,
+    symbolicTargetIdx,
+    theme,
+  ]);
+
+  const handleDismissAiHint = useCallback(() => {
+    if (activeAiHint) {
+      dismissedHintIdsRef.current.add(activeAiHint.id);
+    }
+    setActiveAiHint(null);
+  }, [activeAiHint]);
+
+  const handleApplyAiHint = useCallback(
+    (hint: AiHintSuggestion) => {
+      audioEngineRef.current?.unlock();
+      audioEngineRef.current?.playParameterStroke(0.22, theme, performance.now());
+      cancelParamAnim();
+
+      if (hint.recommendedActivation) {
+        setActivation(hint.recommendedActivation);
+      }
+      if (hint.recommendedAutoDiffPass) {
+        setAutoDiffPass(hint.recommendedAutoDiffPass);
+        if (drawerMode === 'closed') setDrawerMode('computational');
+      }
+      if (hint.recommendedParams) {
+        setParamValues((prev) => ({ ...prev, ...hint.recommendedParams }));
+      }
+      if (hint.recommendedStartOptimizer && sceneId === 'calc-optimizers') {
+        setOptimizerProbes(createInitialOptimizerProbes(landscape));
+        setOptimizerRunning(true);
+      }
+
+      interactionHistoryRef.current = [];
+      dismissedHintIdsRef.current.add(hint.id);
+      setActiveAiHint(null);
+    },
+    [cancelParamAnim, drawerMode, landscape, sceneId, theme]
   );
 
   const handleFocusToken = useCallback((param: SymbolicParameter | null) => {
@@ -873,6 +1085,9 @@ export default function App() {
     setSymbolicAiFormula('En espera');
     setSymbolicAiMse(99);
     setAiSymbolicGrid(null);
+    setActiveAiHint(null);
+    interactionHistoryRef.current = [];
+    dismissedHintIdsRef.current.clear();
     managerRef.current?.resetCamera();
   }, [cancelParamAnim, sceneId, stopSymbolicWorker]);
 
@@ -1297,7 +1512,7 @@ export default function App() {
   return (
     <div
       ref={rootRef}
-      className={`h-screen w-screen flex flex-col overflow-hidden bg-[var(--bg-paper)] text-[var(--text-primary)] ${
+      className={`h-[100dvh] w-screen flex flex-col overflow-hidden bg-[var(--bg-paper)] text-[var(--text-primary)] ${
         ecoMode ? 'eco-mode' : ''
       }`}
       data-scene={sceneId}
@@ -1399,13 +1614,13 @@ export default function App() {
       )}
 
       {/* Protagonist 3D Hand-Painted Sketchbook Canvas (expands to 100% viewport during Intro) */}
-      <main className="relative flex-1 min-h-0 w-full overflow-hidden notebook-paper-bg crayon-ink-viewport">
+      <main className="relative flex-1 min-h-0 w-full overflow-hidden notebook-paper-bg">
         {/* Isolated WebGL canvas mount wrapped in SketchAnimationWrapper for smooth first-time entrance */}
         <SketchAnimationWrapper sceneKey={sceneId} className={webglLost ? 'hidden' : 'block'}>
           <div
             ref={canvasHostRef}
             data-testid="webgl-viewport"
-            className="absolute inset-0 w-full h-full"
+            className="absolute inset-0 w-full h-full touch-none"
           />
         </SketchAnimationWrapper>
 
@@ -1450,7 +1665,7 @@ export default function App() {
             role="tablist"
             aria-label="Modo de laboratorio"
             data-testid="workspace-mode-switcher"
-            className="pointer-events-auto absolute top-3 sm:top-3.5 right-4 sm:right-6 z-[22] inline-flex items-center gap-4 px-3 py-1.5 rounded bg-[var(--bg-paper)]/92 border border-dashed border-[var(--hairline-strong)]"
+            className="pointer-events-auto absolute top-2.5 sm:top-3.5 left-3 right-3 sm:left-auto sm:right-6 z-[22] flex sm:inline-flex items-center justify-center sm:justify-start gap-3.5 sm:gap-4 px-2.5 sm:px-3 py-1.5 rounded bg-[var(--bg-paper)]/94 border border-dashed border-[var(--hairline-strong)]"
           >
             {(
               [
@@ -1514,18 +1729,18 @@ export default function App() {
 
         {/* HANDS-ON PRACTICE HEADER: Minimal direct-on-paper title + single live metric line (3D mode) */}
         {!introOpen && (
-          <div className="pointer-events-none absolute top-3 sm:top-4 left-4 sm:left-6 right-4 sm:right-6 z-10 flex items-start justify-between gap-6">
+          <div className="pointer-events-none absolute top-[54px] sm:top-4 left-3 sm:left-6 right-3 sm:right-6 z-10 flex items-start justify-between gap-4 sm:gap-6">
             {workspaceMode === 'webgl3d' ? (
-              <div className="max-w-[calc(100%-300px)] sm:max-w-[580px] select-none">
-                <h1 className="font-display crayon-ink text-[26px] sm:text-[32px] leading-[1.06] text-[var(--text-primary)]">
+              <div className="max-w-full sm:max-w-[calc(100%-335px)] lg:max-w-[560px] select-none">
+                <h1 className="font-display crayon-ink text-[21px] sm:text-[28px] lg:text-[32px] leading-[1.06] text-[var(--text-primary)]">
                   {sceneMeta.title}
                 </h1>
 
                 {/* Single calm live reading directly beneath title */}
-                <div className="pt-1 flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-0.5 text-[14px] sm:text-[15.5px] text-[var(--text-secondary)] tabular-nums">
+                <div className="pt-0.5 sm:pt-1 flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-0.5 text-[13px] sm:text-[15px] text-[var(--text-secondary)] tabular-nums">
                   <span>
                     {liveMetrics.primaryLabel}:{' '}
-                    <strong className="font-display text-[18px] sm:text-[20px] font-normal text-[var(--text-primary)]">
+                    <strong className="font-display text-[16px] sm:text-[19px] font-normal text-[var(--text-primary)]">
                       {liveMetrics.primaryValue}
                     </strong>
                   </span>
@@ -1534,11 +1749,11 @@ export default function App() {
                   </span>
                   <span>
                     {liveMetrics.secondaryLabel}:{' '}
-                    <strong className="font-display text-[18px] sm:text-[20px] font-normal text-[var(--text-primary)]">
+                    <strong className="font-display text-[16px] sm:text-[19px] font-normal text-[var(--text-primary)]">
                       {liveMetrics.secondaryValue}
                     </strong>
                   </span>
-                  <span className="hidden sm:inline-flex items-baseline gap-2 whitespace-nowrap">
+                  <span className="hidden lg:inline-flex items-baseline gap-2 whitespace-nowrap">
                     <span className="text-[var(--hairline-strong)]" aria-hidden="true">
                       —
                     </span>
@@ -1607,7 +1822,25 @@ export default function App() {
           />
         )}
 
-        {/* Non-obtrusive hand-drawn 3D anatomy callouts, Eco dynamic opacity & 5s idle Crayón Guía */}
+        {/* Modo 'Escritura Libre': Overlaid wax-crayon canvas persisted per lesson in LocalStorage */}
+        <FreehandCanvasOverlay
+          sceneId={sceneId}
+          active={freehandActive}
+          visible={freehandVisible}
+          strokes={freehandStore[sceneId] ?? []}
+          theme={theme}
+          ecoMode={ecoMode}
+          hidden={introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
+          onChangeStrokes={handleChangeFreehandStrokes}
+          onCloseDrawing={() => setFreehandActive(false)}
+          onToggleVisible={() => setFreehandVisible((v) => !v)}
+          onStrokeSound={(delta) => {
+            audioEngineRef.current?.unlock();
+            audioEngineRef.current?.playParameterStroke(delta, theme, performance.now());
+          }}
+        />
+
+        {/* Non-obtrusive hand-drawn 3D anatomy callouts, Escritura Libre & Pista IA controls */}
         <ViewportAnnotationsOverlay
           open={legendOpen}
           onToggle={() => {
@@ -1624,8 +1857,29 @@ export default function App() {
           focusedParamId={focusedParamId}
           theme={theme}
           ecoMode={ecoMode}
-          guideActive={idleGuideActive}
+          guideActive={idleGuideActive && !freehandActive}
           hidden={introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
+          freehandActive={freehandActive}
+          freehandCount={(freehandStore[sceneId] ?? []).length}
+          onToggleFreehand={() => {
+            audioEngineRef.current?.unlock();
+            setFreehandActive((prev) => {
+              const next = !prev;
+              if (next) setFreehandVisible(true);
+              return next;
+            });
+          }}
+          aiHintAvailable={Boolean(activeAiHint)}
+          aiHintOpen={Boolean(activeAiHint)}
+          onRequestAiHint={handleRequestAiHint}
+        />
+
+        {/* Real-time AI Hints margin card (stagnation / divergence coaching + 1-click apply) */}
+        <AiHintToast
+          hint={!introOpen && workspaceMode === 'webgl3d' && drawerMode === 'closed' ? activeAiHint : null}
+          theme={theme}
+          onApply={handleApplyAiHint}
+          onDismiss={handleDismissAiHint}
         />
 
         {/* Clean Slide-Over Drawer (Code Bridge & Adaptive Challenge) — hidden during Intro */}

@@ -161,7 +161,7 @@ export function CodeLabWorkspace({
     <section
       data-testid="codelab-workspace"
       aria-label={`CodeLab ${language === 'rust' ? 'Rust' : 'Java'}: ${spec.title}`}
-      className="absolute inset-0 z-20 notebook-paper-bg overflow-y-auto notebook-scroll px-4 sm:px-8 pt-20 pb-8"
+      className="absolute inset-0 z-20 notebook-paper-bg overflow-y-auto notebook-scroll px-3.5 sm:px-8 pt-16 sm:pt-20 pb-10"
     >
       <div className="max-w-[1120px] mx-auto space-y-6">
         {/* Header & Rust / Java Language Switch */}
@@ -260,13 +260,13 @@ export function CodeLabWorkspace({
                   return (
                     <li
                       key={block.id}
-                      className="crayon-ink-panel px-4 py-3 flex items-center justify-between gap-3"
+                      className="crayon-ink-panel px-3 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2.5 sm:gap-3"
                     >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                         <span className="font-mono text-[13px] text-[var(--text-muted)] tabular-nums shrink-0">
                           {idx + 1}.
                         </span>
-                        <code className="font-mono text-[13.5px] sm:text-[14px] text-[var(--text-primary)] overflow-x-auto whitespace-pre">
+                        <code className="block max-w-full font-mono text-[13px] sm:text-[14px] text-[var(--text-primary)] overflow-x-auto whitespace-pre">
                           {renderedLine}
                         </code>
                       </div>

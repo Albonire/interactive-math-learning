@@ -4,6 +4,7 @@ import type { ThemeMode } from '../core/types';
 import {
   CrayonArrowLeft,
   CrayonArrowRight,
+  CrayonOrbit,
   CrayonPause,
   CrayonPlay,
   CrayonReset,
@@ -85,7 +86,7 @@ export function LessonIntroPlayer({
     return () => window.clearInterval(id);
   }, [playing, beat.durationMs, beatIndex, beats.length, onChangeBeat]);
 
-  // Keyboard navigation: Right/Space advances, Left goes back, Escape enters practice
+  // Keyboard navigation: Right advances, Left goes back, Space/P toggles Pausa Narrativa, Escape enters practice
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -98,7 +99,7 @@ export function LessonIntroPlayer({
         }
       } else if (e.key === 'ArrowLeft' && beatIndex > 0) {
         onChangeBeat(beatIndex - 1);
-      } else if (e.key === ' ') {
+      } else if (e.key === ' ' || e.key === 'p' || e.key === 'P') {
         e.preventDefault();
         setPlaying((p) => !p);
       }
@@ -108,55 +109,112 @@ export function LessonIntroPlayer({
   }, [beatIndex, beats.length, onChangeBeat, onFinish]);
 
   const beatFillPct = Math.min(100, (elapsedMs / Math.max(1, beat.durationMs)) * 100);
+  const narrativePaused = !playing;
+
+  const handleToggleNarrativePause = () => {
+    if (!playing && isLastBeat && elapsedMs >= beat.durationMs) {
+      elapsedRef.current = 0;
+      setElapsedMs(0);
+      onChangeBeat(0);
+    }
+    setPlaying((p) => !p);
+  };
 
   return (
     <section
       data-testid="lesson-intro-fullscreen"
+      data-narrative-paused={narrativePaused ? 'true' : 'false'}
       aria-label={`Introducción teórica: ${intro.title}`}
       className="absolute inset-0 z-30 flex flex-col justify-between pointer-events-none select-none"
     >
       {/* TOP MARGIN: Clean chapter header + instant 1-click escape to practice */}
       <div
-        className="pointer-events-auto px-6 sm:px-10 pt-4 pb-3 flex items-start justify-between gap-6"
+        className="pointer-events-auto px-4 sm:px-8 lg:px-10 pt-3 sm:pt-4 pb-2 sm:pb-3 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-6"
         style={{
           background:
-            'linear-gradient(to bottom, var(--bg-paper) 0%, var(--bg-paper-wash) 72%, transparent 100%)',
+            'linear-gradient(to bottom, var(--bg-paper) 0%, var(--bg-paper-wash) 78%, transparent 100%)',
         }}
       >
-        <div className="max-w-[580px]">
-          <p className="text-[14px] text-[var(--text-muted)] leading-none">
-            Lección {intro.lessonNumber} de 8 · {intro.moduleName} · Introducción teórica
+        <div className="min-w-0 max-w-[580px]">
+          <p className="text-[12.5px] sm:text-[14px] text-[var(--text-muted)] leading-snug">
+            Lección {intro.lessonNumber} de 8 · {intro.moduleName}
+            <span className="hidden sm:inline"> · Introducción teórica</span>
           </p>
-          <h1 className="font-display crayon-ink text-[28px] sm:text-[36px] leading-[1.06] text-[var(--text-primary)] pt-1">
+          <h1 className="font-display crayon-ink text-[22px] sm:text-[32px] lg:text-[36px] leading-[1.06] text-[var(--text-primary)] pt-0.5 sm:pt-1">
             {intro.title}
           </h1>
-          <p className="text-[16px] text-[var(--text-secondary)] pt-0.5">
+          <p className="text-[14px] sm:text-[16px] text-[var(--text-secondary)] pt-0.5 leading-snug">
             {intro.subtitle}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onFinish}
-          data-testid="intro-skip-btn"
-          className="inline-flex items-center gap-1.5 font-display text-[19px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap shrink-0 pt-1 transition-colors"
-        >
-          <span>Saltar a la práctica</span>
-          <CrayonArrowRight size={16} />
-        </button>
+        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0 pt-0.5 sm:pt-1">
+          <button
+            type="button"
+            data-testid="intro-narrative-pause-btn"
+            aria-pressed={narrativePaused}
+            onClick={handleToggleNarrativePause}
+            title="Pausa la progresión automática 3D mientras te permite rotar y acercar la cámara libremente (tecla P)"
+            className={`relative inline-flex items-center gap-1.5 font-display text-[15.5px] sm:text-[18px] cursor-pointer whitespace-nowrap transition-colors ${
+              narrativePaused
+                ? 'text-[var(--ui-accent)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {narrativePaused ? <CrayonOrbit size={15} /> : <CrayonPause size={14} />}
+            <span className="sm:hidden">
+              {narrativePaused ? 'Pausa activa' : 'Pausa Narrativa'}
+            </span>
+            <span className="hidden sm:inline">
+              {narrativePaused ? 'Pausa Narrativa activa' : 'Pausa Narrativa'}
+            </span>
+            {narrativePaused && (
+              <span className="absolute left-0 right-0 -bottom-1">
+                <RoughUnderline crayon="cobalt" theme={theme} seed={607} />
+              </span>
+            )}
+          </button>
+
+          <span className="hidden sm:inline text-[var(--hairline-strong)]" aria-hidden="true">
+            ·
+          </span>
+
+          <button
+            type="button"
+            onClick={onFinish}
+            data-testid="intro-skip-btn"
+            className="inline-flex items-center gap-1.5 font-display text-[16px] sm:text-[19px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap shrink-0 transition-colors"
+          >
+            <span className="sm:hidden">Saltar a práctica</span>
+            <span className="hidden sm:inline">Saltar a la práctica</span>
+            <CrayonArrowRight size={15} />
+          </button>
+        </div>
       </div>
 
       {/* MIDDLE STAGE: Open 3D canvas + contextual visual callouts on left margin (only on Beats 2 & 4) */}
-      <div className="flex-1 min-h-0 px-6 sm:px-10 py-2 flex items-center pointer-events-none">
+      <div className="relative flex-1 min-h-0 px-4 sm:px-8 lg:px-10 py-1.5 sm:py-2 flex items-end sm:items-center pointer-events-none">
+        {narrativePaused && (
+          <div
+            role="status"
+            data-testid="intro-narrative-pause-cue"
+            className="pointer-events-none absolute top-1 left-4 right-4 sm:left-auto sm:right-8 lg:right-10 inline-flex items-center justify-center sm:justify-start gap-2 text-[12.5px] sm:text-[14px] text-[var(--ui-accent)] bg-[var(--bg-paper)]/92 px-3 py-1 border border-dashed border-[var(--hairline-strong)] rounded-[3px] crayon-label-reveal"
+          >
+            <CrayonOrbit size={14} className="shrink-0" />
+            <span className="truncate sm:whitespace-normal">
+              Progresión en pausa · Arrastra sobre el 3D para rotar la cámara
+            </span>
+          </div>
+        )}
         {beat.parts && beat.parts.length > 0 && (
           <div
             data-testid="intro-parts-legend"
-            className="pointer-events-auto max-w-[330px] max-h-full overflow-y-auto notebook-scroll py-3.5 px-4 crayon-ink-panel space-y-2.5 crayon-label-reveal"
+            className="pointer-events-auto w-full sm:w-auto max-w-[340px] max-h-[48%] sm:max-h-full overflow-y-auto notebook-scroll py-2.5 sm:py-3.5 px-3.5 sm:px-4 crayon-ink-panel space-y-2 sm:space-y-2.5 crayon-label-reveal"
           >
-            <p className="font-display text-[18px] text-[var(--text-primary)] leading-none">
+            <p className="font-display text-[16.5px] sm:text-[18px] text-[var(--text-primary)] leading-none">
               Qué ves en la gráfica
             </p>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5 sm:space-y-2">
               {beat.parts.map((part, idx) => (
                 <li key={part.label} className="flex items-start gap-2.5">
                   <span className="pt-0.5 shrink-0">
@@ -167,8 +225,8 @@ export function LessonIntroPlayer({
                       seed={81 + idx * 17}
                     />
                   </span>
-                  <div className="text-[14.5px] leading-snug">
-                    <span className="font-display text-[17px] text-[var(--text-primary)]">
+                  <div className="text-[13.5px] sm:text-[14.5px] leading-snug">
+                    <span className="font-display text-[15.5px] sm:text-[17px] text-[var(--text-primary)]">
                       {part.label}:{' '}
                     </span>
                     <span className="text-[var(--text-secondary)]">{part.meaning}</span>
@@ -182,7 +240,7 @@ export function LessonIntroPlayer({
         {beat.formula && (
           <div
             data-testid="intro-formula-card"
-            className="pointer-events-auto max-w-[360px] max-h-full overflow-y-auto notebook-scroll py-4 px-5 crayon-ink-panel space-y-3 crayon-label-reveal"
+            className="pointer-events-auto w-full sm:w-auto max-w-[360px] max-h-[54%] sm:max-h-full overflow-y-auto notebook-scroll py-3 sm:py-4 px-4 sm:px-5 crayon-ink-panel space-y-2.5 sm:space-y-3 crayon-label-reveal"
           >
             <div className="text-[20px] text-[var(--text-primary)] pb-2 border-b border-dashed border-[var(--hairline)]">
               <KatexInline latex={beat.formula.latex} />
@@ -212,34 +270,34 @@ export function LessonIntroPlayer({
 
       {/* BOTTOM NARRATION & VIDEO-LIKE TIMELINE BAR */}
       <div
-        className="pointer-events-auto px-6 sm:px-10 pt-5 pb-4"
+        className="pointer-events-auto px-4 sm:px-8 lg:px-10 pt-3 sm:pt-5 pb-3 sm:pb-4"
         style={{
           background:
-            'linear-gradient(to top, var(--bg-paper) 0%, var(--bg-paper) 76%, var(--bg-paper-wash) 90%, transparent 100%)',
+            'linear-gradient(to top, var(--bg-paper) 0%, var(--bg-paper) 78%, var(--bg-paper-wash) 92%, transparent 100%)',
         }}
       >
-        <div className="max-w-[920px] mx-auto space-y-3.5">
+        <div className="max-w-[920px] mx-auto space-y-2.5 sm:space-y-3.5">
           {/* Active narration beat text */}
-          <div key={beat.id} className="space-y-1.5 crayon-label-reveal">
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="font-display text-[17px] text-[var(--ui-accent)] whitespace-nowrap">
+          <div key={beat.id} className="space-y-1 sm:space-y-1.5 crayon-label-reveal">
+            <div className="flex flex-wrap items-baseline gap-x-2.5 sm:gap-x-3 gap-y-0.5">
+              <span className="font-display text-[15px] sm:text-[17px] text-[var(--ui-accent)] whitespace-nowrap">
                 {beat.tag}
               </span>
-              <h2 className="relative inline-block font-display crayon-ink text-[24px] sm:text-[28px] leading-tight text-[var(--text-primary)] pb-1">
+              <h2 className="relative inline-block font-display crayon-ink text-[20px] sm:text-[26px] lg:text-[28px] leading-tight text-[var(--text-primary)] pb-0.5 sm:pb-1">
                 {beat.headline}
                 <span className="block w-full mt-0.5">
                   <RoughUnderline crayon="cobalt" theme={theme} seed={641 + beatIndex * 23} />
                 </span>
               </h2>
             </div>
-            <p className="text-[17px] sm:text-[18.5px] leading-[1.42] text-[var(--text-primary)] max-w-[78ch]">
+            <p className="text-[15px] sm:text-[17.5px] lg:text-[18.5px] leading-[1.38] sm:leading-[1.42] text-[var(--text-primary)] max-w-[78ch]">
               {beat.narration}
             </p>
           </div>
 
           {/* 4-segment interactive video-style chapter timeline */}
           <div
-            className="grid grid-cols-4 gap-2.5 pt-1"
+            className="grid grid-cols-4 gap-2 sm:gap-2.5 pt-0.5"
             role="tablist"
             aria-label="Capítulos de la introducción"
           >
@@ -259,7 +317,7 @@ export function LessonIntroPlayer({
                     setElapsedMs(0);
                     onChangeBeat(idx);
                   }}
-                  className="text-left group cursor-pointer space-y-1.5"
+                  className="text-left group cursor-pointer space-y-1 sm:space-y-1.5"
                 >
                   <div className="h-[6px] w-full rounded-[3px] bg-[var(--hairline)] overflow-hidden crayon-stroke-svg">
                     <div
@@ -273,9 +331,9 @@ export function LessonIntroPlayer({
                     />
                   </div>
                   <span
-                    className={`block text-[13.5px] truncate transition-colors ${
+                    className={`block text-[12px] sm:text-[13.5px] truncate transition-colors ${
                       isCurrent
-                        ? 'font-display text-[15.5px] text-[var(--text-primary)]'
+                        ? 'font-display text-[13.5px] sm:text-[15.5px] text-[var(--text-primary)]'
                         : isPast
                           ? 'text-[var(--text-secondary)]'
                           : 'text-[var(--text-muted)] group-hover:text-[var(--text-primary)]'
@@ -289,23 +347,19 @@ export function LessonIntroPlayer({
           </div>
 
           {/* Minimal playback & next-step controls */}
-          <div className="flex items-center justify-between gap-4 pt-1">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-2 sm:gap-4 pt-0.5 sm:pt-1">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <button
                 type="button"
-                onClick={() => {
-                  if (!playing && isLastBeat && elapsedMs >= beat.durationMs) {
-                    elapsedRef.current = 0;
-                    setElapsedMs(0);
-                    onChangeBeat(0);
-                  }
-                  setPlaying((p) => !p);
-                }}
-                aria-label={playing ? 'Pausar presentación' : 'Reproducir presentación'}
-                className="inline-flex items-center gap-1.5 font-display text-[18px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
+                onClick={handleToggleNarrativePause}
+                aria-label={playing ? 'Activar Pausa Narrativa' : 'Reanudar presentación narrativa'}
+                className="inline-flex items-center gap-1.5 font-display text-[15.5px] sm:text-[18px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
               >
-                {playing ? <CrayonPause size={16} /> : <CrayonPlay size={16} />}
-                <span>{playing ? 'Pausar' : 'Reproducir'}</span>
+                {playing ? <CrayonPause size={15} /> : <CrayonPlay size={15} />}
+                <span className="sm:hidden">{playing ? 'Pausar' : 'Reanudar'}</span>
+                <span className="hidden sm:inline">
+                  {playing ? 'Pausar narrativa' : 'Reanudar narrativa'}
+                </span>
               </button>
 
               {onReplaySketch && (
@@ -316,10 +370,11 @@ export function LessonIntroPlayer({
                     setPlaying(true);
                     onReplaySketch();
                   }}
-                  className="inline-flex items-center gap-1.5 text-[15px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap transition-colors"
+                  className="inline-flex items-center gap-1 text-[14px] sm:text-[15px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] cursor-pointer whitespace-nowrap transition-colors"
                 >
                   <CrayonReset size={14} />
-                  <span>Volver a trazar</span>
+                  <span className="sm:hidden">Trazar</span>
+                  <span className="hidden sm:inline">Volver a trazar</span>
                 </button>
               )}
 
@@ -327,15 +382,15 @@ export function LessonIntroPlayer({
                 <button
                   type="button"
                   onClick={() => onChangeBeat(beatIndex - 1)}
-                  className="inline-flex items-center gap-1 text-[15.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
+                  className="inline-flex items-center gap-1 text-[14px] sm:text-[15.5px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] cursor-pointer whitespace-nowrap transition-colors"
                 >
                   <CrayonArrowLeft size={15} />
-                  <span>Anterior</span>
+                  <span className="hidden xs:inline sm:inline">Anterior</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 shrink-0">
               {!isLastBeat ? (
                 <CrayonButton
                   crayon="cobalt"
@@ -343,6 +398,7 @@ export function LessonIntroPlayer({
                   seed={611 + beatIndex * 17}
                   variant="filled"
                   onClick={() => onChangeBeat(beatIndex + 1)}
+                  className="text-[15.5px] sm:text-[17px]"
                 >
                   <span>Siguiente</span>
                   <CrayonArrowRight size={15} />
@@ -354,8 +410,10 @@ export function LessonIntroPlayer({
                   seed={677}
                   variant="filled"
                   onClick={onFinish}
+                  className="text-[15px] sm:text-[17px]"
                 >
-                  <span>Comenzar práctica</span>
+                  <span className="sm:hidden">Practicar</span>
+                  <span className="hidden sm:inline">Comenzar práctica</span>
                   <CrayonArrowRight size={15} />
                 </CrayonButton>
               )}

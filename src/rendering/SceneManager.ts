@@ -214,10 +214,12 @@ export class SceneManager {
     });
     this.controls.addEventListener('change', () => {
       this.emitProjectedAnnotations(false);
+      this.updateContainerAttributes();
       if (this.isSoftwareGl) this.requestSoftwareRender();
     });
     this.controls.addEventListener('end', () => {
       this.emitProjectedAnnotations(true);
+      this.updateContainerAttributes();
       if (this.isSoftwareGl) this.requestSoftwareRender();
     });
 
@@ -295,6 +297,9 @@ export class SceneManager {
     this.container.dataset.viewOffsetY = this.viewOffsetYRatio.toFixed(3);
     this.container.dataset.exploded = this.exploded ? 'true' : 'false';
     this.container.dataset.explodeSpan = String(spanInfo.span);
+    const dx = this.camera.position.x - this.controls.target.x;
+    const dz = this.camera.position.z - this.controls.target.z;
+    this.container.dataset.camAzimuth = Math.atan2(dx, dz).toFixed(3);
   }
 
   private updateExplodeGuides(): void {
@@ -618,6 +623,11 @@ export class SceneManager {
     if (this.isSoftwareGl) {
       this.requestSoftwareRender();
     }
+  }
+
+  public cancelCameraTransition(): void {
+    this.targetCamPos = null;
+    this.targetCamLook = null;
   }
 
   public resetCamera(): void {

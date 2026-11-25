@@ -116,7 +116,7 @@ export function SymbolicWorkspace({
     <section
       data-testid="symbolic-workspace"
       aria-label={`Motor Simbólico: ${spec.title}`}
-      className="absolute inset-0 z-20 notebook-paper-bg overflow-y-auto notebook-scroll px-4 sm:px-8 pt-20 pb-8"
+      className="absolute inset-0 z-20 notebook-paper-bg overflow-y-auto notebook-scroll px-3.5 sm:px-8 pt-16 sm:pt-20 pb-10"
     >
       <div className="max-w-[1080px] mx-auto space-y-6">
         {/* Header */}
@@ -196,13 +196,13 @@ export function SymbolicWorkspace({
                       if (dragIdx !== null) moveBlock(dragIdx, idx);
                       setDragIdx(null);
                     }}
-                    className={`crayon-ink-panel px-4 py-3.5 flex items-center justify-between gap-4 transition-transform ${
+                    className={`crayon-ink-panel px-3 sm:px-4 py-3 sm:py-3.5 flex items-center justify-between gap-2.5 sm:gap-4 transition-transform ${
                       dragIdx === idx ? 'opacity-65 scale-[0.99]' : ''
                     }`}
                   >
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                       <div className="flex flex-col items-center gap-1 pt-0.5 shrink-0">
-                        <span className="font-display text-[16px] text-[var(--text-muted)] tabular-nums">
+                        <span className="font-display text-[15px] sm:text-[16px] text-[var(--text-muted)] tabular-nums">
                           0{idx + 1}
                         </span>
                         <CrayonSwatch
@@ -214,7 +214,7 @@ export function SymbolicWorkspace({
                       </div>
 
                       <div className="min-w-0 flex-1 space-y-1">
-                        <div className="text-[15.5px] sm:text-[17px] leading-relaxed text-[var(--text-primary)] break-words">
+                        <div className="text-[15px] sm:text-[17px] leading-relaxed text-[var(--text-primary)] overflow-x-auto max-w-full">
                           <KatexInline latex={block.latex} />
                         </div>
                         <p className="text-[13.5px] text-[var(--text-secondary)] leading-snug">

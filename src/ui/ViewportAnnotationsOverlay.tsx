@@ -11,7 +11,7 @@ import {
   type PositionedCallout,
   type ProjectedAnnotation,
 } from '../rendering/sceneAnnotations';
-import { CrayonNote } from './CrayonIcons';
+import { CrayonLightbulb, CrayonNote, CrayonPencil } from './CrayonIcons';
 import { RoughUnderline } from './RoughElements';
 
 interface ViewportAnnotationsOverlayProps {
@@ -23,6 +23,12 @@ interface ViewportAnnotationsOverlayProps {
   ecoMode: boolean;
   guideActive: boolean;
   hidden?: boolean;
+  freehandActive?: boolean;
+  freehandCount?: number;
+  onToggleFreehand?: () => void;
+  aiHintAvailable?: boolean;
+  aiHintOpen?: boolean;
+  onRequestAiHint?: () => void;
 }
 
 /**
@@ -43,6 +49,12 @@ export function ViewportAnnotationsOverlay({
   ecoMode,
   guideActive,
   hidden = false,
+  freehandActive = false,
+  freehandCount = 0,
+  onToggleFreehand,
+  aiHintAvailable = false,
+  aiHintOpen = false,
+  onRequestAiHint,
 }: ViewportAnnotationsOverlayProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -150,7 +162,8 @@ export function ViewportAnnotationsOverlay({
       const strokeHex = getCrayonHex(c.crayon, theme);
       const initialOpacity = calloutOpacities.get(c.id) ?? 0.85;
 
-      const startX = c.side === 'left' ? c.labelX + 150 : c.labelX - 150;
+      const labelOffset = viewportSize.width < 640 ? 118 : 150;
+      const startX = c.side === 'left' ? c.labelX + labelOffset : c.labelX - labelOffset;
       const startY = c.labelY - 7;
 
       const dx = c.anchorX - c.ctrlX;
@@ -330,8 +343,74 @@ export function ViewportAnnotationsOverlay({
       data-eco-pointer-active={ecoPointer.active ? 'true' : 'false'}
       data-guide-active={guideTarget ? 'true' : 'false'}
     >
-      {/* Small, unobtrusive top-right "Leyenda" toggle inside the 3D viewport */}
-      <div className="pointer-events-auto absolute top-[52px] sm:top-[56px] right-4 sm:right-6 z-20">
+      {/* Quiet 3D viewport tools: bottom-right above dock on phones, top-right below mode switcher on sm+ */}
+      <div className="pointer-events-auto absolute bottom-9 right-3 sm:bottom-auto sm:top-[56px] sm:right-6 z-20 flex items-center gap-2 sm:gap-3 px-2 sm:px-2.5 py-1 rounded bg-[var(--bg-paper)]/94 border border-dashed border-[var(--hairline)]">
+        {onToggleFreehand && (
+          <button
+            type="button"
+            onClick={onToggleFreehand}
+            aria-pressed={freehandActive}
+            data-testid="viewport-freehand-toggle"
+            title={
+              freehandActive
+                ? 'Salir de Escritura Libre para rotar el 3D (tecla D)'
+                : 'Anotar ecuaciones o bocetos de crayón encima de la vista 3D (tecla D)'
+            }
+            className={`relative inline-flex items-center gap-1 sm:gap-1.5 py-1 px-1 text-[13.5px] sm:text-[15px] leading-none cursor-pointer transition-colors whitespace-nowrap ${
+              freehandActive
+                ? 'font-display text-[15.5px] sm:text-[17.5px] text-[var(--ui-accent)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+            style={{ textShadow: haloShadow }}
+          >
+            <CrayonPencil size={14} />
+            <span className="sm:hidden">
+              Dibujar{freehandCount > 0 ? ` (${freehandCount})` : ''}
+            </span>
+            <span className="hidden sm:inline">
+              Escritura Libre{freehandCount > 0 ? ` (${freehandCount})` : ''}
+            </span>
+            {freehandActive && (
+              <span className="absolute left-0.5 right-0.5 -bottom-0.5">
+                <RoughUnderline crayon="cobalt" theme={theme} seed={71} />
+              </span>
+            )}
+          </button>
+        )}
+
+        {onRequestAiHint && (
+          <>
+            <span className="text-[var(--hairline-strong)] text-[12px] sm:text-[13px]" aria-hidden="true">
+              ·
+            </span>
+            <button
+              type="button"
+              onClick={onRequestAiHint}
+              aria-pressed={aiHintOpen}
+              data-testid="viewport-ai-hint-toggle"
+              title="Analizar tus ajustes actuales con Pistas de IA"
+              className={`relative inline-flex items-center gap-1 sm:gap-1.5 py-1 px-1 text-[13.5px] sm:text-[15px] leading-none cursor-pointer transition-colors whitespace-nowrap ${
+                aiHintOpen || aiHintAvailable
+                  ? 'font-display text-[15.5px] sm:text-[17.5px] text-[var(--ui-accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+              style={{ textShadow: haloShadow }}
+            >
+              <CrayonLightbulb size={14} />
+              <span>Pista IA</span>
+              {aiHintOpen && (
+                <span className="absolute left-0.5 right-0.5 -bottom-0.5">
+                  <RoughUnderline crayon="ochre" theme={theme} seed={79} />
+                </span>
+              )}
+            </button>
+          </>
+        )}
+
+        <span className="text-[var(--hairline-strong)] text-[12px] sm:text-[13px]" aria-hidden="true">
+          ·
+        </span>
+
         <button
           type="button"
           onClick={onToggle}
@@ -342,17 +421,17 @@ export function ViewportAnnotationsOverlay({
               ? 'Ocultar anotaciones dibujadas sobre la escena 3D (tecla L)'
               : 'Mostrar anotaciones dibujadas señalando cada parte de la figura 3D (tecla L)'
           }
-          className={`relative inline-flex items-center gap-1.5 py-1 px-1.5 text-[15px] leading-none cursor-pointer transition-colors whitespace-nowrap ${
+          className={`relative inline-flex items-center gap-1 sm:gap-1.5 py-1 px-1 text-[13.5px] sm:text-[15px] leading-none cursor-pointer transition-colors whitespace-nowrap ${
             open
-              ? 'font-display text-[17.5px] text-[var(--ui-accent)]'
+              ? 'font-display text-[15.5px] sm:text-[17.5px] text-[var(--ui-accent)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
           style={{ textShadow: haloShadow }}
         >
-          <CrayonNote size={15} />
+          <CrayonNote size={14} />
           <span>Leyenda</span>
           {open && (
-            <span className="absolute left-1 right-1 -bottom-0.5">
+            <span className="absolute left-0.5 right-0.5 -bottom-0.5">
               <RoughUnderline crayon="cobalt" theme={theme} seed={83} />
             </span>
           )}
@@ -398,7 +477,7 @@ export function ViewportAnnotationsOverlay({
                 opacity,
                 textShadow: haloShadow,
               }}
-              className={`absolute w-[144px] pointer-events-none transition-opacity duration-300 ${
+              className={`absolute w-[114px] sm:w-[144px] pointer-events-none transition-opacity duration-300 ${
                 c.side === 'left' ? 'text-right' : 'text-left'
               }`}
             >

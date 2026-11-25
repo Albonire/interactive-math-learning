@@ -138,9 +138,9 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
       <RoughDivider theme={theme} seed={211} />
 
       {!collapsed && (
-        <div className="px-6 py-2.5 flex flex-col gap-2.5">
+        <div className="px-3.5 sm:px-6 py-2 sm:py-2.5 flex flex-col gap-2 sm:gap-2.5 max-h-[42dvh] sm:max-h-none overflow-y-auto sm:overflow-visible notebook-scroll">
           {/* ROW 1: Compact Step Progress + Clear Single-Sentence Prompt + Single Primary CTA */}
-          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-6 gap-y-2 min-h-[42px]">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-4 sm:gap-x-6 gap-y-2 min-h-[38px] sm:min-h-[42px]">
             {/* Calm converged step markers (1 · 2 · 3 · Reto) */}
             <div
               className="flex items-center gap-1.5 shrink-0"
@@ -225,16 +225,16 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
             </div>
 
             {/* Clean Step Prompt OR Active Reto Target (never contradicts the open Reto drawer) */}
-            <div className="flex-1 min-w-[220px] flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <div className="order-3 sm:order-none basis-full sm:basis-auto flex-1 min-w-0 sm:min-w-[200px] flex flex-wrap items-baseline gap-x-2 sm:gap-x-2.5 gap-y-0.5">
               {challengeActive && activeChallenge ? (
                 <>
-                  <span className="font-display text-[19px] leading-tight text-[var(--text-primary)] whitespace-nowrap">
+                  <span className="font-display text-[17px] sm:text-[19px] leading-tight text-[var(--text-primary)] whitespace-nowrap">
                     Reto práctico
                   </span>
                   {challengeProximity.cueLabel && (
                     <span
                       data-testid="dock-optimal-cue"
-                      className="font-display text-[16.5px] whitespace-nowrap crayon-ink transition-colors duration-200"
+                      className="font-display text-[15px] sm:text-[16.5px] whitespace-nowrap crayon-ink transition-colors duration-200"
                       style={{
                         color: challengeProximity.isOptimal
                           ? 'var(--ui-success)'
@@ -244,21 +244,21 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
                       {challengeProximity.cueLabel}
                     </span>
                   )}
-                  <span className="text-[14.5px] leading-snug text-[var(--text-secondary)]">
+                  <span className="text-[13.5px] sm:text-[14.5px] leading-snug text-[var(--text-secondary)]">
                     {activeChallenge.targetDescription}
                   </span>
                 </>
               ) : (
                 <>
-                  <span className="font-display text-[19px] leading-tight text-[var(--text-primary)] whitespace-nowrap">
+                  <span className="font-display text-[17px] sm:text-[19px] leading-tight text-[var(--text-primary)] whitespace-nowrap">
                     {step.title}
                   </span>
                   {stepDone && (
-                    <span className="font-display text-[16px] text-[var(--ui-success)] whitespace-nowrap crayon-ink">
+                    <span className="font-display text-[15px] sm:text-[16px] text-[var(--ui-success)] whitespace-nowrap crayon-ink">
                       ✓ ¡Listo!
                     </span>
                   )}
-                  <span className="text-[15px] leading-snug text-[var(--text-secondary)]">
+                  <span className="text-[13.5px] sm:text-[15px] leading-snug text-[var(--text-secondary)]">
                     {stepDone ? step.takeaway : step.instruction}
                   </span>
                 </>
@@ -350,17 +350,17 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
           <div className="w-full border-t border-dashed border-[var(--hairline)]" />
 
           {/* ROW 2: Live Equation + 3D-Linked Hand-Drawn Sliders + Essential Scene Controls */}
-          <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 sm:gap-x-5 gap-y-2">
+            <div className="w-full sm:w-auto flex flex-wrap items-center gap-x-4 sm:gap-x-5 gap-y-1.5">
               <span
-                className={`text-[15px] text-[var(--text-primary)] shrink-0 transition-opacity duration-150 ${
+                className={`text-[14px] sm:text-[15px] text-[var(--text-primary)] shrink-0 transition-opacity duration-150 ${
                   focusedParamId ? 'opacity-35' : 'opacity-95'
                 }`}
               >
                 <KatexInline latex={getFormulaLeadLatex(sceneId)} />
               </span>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <div className="w-full sm:w-auto grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-4 sm:gap-y-1.5">
                 {paramsMeta.map((p, idx) => {
                   const val = paramValues[p.id] ?? p.value;
                   const dimmed = focusedParamId !== null && focusedParamId !== p.id;
@@ -375,7 +375,7 @@ export function CoursePipelineDock(props: CoursePipelineDockProps) {
                       data-param-id={p.id}
                       data-param-optimal={paramOptimal ? 'true' : 'false'}
                       style={{ '--optimal-wash': paramGlow } as CSSProperties}
-                      className={`crayon-param-optimal-wash w-[108px] sm:w-[120px] flex flex-col transition-opacity duration-150 ${
+                      className={`crayon-param-optimal-wash w-full sm:w-[120px] flex flex-col transition-opacity duration-150 ${
                         dimmed ? 'opacity-35' : 'opacity-100'
                       }`}
                     >
