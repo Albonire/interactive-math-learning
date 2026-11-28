@@ -110,7 +110,7 @@ export function dueReviews(state: StudyRhythmState, today: string): StudyModuleI
     .map(([id]) => id);
 }
 
-function load(): StudyRhythmState {
+export function loadStudyRhythm(): StudyRhythmState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return EMPTY_RHYTHM;
@@ -143,7 +143,7 @@ function save(state: StudyRhythmState): void {
 
 /** React binding. `today` is recomputed per render so a session crossing midnight stays correct. */
 export function useStudyRhythm(sealed: ReadonlySet<StudyModuleId>) {
-  const [state, setState] = useState<StudyRhythmState>(load);
+  const [state, setState] = useState<StudyRhythmState>(loadStudyRhythm);
   const today = localDay();
 
   useEffect(() => {

@@ -20,6 +20,7 @@ import {
   Children,
   cloneElement,
   createElement,
+  Fragment,
   isValidElement,
   memo,
   type ReactElement,
@@ -219,6 +220,9 @@ export function handifySvgTree(node: ReactNode, path = 'r', insideSvg = false): 
     if (!isValidElement(child)) return child;
     const el = child as ReactElement<AnyProps>;
     const childPath = `${path}.${el.key ?? index}`;
+    if (el.type === Fragment) {
+      return cloneElement(el, undefined, handifySvgTree(el.props.children as ReactNode, childPath, insideSvg));
+    }
     if (typeof el.type !== 'string') return el;
     const type = el.type;
     const props = el.props;
