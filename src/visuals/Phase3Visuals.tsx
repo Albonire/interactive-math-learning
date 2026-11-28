@@ -327,13 +327,18 @@ export function M15Visual({ theme }: ModuleVisualProps) {
 
   const mapX = (x: number) => 55 + (x / 3.2) * 470;
   const mapY = (y: number) => 190 - (y / 4.8) * 165;
+  const setB = (v: number) => setUpperB(snapTo(v, 0.1, 0.6, 3.0));
+  // Drag the upper limit b along the axis: the accumulated area grows at rate f(b) (TFC).
+  const drag = useDiagramDrag<'b'>((_, pt) => setB(((pt.x - 55) / 470) * 3.2));
 
   return (
     <VisualStageCard
       controls={
         <>
           <ParamSlider label="Subdivisiones n" value={nRect} min={2} max={32} onChange={setNRect} />
-          <ParamSlider label="Límite superior b" value={upperB} min={0.6} max={3.0} step={0.1} onChange={setUpperB} />
+          <span className="font-hand text-[14px] text-[var(--text-secondary)]">
+            Arrastra la línea <strong style={{ color: p.vermilion }}>b = {upperB.toFixed(1)}</strong> para acumular área.
+          </span>
           <div className="flex gap-1.5">
             {(['left', 'mid', 'right'] as const).map((r) => (
               <ActionBtn key={r} active={rule === r} onClick={() => setRule(r)}>
@@ -345,7 +350,7 @@ export function M15Visual({ theme }: ModuleVisualProps) {
       }
       caption={`Riemann (${nRect} rect.) = ${approx.toFixed(4)} · Integral exacta F(${upperB.toFixed(1)}) = ${exactF(upperB).toFixed(4)} · TFC: dF/db = f(${upperB.toFixed(1)}) = ${f(upperB).toFixed(3)}.`}
     >
-      <svg viewBox="0 0 560 210" className="w-full h-auto max-h-[235px]">
+      <svg viewBox="0 0 560 210" className="w-full h-auto max-h-[235px]" {...drag.svgProps}>
         <line x1="40" y1={mapY(0)} x2="535" y2={mapY(0)} stroke={p.ink} strokeWidth="1.5" />
         <line x1={mapX(0)} y1="16" x2={mapX(0)} y2="198" stroke={p.ink} strokeWidth="1.5" />
         {rects.map((r, i) => (
@@ -373,6 +378,16 @@ export function M15Visual({ theme }: ModuleVisualProps) {
         <text x={mapX(upperB)} y="205" textAnchor="middle" fontSize="11" fill={p.vermilion} fontFamily="monospace">
           b={upperB.toFixed(1)}
         </text>
+        <DiagramDragHandle
+          cx={mapX(upperB)}
+          cy={mapY(f(upperB))}
+          color={p.vermilion}
+          paperBg={p.bg}
+          label="Límite superior b (arrastra en horizontal)"
+          valueText={`b = ${upperB.toFixed(1)}`}
+          onKeyStep={(dx) => setB(upperB + dx * 0.1)}
+          {...drag.bind('b')}
+        />
       </svg>
     </VisualStageCard>
   );
