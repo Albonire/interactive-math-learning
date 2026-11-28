@@ -197,7 +197,9 @@ export function M8Visual({ theme }: ModuleVisualProps) {
           <div className="space-y-2 font-mono text-[14px] max-w-[360px] mx-auto">
             {list.map((row, r) => (
               <div key={r} className="flex items-center gap-2">
-                <span className="text-[var(--text-muted)] w-12">r_{r + 1} = 0.</span>
+                <span className="text-[var(--text-muted)] w-16 shrink-0 whitespace-nowrap">
+                  r<sub>{r + 1}</sub> = 0.
+                </span>
                 {row.map((bit, c) => {
                   const isDiag = r === c && r < cantorStep;
                   return (
@@ -219,7 +221,7 @@ export function M8Visual({ theme }: ModuleVisualProps) {
               </div>
             ))}
             <div className="pt-2 border-t border-[var(--hairline-strong)] flex items-center gap-2">
-              <span className="font-bold w-12" style={{ color: p.sage }}>d = 0.</span>
+              <span className="font-bold w-16 shrink-0 whitespace-nowrap" style={{ color: p.sage }}>d = 0.</span>
               {diag.map((bit, i) => (
                 <span
                   key={i}

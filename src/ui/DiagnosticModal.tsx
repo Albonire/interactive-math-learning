@@ -1,5 +1,5 @@
 import { createSessionSalt, shuffledOptionOrder } from '../core/optionShuffle';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   DIAGNOSTIC_QUESTIONS,
   FAST_TRACK_THRESHOLD_PERCENT,
@@ -111,6 +111,16 @@ export function DiagnosticModal({
   // Shuffle display order per question (answers stay stored by original index), so the
   // correct option cannot be inferred from its position. A new salt per run of the test.
   const [salt, setSalt] = useState(createSessionSalt);
+
+  // Escape closes the dialog, like the curriculum map.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 

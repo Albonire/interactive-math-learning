@@ -87,7 +87,7 @@ export function M1Visual({ theme }: ModuleVisualProps) {
                       isOn ? '' : 'opacity-72'
                     }`}
                   >
-                    <div className="text-[11.5px] font-mono-math text-[var(--text-muted)]">2^{bit}</div>
+                    <div className="text-[12.5px] font-mono-math text-[var(--text-muted)]">2<sup>{bit}</sup></div>
                     <div className="font-display text-[25px] leading-tight text-[var(--text-primary)] tabular-nums">
                       {isOn ? '1' : '0'}
                     </div>
@@ -111,7 +111,7 @@ export function M1Visual({ theme }: ModuleVisualProps) {
                       <span key={`${d}-${idx}`} className="inline-flex items-center gap-1">
                         {idx > 0 && <span className="text-[var(--text-muted)]">+</span>}
                         <span className="sketch-tile px-2 py-0.5 border border-dashed border-[var(--hairline-strong)] bg-[var(--bg-surface)]/70">
-                          {d}·{base}^{exp}
+                          {d}·{base}<sup>{exp}</sup>
                         </span>
                       </span>
                     );
@@ -334,7 +334,9 @@ export function M1Visual({ theme }: ModuleVisualProps) {
               return (
                 <g key={level}>
                   <text x="10" y={y + 4} fontSize="11" fill={p.pencil} fontFamily="monospace">
-                    {powBase}^{level}={count}
+                    {powBase}
+                    <tspan baselineShift="super" fontSize="8">{level}</tspan>
+                    <tspan> = {count}</tspan>
                   </text>
                   {Array.from({ length: capped }, (_, i) => {
                     const x = 110 + ((i + 0.5) / capped) * 510;
