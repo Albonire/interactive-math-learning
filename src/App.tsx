@@ -87,6 +87,11 @@ import { FreehandCanvasOverlay } from './ui/FreehandCanvasOverlay';
 import { AiHintToast } from './ui/AiHintToast';
 import { SymbolicWorkspace } from './ui/SymbolicWorkspace';
 import { CodeLabWorkspace } from './ui/CodeLabWorkspace';
+import { ModuleWorkspace } from './ui/ModuleWorkspace';
+import { DiagnosticModal } from './ui/DiagnosticModal';
+import { STUDY_MODULES } from './core/studyPlan';
+import type { StudyModuleId } from './core/studyPlanTypes';
+import type { DiagnosticReport } from './core/diagnostic';
 import { CrayonSvgDefs, RoughUnderline, WebGLFallbackSvg } from './ui/RoughElements';
 
 const LESSON_PROGRESS_KEY = 'bibifold_completed_steps_v1';
@@ -121,6 +126,11 @@ function defaultParamsFor(sceneId: SceneId): Record<string, number> {
 export default function App() {
   const [aiData, setAiData] = useState<PersistedAiData>(() => loadPersistedAiData());
   const initialSceneId: SceneId = aiData.lastSceneId ?? 'lin-span';
+  const [appView, setAppView] = useState<'module' | 'lab3d'>('module');
+  const [activeModuleId, setActiveModuleId] = useState<StudyModuleId>(
+    () => aiData.activeModuleId ?? 'M1'
+  );
+  const [diagnosticOpen, setDiagnosticOpen] = useState<boolean>(false);
 
   const [sceneId, setSceneId] = useState<SceneId>(initialSceneId);
   const [theme, setTheme] = useState<ThemeMode>('paper');
@@ -164,17 +174,8 @@ export default function App() {
     return false;
   });
 
-  // Fullscreen Animated Theory Introduction (auto-skipped on reload when returning to a previously seen lesson)
-  const [introOpen, setIntroOpen] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('autostart') === '1') return false;
-    }
-    if (aiData.lastSceneId && aiData.seenIntroScenes.includes(initialSceneId)) {
-      return false;
-    }
-    return true;
-  });
+  // Fullscreen Animated Theory Introduction (active only inside 3D Lab mode)
+  const [introOpen, setIntroOpen] = useState<boolean>(false);
   const [introBeatIdx, setIntroBeatIdx] = useState<number>(0);
   const [introPlaying, setIntroPlaying] = useState<boolean>(true);
   const seenIntrosRef = useRef<Set<SceneId>>(
@@ -349,15 +350,20 @@ export default function App() {
     rhythmEngineRef.current?.syncSettings(audioEnabled, ecoMode);
   }, [audioEnabled, ecoMode]);
 
-  // Initialize Three.js WebGL 2 SceneManager once on mount
+  // Initialize Three.js WebGL 2 SceneManager lazily only when in 3D Lab mode
   useEffect(() => {
+    if (appView !== 'lab3d') {
+      managerRef.current?.dispose();
+      managerRef.current = null;
+      return;
+    }
     const container = canvasHostRef.current;
     if (!container) return;
 
     try {
       const manager = new SceneManager({
         container,
-        initialTheme: theme,
+        initialTheme: themeRef.current,
         initialEcoMode: ecoMode,
         onContextLost: () => setWebglLost(true),
         onContextRestored: () => setWebglLost(false),
@@ -372,6 +378,25 @@ export default function App() {
         },
       });
       managerRef.current = manager;
+      manager.syncState(
+        {
+          sceneId,
+          params: paramValuesRef.current,
+          theme: themeRef.current,
+          activation,
+          dataset,
+          landscape,
+          autoDiffPass,
+          optimizerProbes,
+          symbolicTargetIdx,
+          aiSymbolicGrid,
+        },
+        layers,
+        exploded,
+        steadyStrokes,
+        activeFocusedLayerId,
+        ecoMode
+      );
     } catch {
       setWebglLost(true);
     }
@@ -380,9 +405,9 @@ export default function App() {
       managerRef.current?.dispose();
       managerRef.current = null;
     };
-    // Intentionally mounted once so HUD state updates never recreate WebGL context
+    // Mount/unmount WebGL cleanly strictly on entering/leaving Lab 3D mode
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [appView]);
 
   // Stop Web Worker on unmount or scene exit
   const stopSymbolicWorker = useCallback(() => {
@@ -471,7 +496,7 @@ export default function App() {
       const firstOpen = nextLesson.steps.findIndex((s) => !completedStepIds.has(s.id));
       setActiveStepIdx(firstOpen === -1 ? 0 : firstOpen);
 
-      const shouldOpenIntro = replayIntro ?? !seenIntrosRef.current.has(nextId);
+      const shouldOpenIntro = replayIntro ?? false;
       if (shouldOpenIntro) {
         persistSessionLesson(nextId, true);
         setIntroBeatIdx(0);
@@ -482,6 +507,61 @@ export default function App() {
       }
     },
     [cancelParamAnim, completedStepIds, persistSessionLesson, stopSymbolicWorker]
+  );
+
+  // Study Plan navigation & persistence callbacks
+  const completedModuleSet = useMemo(
+    () => new Set<StudyModuleId>(aiData.completedModuleIds ?? []),
+    [aiData.completedModuleIds]
+  );
+
+  const handleSelectModule = useCallback((nextModId: StudyModuleId) => {
+    setActiveModuleId(nextModId);
+    setAppView('module');
+    setIntroOpen(false);
+    setMapOpen(false);
+    setDrawerMode('closed');
+    setAiData((prev) => {
+      if (prev.activeModuleId === nextModId) return prev;
+      const next: PersistedAiData = { ...prev, activeModuleId: nextModId };
+      savePersistedAiData(next);
+      return next;
+    });
+  }, []);
+
+  const handleMarkModuleCompleted = useCallback((doneId: StudyModuleId) => {
+    setAiData((prev) => {
+      const existing = prev.completedModuleIds ?? [];
+      if (existing.includes(doneId)) return prev;
+      const next: PersistedAiData = {
+        ...prev,
+        completedModuleIds: [...existing, doneId],
+      };
+      savePersistedAiData(next);
+      return next;
+    });
+  }, []);
+
+  const handleCompleteDiagnostic = useCallback((report: DiagnosticReport) => {
+    setAiData((prev) => {
+      const next: PersistedAiData = {
+        ...prev,
+        diagnosticReport: report,
+      };
+      savePersistedAiData(next);
+      return next;
+    });
+  }, []);
+
+  const handleOpen3DScene = useCallback(
+    (targetSceneId: SceneId) => {
+      setAppView('lab3d');
+      selectScene(targetSceneId, false);
+      window.requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+    },
+    [selectScene]
   );
 
   // Live 3D choreography while the fullscreen theory intro plays
@@ -1515,6 +1595,8 @@ export default function App() {
       className={`h-[100dvh] w-screen flex flex-col overflow-hidden bg-[var(--bg-paper)] text-[var(--text-primary)] ${
         ecoMode ? 'eco-mode' : ''
       }`}
+      data-app-view={appView}
+      data-module={activeModuleId}
       data-scene={sceneId}
       data-theme={theme}
       data-eco={ecoMode ? 'true' : 'false'}
@@ -1527,20 +1609,42 @@ export default function App() {
       <CrayonSvgDefs ecoMode={ecoMode} />
 
       {/* Calm Top Bar — completely hidden during Fullscreen Theory Introduction */}
-      {!introOpen && (
+      {!(appView === 'lab3d' && introOpen) && (
         <TopBar
+          appView={appView}
+          activeModuleId={activeModuleId}
           activeSceneId={sceneId}
           drawerMode={drawerMode}
           mapOpen={mapOpen}
+          diagnosticOpen={diagnosticOpen}
+          diagnosticDone={Boolean(aiData.diagnosticReport)}
           rhythmOpen={rhythmOpen}
           rhythmPlaying={rhythmSnapshot.isPlaying}
           rhythmBpm={rhythmSnapshot.detectedBpm}
           theme={theme}
           ecoMode={ecoMode}
           audioEnabled={audioEnabled}
+          onBackToModule={() => {
+            setDrawerMode('closed');
+            setIntroOpen(false);
+            setAppView('module');
+          }}
           onToggleMap={() => {
             setRhythmOpen(false);
+            setDiagnosticOpen(false);
             setMapOpen((v) => !v);
+          }}
+          onToggleDiagnostic={() => {
+            setRhythmOpen(false);
+            setMapOpen(false);
+            setDiagnosticOpen((v) => !v);
+          }}
+          onOpenLinked3D={() => {
+            setRhythmOpen(false);
+            setMapOpen(false);
+            setDiagnosticOpen(false);
+            const target = STUDY_MODULES[activeModuleId].linked3DSceneId ?? sceneId;
+            handleOpen3DScene(target);
           }}
           onOpenIntro={() => {
             audioEngineRef.current?.unlock();
@@ -1578,7 +1682,7 @@ export default function App() {
         />
       )}
 
-      {!introOpen && (
+      {!(appView === 'lab3d' && introOpen) && (
         <RhythmAudioPopover
           open={rhythmOpen}
           theme={theme}
@@ -1613,18 +1717,38 @@ export default function App() {
         />
       )}
 
-      {/* Protagonist 3D Hand-Painted Sketchbook Canvas (expands to 100% viewport during Intro) */}
+      {/* Main Stage: 32-Module Visual Study Plan OR Flagship 3D WebGL Lab */}
       <main className="relative flex-1 min-h-0 w-full overflow-hidden notebook-paper-bg">
-        {/* Isolated WebGL canvas mount wrapped in SketchAnimationWrapper for smooth first-time entrance */}
-        <SketchAnimationWrapper sceneKey={sceneId} className={webglLost ? 'hidden' : 'block'}>
-          <div
-            ref={canvasHostRef}
-            data-testid="webgl-viewport"
-            className="absolute inset-0 w-full h-full touch-none"
+        {/* 32-Module Escalera Workspace (Default Primary Experience) */}
+        {appView === 'module' && (
+          <ModuleWorkspace
+            moduleId={activeModuleId}
+            theme={theme}
+            completedModuleIds={completedModuleSet}
+            diagnosticReport={aiData.diagnosticReport ?? null}
+            onSelectModule={handleSelectModule}
+            onMarkModuleCompleted={handleMarkModuleCompleted}
+            onOpen3DScene={handleOpen3DScene}
+            onOpenDiagnostic={() => setDiagnosticOpen(true)}
+            onOpenPlanMap={() => setMapOpen(true)}
           />
-        </SketchAnimationWrapper>
+        )}
 
-        {webglLost && (
+        {/* Isolated WebGL canvas mount (mounted only when appView === 'lab3d') */}
+        {appView === 'lab3d' && (
+          <SketchAnimationWrapper
+            sceneKey={sceneId}
+            className={webglLost ? 'hidden' : 'block'}
+          >
+            <div
+              ref={canvasHostRef}
+              data-testid="webgl-viewport"
+              className="absolute inset-0 w-full h-full touch-none"
+            />
+          </SketchAnimationWrapper>
+        )}
+
+        {appView === 'lab3d' && webglLost && (
           <WebGLFallbackSvg
             title={sceneMeta.title}
             theme={theme}
@@ -1633,8 +1757,8 @@ export default function App() {
           />
         )}
 
-        {/* FULLSCREEN ANIMATED THEORY INTRODUCTION (clears entire viewport around the 3D graph) */}
-        {introOpen && (
+        {/* FULLSCREEN ANIMATED THEORY INTRODUCTION (Lab 3D only) */}
+        {appView === 'lab3d' && introOpen && (
           <LessonIntroPlayer
             intro={LESSON_INTROS[sceneId]}
             beatIndex={introBeatIdx}
@@ -1660,7 +1784,7 @@ export default function App() {
         )}
 
         {/* Calm Top-Right Workspace Mode Switcher (Visual 3D · Simbólico · CodeLab) */}
-        {!introOpen && drawerMode === 'closed' && (
+        {appView === 'lab3d' && !introOpen && drawerMode === 'closed' && (
           <div
             role="tablist"
             aria-label="Modo de laboratorio"
@@ -1728,7 +1852,7 @@ export default function App() {
         )}
 
         {/* HANDS-ON PRACTICE HEADER: Minimal direct-on-paper title + single live metric line (3D mode) */}
-        {!introOpen && (
+        {appView === 'lab3d' && !introOpen && (
           <div className="pointer-events-none absolute top-[54px] sm:top-4 left-3 sm:left-6 right-3 sm:right-6 z-10 flex items-start justify-between gap-4 sm:gap-6">
             {workspaceMode === 'webgl3d' ? (
               <div className="max-w-full sm:max-w-[calc(100%-335px)] lg:max-w-[560px] select-none">
@@ -1795,7 +1919,7 @@ export default function App() {
         )}
 
         {/* Symbolic Engine v1 Workspace (Step-by-step KaTeX derivation + Equivalence verifier) */}
-        {!introOpen && workspaceMode === 'symbolic' && (
+        {appView === 'lab3d' && !introOpen && workspaceMode === 'symbolic' && (
           <SymbolicWorkspace
             sceneId={sceneId}
             theme={theme}
@@ -1809,7 +1933,7 @@ export default function App() {
         )}
 
         {/* CodeLab Engine v1 Workspace (Rust & Java Parsons blocks + Web Worker test harness) */}
-        {!introOpen && workspaceMode === 'codelab' && (
+        {appView === 'lab3d' && !introOpen && workspaceMode === 'codelab' && (
           <CodeLabWorkspace
             sceneId={sceneId}
             theme={theme}
@@ -1830,7 +1954,7 @@ export default function App() {
           strokes={freehandStore[sceneId] ?? []}
           theme={theme}
           ecoMode={ecoMode}
-          hidden={introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
+          hidden={appView !== 'lab3d' || introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
           onChangeStrokes={handleChangeFreehandStrokes}
           onCloseDrawing={() => setFreehandActive(false)}
           onToggleVisible={() => setFreehandVisible((v) => !v)}
@@ -1858,7 +1982,7 @@ export default function App() {
           theme={theme}
           ecoMode={ecoMode}
           guideActive={idleGuideActive && !freehandActive}
-          hidden={introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
+          hidden={appView !== 'lab3d' || introOpen || drawerMode !== 'closed' || workspaceMode !== 'webgl3d'}
           freehandActive={freehandActive}
           freehandCount={(freehandStore[sceneId] ?? []).length}
           onToggleFreehand={() => {
@@ -1876,14 +2000,14 @@ export default function App() {
 
         {/* Real-time AI Hints margin card (stagnation / divergence coaching + 1-click apply) */}
         <AiHintToast
-          hint={!introOpen && workspaceMode === 'webgl3d' && drawerMode === 'closed' ? activeAiHint : null}
+          hint={appView === 'lab3d' && !introOpen && workspaceMode === 'webgl3d' && drawerMode === 'closed' ? activeAiHint : null}
           theme={theme}
           onApply={handleApplyAiHint}
           onDismiss={handleDismissAiHint}
         />
 
-        {/* Clean Slide-Over Drawer (Code Bridge & Adaptive Challenge) — hidden during Intro */}
-        {!introOpen && (
+        {/* Clean Slide-Over Drawer (Code Bridge & Adaptive Challenge) — Lab 3D only */}
+        {appView === 'lab3d' && !introOpen && (
           <SlideDrawer
             mode={drawerMode}
             sceneId={sceneId}
@@ -1910,7 +2034,7 @@ export default function App() {
       </main>
 
       {/* Unified Sequential Practice Dock — shown only in 3D hands-on mode */}
-      {!introOpen && workspaceMode === 'webgl3d' && (
+      {appView === 'lab3d' && !introOpen && workspaceMode === 'webgl3d' && (
         <CoursePipelineDock
           lesson={activeLesson}
           sceneId={sceneId}
@@ -1991,17 +2115,16 @@ export default function App() {
         />
       )}
 
-      {/* Visual Course Index Modal (Hand-Drawn Map + Clean Table of Contents) */}
+      {/* 7-Phase / 32-Module Visual Study Plan Modal */}
       <CurriculumMapModal
-        open={!introOpen && mapOpen}
-        activeSceneId={sceneId}
-        bktMap={aiData.bkt}
-        completedStepIds={completedStepIds}
-        completed3DChallengeScenes={aiData.completed3DChallengeScenes}
-        completedSymbolicScenes={aiData.completedSymbolicScenes}
-        completedCodeLabScenes={aiData.completedCodeLabScenes}
+        open={!(appView === 'lab3d' && introOpen) && mapOpen}
+        activeModuleId={activeModuleId}
+        completedModuleIds={completedModuleSet}
+        diagnosticReport={aiData.diagnosticReport ?? null}
         theme={theme}
-        onSelectScene={selectScene}
+        onSelectModule={handleSelectModule}
+        onOpen3DScene={handleOpen3DScene}
+        onOpenDiagnostic={() => setDiagnosticOpen(true)}
         onClose={() => setMapOpen(false)}
         onExportProgress={handleExportProgress}
         onImportProgress={handleImportProgress}
@@ -2011,6 +2134,7 @@ export default function App() {
           const fresh = createDefaultPersistedData();
           setAiData(fresh);
           savePersistedAiData(fresh);
+          setActiveModuleId('M1');
           const emptySteps = new Set<string>();
           setCompletedStepIds(emptySteps);
           saveCompletedSteps(emptySteps);
@@ -2035,6 +2159,16 @@ export default function App() {
           setCelebrationStamp(null);
           managerRef.current?.resetCamera();
         }}
+      />
+
+      {/* Fase 0: Diagnóstico adaptativo de vacíos y mapa de calor */}
+      <DiagnosticModal
+        open={!(appView === 'lab3d' && introOpen) && diagnosticOpen}
+        theme={theme}
+        existingReport={aiData.diagnosticReport ?? null}
+        onComplete={handleCompleteDiagnostic}
+        onJumpToModule={handleSelectModule}
+        onClose={() => setDiagnosticOpen(false)}
       />
     </div>
   );

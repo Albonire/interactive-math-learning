@@ -1,4 +1,7 @@
 import type { BktSkillState, SceneId, SkillId } from '../core/types';
+import type { StudyModuleId } from '../core/studyPlanTypes';
+import { isValidStudyModuleId } from '../core/studyPlan';
+import type { DiagnosticReport } from '../core/diagnostic';
 import { createInitialBktMap, DEFAULT_HALF_LIFE_DAYS } from '../ai/bktEngine';
 import { createInitialBanditState, type LinUcbState } from '../ai/contextualBandit';
 
@@ -15,6 +18,9 @@ export interface PersistedAiData {
   completedCodeLabScenes: SceneId[];
   lastSceneId?: SceneId;
   seenIntroScenes: SceneId[];
+  activeModuleId?: StudyModuleId;
+  completedModuleIds?: StudyModuleId[];
+  diagnosticReport?: DiagnosticReport | null;
   updatedAt: number;
 }
 
@@ -48,6 +54,9 @@ export function createDefaultPersistedData(): PersistedAiData {
     completedCodeLabScenes: [],
     lastSceneId: undefined,
     seenIntroScenes: [],
+    activeModuleId: 'M1',
+    completedModuleIds: [],
+    diagnosticReport: null,
     updatedAt: Date.now(),
   };
 }
@@ -95,6 +104,21 @@ export function migratePersistedAiData(raw: unknown): PersistedAiData {
       ? (obj.lastSceneId as SceneId)
       : undefined;
 
+  const activeModuleId: StudyModuleId = isValidStudyModuleId(obj.activeModuleId)
+    ? obj.activeModuleId
+    : 'M1';
+
+  const completedModuleIds: StudyModuleId[] = Array.isArray(obj.completedModuleIds)
+    ? Array.from(new Set(obj.completedModuleIds.filter(isValidStudyModuleId)))
+    : [];
+
+  const diagnosticReport =
+    obj.diagnosticReport &&
+    typeof obj.diagnosticReport === 'object' &&
+    typeof (obj.diagnosticReport as DiagnosticReport).overallPercent === 'number'
+      ? (obj.diagnosticReport as DiagnosticReport)
+      : null;
+
   return {
     version: 3,
     bkt: mergedBkt,
@@ -108,6 +132,9 @@ export function migratePersistedAiData(raw: unknown): PersistedAiData {
     completedCodeLabScenes: validScenes(obj.completedCodeLabScenes),
     lastSceneId,
     seenIntroScenes: validScenes(obj.seenIntroScenes),
+    activeModuleId,
+    completedModuleIds,
+    diagnosticReport,
     updatedAt: typeof obj.updatedAt === 'number' ? obj.updatedAt : Date.now(),
   };
 }

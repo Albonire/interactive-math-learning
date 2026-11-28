@@ -120,6 +120,50 @@ export function CrayonSvgDefs({ ecoMode = false }: { ecoMode?: boolean }) {
             yChannelSelector="G"
           />
         </filter>
+
+        {/*
+          Hand-inked organic sketch filter for all 32 interactive mathematical SVG diagrams.
+          Uses userSpaceOnUse so purely horizontal/vertical axes & hairlines never clip to zero bbox.
+        */}
+        <filter
+          id="hand-diagram-ink"
+          filterUnits="userSpaceOnUse"
+          x="-80"
+          y="-80"
+          width="1200"
+          height="600"
+          colorInterpolationFilters="sRGB"
+        >
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.018 0.022"
+            numOctaves={ecoMode ? 1 : 2}
+            seed="31"
+            result="wobble"
+          />
+          <feDisplacementMap
+            in="SourceGraphic"
+            in2="wobble"
+            scale={ecoMode ? 1.2 : 2.25}
+            xChannelSelector="R"
+            yChannelSelector="G"
+            result="handPath"
+          />
+          <feTurbulence
+            type="fractalNoise"
+            baseFrequency="0.48"
+            numOctaves={ecoMode ? 1 : 2}
+            seed="73"
+            result="grain"
+          />
+          <feDisplacementMap
+            in="handPath"
+            in2="grain"
+            scale={ecoMode ? 0.5 : 0.95}
+            xChannelSelector="R"
+            yChannelSelector="B"
+          />
+        </filter>
       </defs>
     </svg>
   );
@@ -301,35 +345,35 @@ export function CrayonButton({
     if (variant === 'filled') {
       // Painterly multi-pass wax crayon stroke behind CTA text
       svg.appendChild(
-        rc.rectangle(4, 4, 172, 34, {
+        rc.rectangle(2.5, 2.5, 175, 37, {
           seed,
           stroke: col,
           strokeWidth: 2.2,
           fill: col,
           fillStyle: 'zigzag',
-          fillWeight: 2.8,
-          hachureGap: 3.1,
+          fillWeight: 3.1,
+          hachureGap: 2.9,
           hachureAngle: -14,
-          roughness: 1.65,
+          roughness: 1.55,
         })
       );
       svg.appendChild(
-        rc.rectangle(5, 5, 170, 32, {
+        rc.rectangle(3.5, 3.5, 173, 35, {
           seed: seed + 19,
           stroke: col,
           strokeWidth: 1.4,
-          roughness: 1.75,
-          bowing: 1.2,
+          roughness: 1.65,
+          bowing: 1.1,
         })
       );
     } else {
       svg.appendChild(
-        rc.rectangle(4, 4, 172, 34, {
+        rc.rectangle(2.5, 2.5, 175, 37, {
           seed,
           stroke: col,
           strokeWidth: 2.0,
-          roughness: 1.65,
-          bowing: 1.15,
+          roughness: 1.55,
+          bowing: 1.1,
         })
       );
     }
@@ -356,7 +400,7 @@ export function CrayonButton({
       data-testid={dataTestId}
       aria-expanded={ariaExpanded}
       title={title}
-      className={`relative inline-flex items-center justify-center gap-1.5 px-4 py-1.5 font-display text-[18px] leading-none whitespace-nowrap shrink-0 cursor-pointer transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:scale-100 ${className}`}
+      className={`relative inline-flex items-center justify-center gap-1.5 px-5 py-2 font-display text-[17.5px] leading-none whitespace-nowrap shrink-0 cursor-pointer transition-transform duration-150 hover:scale-[1.03] active:scale-[0.98] disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:scale-100 ${className}`}
       style={{ color: textColor }}
     >
       <svg
@@ -471,13 +515,15 @@ export function CrayonSlider({
   onFocusStart?: () => void;
   onFocusEnd?: () => void;
 }) {
-  const svgRef = useRef<SVGSVGElement | null>(null);
+  const railSvgRef = useRef<SVGSVGElement | null>(null);
+  const thumbSvgRef = useRef<SVGSVGElement | null>(null);
   const ratio = Math.max(0, Math.min(1, (value - min) / Math.max(1e-6, max - min)));
-  const thumbX = 10 + ratio * 100;
+  const railFillX = 4 + ratio * 112;
   const clampedGlow = Math.max(0, Math.min(1, optimalGlow));
 
+  // 1. Horizontal rail & wax fill stroke (stretches cleanly across any slider width)
   useEffect(() => {
-    const svg = svgRef.current;
+    const svg = railSvgRef.current;
     if (!svg) return;
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     const rc = rough.svg(svg);
@@ -486,49 +532,29 @@ export function CrayonSlider({
     const fillColor = getCrayonHex(crayon, theme);
     const sageHex = getCrayonHex('sage', theme);
     const ochreHex = getCrayonHex('ochre', theme);
-    const paperColor = THEME_PALETTES[theme].paperBg;
     const cy = 12;
 
-    // Subtle intensifying hand-rubbed wax halo behind track & thumb during active Reto proximity
     if (clampedGlow > 0.05) {
       const haloGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
       haloGroup.setAttribute('filter', 'url(#crayon-wax-glow)');
-      if (isOptimal) {
-        haloGroup.setAttribute('class', 'crayon-optimal-halo');
-      }
+      if (isOptimal) haloGroup.setAttribute('class', 'crayon-optimal-halo');
       const haloStroke = isOptimal ? sageHex : ochreHex;
       const haloAlpha = (0.18 + clampedGlow * (theme === 'paper' ? 0.36 : 0.44)).toFixed(2);
       haloGroup.setAttribute('opacity', haloAlpha);
-
-      // Warm smudged wax pass along the rail
       haloGroup.appendChild(
-        rc.line(8, cy, Math.max(22, thumbX), cy, {
+        rc.line(4, cy, Math.max(12, railFillX), cy, {
           seed: seed + 53,
           stroke: haloStroke,
           strokeWidth: 7.5 + clampedGlow * 5.2,
           roughness: 1.85,
         })
       );
-
-      // Expanding sketchy wax halo around the thumb
-      haloGroup.appendChild(
-        rc.circle(thumbX, cy, 15.5 + clampedGlow * 6.5, {
-          seed: seed + 61,
-          stroke: haloStroke,
-          strokeWidth: 2.6 + clampedGlow * 2.1,
-          fill: haloStroke,
-          fillStyle: 'hachure',
-          hachureGap: 3.4,
-          roughness: 1.7,
-        })
-      );
-
       svg.appendChild(haloGroup);
     }
 
     // Hand-drawn pencil rail
     svg.appendChild(
-      rc.line(8, cy, 112, cy, {
+      rc.line(4, cy, 116, cy, {
         seed,
         stroke: trackColor,
         strokeWidth: 2.2,
@@ -537,42 +563,80 @@ export function CrayonSlider({
     );
 
     // Colored wax crayon fill stroke up to the thumb
-    if (thumbX > 11) {
+    if (railFillX > 6) {
       svg.appendChild(
-        rc.line(8, cy, thumbX, cy, {
+        rc.line(4, cy, railFillX, cy, {
           seed: seed + 7,
           stroke: fillColor,
-          strokeWidth: isOptimal ? 5.2 : 4.8,
-          roughness: 1.5,
-        })
-      );
-    }
-
-    // Crisp hand-drawn sage confirmation ring right around the thumb when optimal is reached
-    if (isOptimal) {
-      svg.appendChild(
-        rc.circle(thumbX, cy, 17.5, {
-          seed: seed + 79,
-          stroke: sageHex,
-          strokeWidth: 1.65,
+          strokeWidth: isOptimal ? 5.0 : 4.4,
           roughness: 1.45,
         })
       );
     }
 
-    // Scribbled wax dot handle
+    animateSvgStrokesOnce(svg, `slider:${ariaLabel}`, {
+      durationMs: 480,
+      staggerMs: 55,
+      maxTotalStaggerMs: 220,
+    });
+  }, [railFillX, crayon, theme, seed, ariaLabel, clampedGlow, isOptimal]);
+
+  // 2. True aspect-ratio 1:1 circular scribbled wax handle (never stretches into an oval!)
+  useEffect(() => {
+    const svg = thumbSvgRef.current;
+    if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    const rc = rough.svg(svg);
+    const fillColor = getCrayonHex(crayon, theme);
+    const sageHex = getCrayonHex('sage', theme);
+    const ochreHex = getCrayonHex('ochre', theme);
+    const paperColor = THEME_PALETTES[theme].paperBg;
+    const c = 14;
+
+    if (clampedGlow > 0.05) {
+      const haloGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      haloGroup.setAttribute('filter', 'url(#crayon-wax-glow)');
+      if (isOptimal) haloGroup.setAttribute('class', 'crayon-optimal-halo');
+      const haloStroke = isOptimal ? sageHex : ochreHex;
+      const haloAlpha = (0.2 + clampedGlow * 0.42).toFixed(2);
+      haloGroup.setAttribute('opacity', haloAlpha);
+      haloGroup.appendChild(
+        rc.circle(c, c, 17 + clampedGlow * 5, {
+          seed: seed + 61,
+          stroke: haloStroke,
+          strokeWidth: 2.4 + clampedGlow * 1.8,
+          fill: haloStroke,
+          fillStyle: 'hachure',
+          hachureGap: 3.4,
+          roughness: 1.65,
+        })
+      );
+      svg.appendChild(haloGroup);
+    }
+
+    if (isOptimal) {
+      svg.appendChild(
+        rc.circle(c, c, 19.5, {
+          seed: seed + 79,
+          stroke: sageHex,
+          strokeWidth: 1.65,
+          roughness: 1.4,
+        })
+      );
+    }
+
     svg.appendChild(
-      rc.circle(thumbX, cy, 13, {
+      rc.circle(c, c, 14, {
         seed: seed + 23,
         stroke: isOptimal ? sageHex : fillColor,
         strokeWidth: 2.2,
         fill: paperColor,
         fillStyle: 'solid',
-        roughness: 1.2,
+        roughness: 1.25,
       })
     );
     svg.appendChild(
-      rc.circle(thumbX, cy, 6, {
+      rc.circle(c, c, 6.2, {
         seed: seed + 31,
         stroke: isOptimal ? sageHex : fillColor,
         fill: isOptimal ? sageHex : fillColor,
@@ -580,13 +644,7 @@ export function CrayonSlider({
         roughness: 0.9,
       })
     );
-
-    animateSvgStrokesOnce(svg, `slider:${ariaLabel}`, {
-      durationMs: 480,
-      staggerMs: 55,
-      maxTotalStaggerMs: 220,
-    });
-  }, [thumbX, crayon, theme, seed, ariaLabel, clampedGlow, isOptimal]);
+  }, [crayon, theme, seed, clampedGlow, isOptimal]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     const mult = e.shiftKey ? 5 : 1;
@@ -621,11 +679,18 @@ export function CrayonSlider({
       className="relative w-full h-[24px] flex items-center select-none rounded-[3px] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-dashed has-[:focus-visible]:outline-[var(--ui-accent)] has-[:focus-visible]:outline-offset-2"
     >
       <svg
-        ref={svgRef}
+        ref={railSvgRef}
         viewBox="0 0 120 24"
         preserveAspectRatio="none"
         aria-hidden="true"
         className="w-full h-[24px] block pointer-events-none crayon-stroke-svg overflow-visible"
+      />
+      <svg
+        ref={thumbSvgRef}
+        viewBox="0 0 28 28"
+        aria-hidden="true"
+        style={{ left: `calc(8px + (100% - 16px) * ${ratio})` }}
+        className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26px] h-[26px] pointer-events-none crayon-stroke-svg overflow-visible"
       />
       <input
         type="range"

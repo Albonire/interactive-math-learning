@@ -1,0 +1,885 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  STUDY_MODULES,
+  STUDY_PHASES_MAP,
+  VERIFIED_REFERENCES,
+  getAdjacentModuleIds,
+  getDependentsOf,
+} from '../core/studyPlan';
+import type { StudyModuleId } from '../core/studyPlanTypes';
+import type { DiagnosticReport } from '../core/diagnostic';
+import { SCENES } from '../core/curriculum';
+import type { SceneId, ThemeMode } from '../core/types';
+import { HandCrafted3DStage } from '../visuals/HandCrafted3DStage';
+import { ModuleVisualDispatcher } from '../visuals/ModuleVisualDispatcher';
+import { CrayonDictionaryProvider, GlossaryText } from './CrayonDictionary';
+import {
+  CrayonArrowLeft,
+  CrayonArrowRight,
+  CrayonCheck,
+  CrayonLightbulb,
+  CrayonPencil,
+} from './CrayonIcons';
+import { CrayonStamp } from './CrayonStamp';
+import { KatexInline } from './KatexFormula';
+import {
+  CrayonButton,
+  CrayonProgressStroke,
+  CrayonStepMarker,
+  RoughDivider,
+  RoughUnderline,
+} from './RoughElements';
+
+interface ModuleWorkspaceProps {
+  moduleId: StudyModuleId;
+  theme: ThemeMode;
+  completedModuleIds: ReadonlySet<StudyModuleId>;
+  diagnosticReport: DiagnosticReport | null;
+  onSelectModule: (id: StudyModuleId) => void;
+  onMarkModuleCompleted: (id: StudyModuleId) => void;
+  onOpen3DScene: (sceneId: SceneId) => void;
+  onOpenDiagnostic: () => void;
+  onOpenPlanMap: () => void;
+}
+
+const FORMAT_LABELS: Record<string, string> = {
+  W: 'Interactivo',
+  A: 'Animación',
+  E: 'Diagrama',
+  R: 'Referencia',
+};
+
+const CHAPTERS = [
+  { id: 'intuition', label: 'I. Intuición' },
+  { id: 'story3d', label: 'II. 3D y Teoría' },
+  { id: 'atlas', label: 'III. Atlas y Temario' },
+  { id: 'practice', label: 'IV. Python y Sello' },
+] as const;
+
+type ChapterId = (typeof CHAPTERS)[number]['id'];
+
+export function ModuleWorkspace({
+  moduleId,
+  theme,
+  completedModuleIds,
+  diagnosticReport,
+  onSelectModule,
+  onMarkModuleCompleted,
+  onOpen3DScene,
+  onOpenDiagnostic,
+  onOpenPlanMap,
+}: ModuleWorkspaceProps) {
+  const mod = STUDY_MODULES[moduleId];
+  const phase = STUDY_PHASES_MAP[mod.phaseId];
+  const { prev, next } = getAdjacentModuleIds(moduleId);
+  const dependents = getDependentsOf(moduleId);
+  const isCompleted = completedModuleIds.has(moduleId);
+  const totalPercent = Math.round((completedModuleIds.size / 32) * 100);
+
+  const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Scroll-driven state
+  const [pageProgress, setPageProgress] = useState(0);
+  const [storyProgress, setStoryProgress] = useState(0);
+  const [activeBeat, setActiveBeat] = useState(0);
+  const [activeChapter, setActiveChapter] = useState<ChapterId>('intuition');
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const chapterRefs = useRef<Record<ChapterId, HTMLElement | null>>({
+    intuition: null,
+    story3d: null,
+    atlas: null,
+    practice: null,
+  });
+  const beatRefs = useRef<Array<HTMLElement | null>>([null, null, null, null]);
+
+  // Reset checkpoint & scroll cleanly on module change
+  useEffect(() => {
+    setSelectedOpt(null);
+    setSubmitted(false);
+    setCopied(false);
+    setPageProgress(0);
+    setStoryProgress(0);
+    setActiveBeat(0);
+    setActiveChapter('intuition');
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0;
+    }
+  }, [moduleId]);
+
+  // Smooth rAF-throttled scroll tracker driving the 3D sculpture, active narrative beat & ink progress thread
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    let rafId = 0;
+
+    const computeScroll = () => {
+      rafId = 0;
+      const maxScroll = Math.max(1, container.scrollHeight - container.clientHeight);
+      const nextPageProg = Math.max(0, Math.min(1, container.scrollTop / maxScroll));
+      setPageProgress(nextPageProg);
+
+      const containerRect = container.getBoundingClientRect();
+      const focusY = containerRect.top + containerRect.height * 0.36;
+
+      // Determine active chapter
+      let currentChap: ChapterId = 'intuition';
+      for (const ch of CHAPTERS) {
+        const el = chapterRefs.current[ch.id];
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        if (r.top <= focusY + 40) {
+          currentChap = ch.id;
+        }
+      }
+      setActiveChapter(currentChap);
+
+      // Compute continuous scroll progress (0..1) inside Chapter II (3D Scrollytelling)
+      const storyEl = chapterRefs.current.story3d;
+      if (storyEl) {
+        const r = storyEl.getBoundingClientRect();
+        const span = Math.max(180, r.height - containerRect.height * 0.35);
+        const passed = containerRect.top + containerRect.height * 0.28 - r.top;
+        const prog = Math.max(0, Math.min(1, passed / span));
+        setStoryProgress(prog);
+      }
+
+      // Highlight nearest narrative beat 0..3
+      let bestBeat = 0;
+      let bestDist = Number.POSITIVE_INFINITY;
+      beatRefs.current.forEach((el, idx) => {
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        const mid = (r.top + r.bottom) * 0.5;
+        const dist = Math.abs(mid - focusY);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestBeat = idx;
+        }
+      });
+      setActiveBeat(bestBeat);
+    };
+
+    const onScroll = () => {
+      if (rafId === 0) {
+        rafId = window.requestAnimationFrame(computeScroll);
+      }
+    };
+
+    computeScroll();
+    container.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (rafId !== 0) window.cancelAnimationFrame(rafId);
+    };
+  }, [moduleId]);
+
+  const scrollToChapter = useCallback((id: ChapterId) => {
+    const el = chapterRefs.current[id];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
+  const diagBlock = diagnosticReport?.blocks.find((b) => b.moduleId === moduleId) ?? null;
+  const linkedScene = mod.linked3DSceneId ? SCENES[mod.linked3DSceneId] : null;
+  const secondaryScene = mod.secondary3DSceneId ? SCENES[mod.secondary3DSceneId] : null;
+
+  const isCorrect = submitted && selectedOpt === mod.checkpoint.correctIndex;
+
+  const handleVerifyCheckpoint = () => {
+    if (selectedOpt === null) return;
+    setSubmitted(true);
+    if (selectedOpt === mod.checkpoint.correctIndex) {
+      onMarkModuleCompleted(moduleId);
+    }
+  };
+
+  const handleCopyCode = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(mod.pythonLab.code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    }
+  };
+
+  return (
+    <CrayonDictionaryProvider
+      theme={theme}
+      activeModuleId={moduleId}
+      onJumpToModule={onSelectModule}
+    >
+      <div
+        ref={scrollRef}
+        data-testid="module-workspace"
+        data-active-chapter={activeChapter}
+        data-story-progress={storyProgress.toFixed(2)}
+        className="h-full w-full overflow-y-auto notebook-paper-bg notebook-scroll relative"
+      >
+        {/* Sticky Open-Page Scroll Thread & Chapter Anchors (zero box, crisp opaque paper background) */}
+        <div
+          className="sticky top-0 z-20 border-b border-dashed border-[var(--hairline)]"
+          style={{ backgroundColor: 'var(--bg-paper)' }}
+        >
+          <div className="max-w-[1140px] mx-auto px-3.5 sm:px-6 lg:px-8 py-2 flex flex-wrap items-center justify-between gap-2">
+            <nav
+              aria-label="Capítulos del cuaderno"
+              className="flex items-center gap-x-4 sm:gap-x-6 gap-y-1 overflow-x-auto no-scrollbar"
+            >
+              {CHAPTERS.map((ch) => {
+                const isAct = activeChapter === ch.id;
+                return (
+                  <button
+                    key={ch.id}
+                    type="button"
+                    data-testid={`chapter-nav-${ch.id}`}
+                    onClick={() => scrollToChapter(ch.id)}
+                    className={`relative shrink-0 py-0.5 text-[14px] sm:text-[15px] whitespace-nowrap cursor-pointer transition-colors ${
+                      isAct
+                        ? 'font-display text-[16.5px] sm:text-[17.5px] text-[var(--ui-accent)]'
+                        : 'font-hand text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                    }`}
+                  >
+                    {ch.label}
+                    {isAct && (
+                      <span aria-hidden="true" className="absolute left-0 right-0 -bottom-1">
+                        <RoughUnderline crayon="cobalt" theme={theme} seed={ch.id.length * 13 + 5} />
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="hidden md:flex items-center gap-2 text-[13px] font-hand text-[var(--text-muted)]">
+              <CrayonPencil size={13} className="text-[var(--ui-accent)] opacity-80" />
+              <span>Toca palabras subrayadas para el Crayón Diccionario</span>
+            </div>
+          </div>
+
+          {/* Continuous hand-inked scroll progress thread */}
+          <div className="h-[2.5px] w-full bg-transparent">
+            <div
+              className="h-full transition-[width] duration-75 ease-out"
+              style={{
+                width: `${Math.round(pageProgress * 100)}%`,
+                backgroundColor: 'var(--ui-accent)',
+                opacity: 0.72,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Continuous Open-Page Notebook Spread — Zero Excess Boxes */}
+        <div className="max-w-[1140px] mx-auto px-4 sm:px-7 lg:px-10 py-6 sm:py-8 space-y-14 pb-20">
+          {/* ── MASTHEAD ──────────────────────────────────────────────────── */}
+          <header className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[14px] text-[var(--text-muted)]">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <button
+                  type="button"
+                  onClick={onOpenPlanMap}
+                  className="font-hand text-[14.5px] text-[var(--text-secondary)] hover:text-[var(--ui-accent)] underline decoration-dotted cursor-pointer transition-colors"
+                >
+                  Fase {phase.index}: {phase.shortTitle}
+                </button>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono-math text-[13px]">{mod.id} de 32</span>
+                <span aria-hidden="true">·</span>
+                <span>Nivel {mod.level}</span>
+                {mod.optional && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span>Opcional</span>
+                  </>
+                )}
+                {isCompleted && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-1 text-[var(--ui-success)] font-display text-[15px]">
+                      <CrayonCheck size={14} /> Dominado
+                    </span>
+                  </>
+                )}
+                {diagBlock && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    <span
+                      className="font-hand"
+                      style={{
+                        color:
+                          diagBlock.recommendation === 'repaso-rapido'
+                            ? 'var(--ui-success)'
+                            : 'var(--ui-warning)',
+                      }}
+                    >
+                      Diagnóstico:{' '}
+                      {diagBlock.recommendation === 'repaso-rapido'
+                        ? 'Repaso rápido'
+                        : 'Cursar completo'}
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div
+                  className="hidden sm:inline-flex items-center gap-1.5 mr-1 text-[12.5px] font-mono-math text-[var(--text-muted)]"
+                  title={`Avance global del plan: ${completedModuleIds.size} de 32 módulos dominados`}
+                >
+                  <CrayonProgressStroke
+                    percent={totalPercent}
+                    crayon="sage"
+                    theme={theme}
+                    seed={41}
+                    className="w-16 h-[10px]"
+                  />
+                  <span>{completedModuleIds.size}/32</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={!prev}
+                  onClick={() => prev && onSelectModule(prev)}
+                  className="sketch-btn inline-flex items-center gap-1 px-2.5 py-1 text-[13.5px] font-hand text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-35 cursor-pointer"
+                >
+                  <CrayonArrowLeft size={13} />
+                  <span>{prev ?? 'Inicio'}</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!next}
+                  onClick={() => next && onSelectModule(next)}
+                  className="sketch-btn inline-flex items-center gap-1 px-2.5 py-1 text-[13.5px] font-hand text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-35 cursor-pointer"
+                >
+                  <span>{next ?? 'Fin'}</span>
+                  <CrayonArrowRight size={13} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="space-y-1.5 min-w-0">
+                <h1 className="font-display crayon-ink text-[30px] sm:text-[38px] leading-[1.06] text-[var(--text-primary)]">
+                  {mod.id} · {mod.title}
+                </h1>
+                <p className="text-[16.5px] sm:text-[17.5px] text-[var(--text-secondary)] leading-relaxed max-w-[760px]">
+                  <GlossaryText text={mod.appliedCsMlFocus} />
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                {linkedScene ? (
+                  <CrayonButton
+                    crayon="cobalt"
+                    theme={theme}
+                    seed={mod.number * 13 + 7}
+                    dataTestId="open-linked-3d-btn"
+                    onClick={() => onOpen3DScene(linkedScene.id)}
+                  >
+                    <span>Abrir Lab 3D: {linkedScene.shortLabel}</span>
+                    <CrayonArrowRight size={15} />
+                  </CrayonButton>
+                ) : !diagnosticReport && mod.id === 'M1' ? (
+                  <CrayonButton
+                    crayon="cobalt"
+                    theme={theme}
+                    seed={91}
+                    dataTestId="open-diagnostic-cta"
+                    onClick={onOpenDiagnostic}
+                  >
+                    <span>Hacer Diagnóstico (Fase 0)</span>
+                    <CrayonArrowRight size={15} />
+                  </CrayonButton>
+                ) : null}
+
+                {secondaryScene && (
+                  <button
+                    type="button"
+                    onClick={() => onOpen3DScene(secondaryScene.id)}
+                    className="sketch-btn px-3 py-1.5 text-[14.5px] font-hand text-[var(--text-primary)] cursor-pointer"
+                  >
+                    Lab 3D extra: {secondaryScene.shortLabel}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[14px] text-[var(--text-secondary)]">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[var(--text-muted)]">Prerrequisitos:</span>
+                {mod.prerequisites.length === 0 ? (
+                  <span>Ninguno (punto de entrada)</span>
+                ) : (
+                  mod.prerequisites.map((pre, i) => (
+                    <span key={pre} className="inline-flex items-center gap-1">
+                      {i > 0 && <span className="text-[var(--hairline-strong)]">·</span>}
+                      <button
+                        type="button"
+                        onClick={() => onSelectModule(pre)}
+                        className="font-mono-math text-[13px] underline decoration-dotted hover:text-[var(--ui-accent)] cursor-pointer"
+                      >
+                        {pre}
+                        {completedModuleIds.has(pre) ? ' ✓' : ''}
+                      </button>
+                    </span>
+                  ))
+                )}
+              </div>
+
+              {dependents.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[var(--text-muted)]">Desbloquea:</span>
+                  {dependents.slice(0, 5).map((dep, i) => (
+                    <span key={dep} className="inline-flex items-center gap-1">
+                      {i > 0 && <span className="text-[var(--hairline-strong)]">·</span>}
+                      <button
+                        type="button"
+                        onClick={() => onSelectModule(dep)}
+                        className="font-mono-math text-[13px] hover:text-[var(--ui-accent)] cursor-pointer"
+                      >
+                        {dep}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </header>
+
+          <RoughDivider theme={theme} seed={mod.number * 17 + 3} />
+
+          {/* ── CHAPTER I: DIRECT-MANIPULATION INTUITION STAGE ────────────── */}
+          <section
+            ref={(el) => {
+              chapterRefs.current.intuition = el;
+            }}
+            data-scroll-chapter="intuition"
+            className="scroll-mt-16 space-y-3"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-display crayon-ink text-[24px] sm:text-[27px] text-[var(--text-primary)]">
+                I. Toca la intuición directamente
+              </h2>
+              <span className="font-hand text-[14.5px] text-[var(--text-muted)]">
+                Peldaño A · Manipulación viva sobre el cuaderno
+              </span>
+            </div>
+
+            <ModuleVisualDispatcher
+              moduleId={moduleId}
+              theme={theme}
+              onOpen3DLab={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
+              linked3DLabel={linkedScene ? `Abrir Lab 3D: ${linkedScene.shortLabel}` : undefined}
+            />
+          </section>
+
+          <RoughDivider theme={theme} seed={mod.number * 23 + 11} />
+
+          {/* ── CHAPTER II: SCROLL-DRIVEN 3D STORYTELLING & THEORY ────────── */}
+          <section
+            ref={(el) => {
+              chapterRefs.current.story3d = el;
+            }}
+            data-scroll-chapter="story3d"
+            className="scroll-mt-16 space-y-6"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-display crayon-ink text-[24px] sm:text-[27px] text-[var(--text-primary)]">
+                II. Recorrido 3D y formalización paso a paso
+              </h2>
+              <span className="font-hand text-[14.5px] text-[var(--text-muted)]">
+                Desplázate: el dibujo 3D evoluciona con cada peldaño
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+              {/* Mobile/Tablet: 3D Stage appears first so touch users inspect immediately; Desktop: Sticky right column */}
+              <div className="lg:col-span-6 lg:order-2 lg:sticky lg:top-16">
+                <HandCrafted3DStage
+                  moduleId={moduleId}
+                  theme={theme}
+                  scrollProgress={storyProgress}
+                  activeBeat={activeBeat}
+                  onOpenWebGL={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
+                  webGLLabel={linkedScene ? `Explorar en Lab 3D WebGL: ${linkedScene.shortLabel}` : undefined}
+                />
+              </div>
+
+              {/* Left Open-Page Scrollytelling Narrative Beats — ZERO rectangular boxes */}
+              <div className="lg:col-span-6 lg:order-1 space-y-10 sm:space-y-12">
+                {/* Beat 01: Enfoque de matemática pura */}
+                <article
+                  ref={(el) => {
+                    beatRefs.current[0] = el;
+                  }}
+                  data-beat-active={activeBeat === 0 ? 'true' : undefined}
+                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 transition-colors ${
+                    activeBeat === 0
+                      ? 'border-[var(--ui-accent)] opacity-100'
+                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-[14px] font-mono-math text-[var(--ui-accent)] mb-1">
+                    <span>01</span>
+                    <CrayonPencil size={14} />
+                    <span className="font-hand text-[15px]">Enfoque de matemática pura</span>
+                  </div>
+                  <h3 className="font-display text-[21px] text-[var(--text-primary)] mb-1.5">
+                    La estructura detrás del trazo
+                  </h3>
+                  <p className="text-[16px] text-[var(--text-primary)] leading-relaxed">
+                    <GlossaryText text={mod.pureMathFocus} />
+                  </p>
+                </article>
+
+                {/* Beat 02: Computación e IA */}
+                <article
+                  ref={(el) => {
+                    beatRefs.current[1] = el;
+                  }}
+                  data-beat-active={activeBeat === 1 ? 'true' : undefined}
+                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 transition-colors ${
+                    activeBeat === 1
+                      ? 'border-[var(--ui-success)] opacity-100'
+                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 text-[14px] font-mono-math text-[var(--ui-success)] mb-1">
+                    <span>02</span>
+                    <CrayonLightbulb size={14} />
+                    <span className="font-hand text-[15px]">Puente con computación e IA</span>
+                  </div>
+                  <h3 className="font-display text-[21px] text-[var(--text-primary)] mb-1.5">
+                    Dónde cobra vida en software y modelos
+                  </h3>
+                  <p className="text-[16px] text-[var(--text-primary)] leading-relaxed">
+                    <GlossaryText text={mod.appliedCsMlFocus} />
+                  </p>
+                </article>
+
+                {/* Beat 03: Cálculo concreto con números pequeños */}
+                <article
+                  ref={(el) => {
+                    beatRefs.current[2] = el;
+                  }}
+                  data-beat-active={activeBeat === 2 ? 'true' : undefined}
+                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 space-y-2.5 transition-colors ${
+                    activeBeat === 2
+                      ? 'border-[var(--ui-accent)] opacity-100'
+                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                  }`}
+                >
+                  <div className="font-mono-math text-[13.5px] text-[var(--ui-accent)]">
+                    03 · Peldaño B · Cálculo con números pequeños
+                  </div>
+                  <h3 className="font-display text-[22px] text-[var(--text-primary)] leading-snug">
+                    {mod.concreteExample.title}
+                  </h3>
+                  <p className="text-[16px] text-[var(--text-primary)] leading-relaxed">
+                    <GlossaryText text={mod.concreteExample.problem} />
+                  </p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-[15.5px] text-[var(--text-secondary)]">
+                    {mod.concreteExample.steps.map((st, i) => (
+                      <li key={i} className="leading-relaxed">
+                        <GlossaryText text={st} />
+                      </li>
+                    ))}
+                  </ol>
+                </article>
+
+                {/* Beat 04: Formalización y fórmula clave */}
+                <article
+                  ref={(el) => {
+                    beatRefs.current[3] = el;
+                  }}
+                  data-beat-active={activeBeat === 3 ? 'true' : undefined}
+                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 space-y-3 transition-colors ${
+                    activeBeat === 3
+                      ? 'border-[var(--crayon-plum)] opacity-100'
+                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                  }`}
+                >
+                  <div className="font-mono-math text-[13.5px] text-[var(--ui-accent)]">
+                    04 · Peldaño C · Definición formal
+                  </div>
+                  <div className="py-2.5 px-3 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto text-[18px] text-[var(--text-primary)]">
+                    <KatexInline latex={mod.concreteExample.latex} />
+                  </div>
+                  <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed">
+                    <GlossaryText text={mod.concreteExample.formalDefinition} />
+                  </p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          <RoughDivider theme={theme} seed={mod.number * 29 + 5} />
+
+          {/* ── CHAPTER III: OPEN ATLAS OF REPRESENTATIONS & SYLLABUS ─────── */}
+          <section
+            ref={(el) => {
+              chapterRefs.current.atlas = el;
+            }}
+            data-scroll-chapter="atlas"
+            className="scroll-mt-16 space-y-8"
+          >
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="font-display crayon-ink text-[24px] sm:text-[27px] text-[var(--text-primary)]">
+                  III. Atlas de representaciones visuales
+                </h2>
+                <span className="font-hand text-[14.5px] text-[var(--text-muted)]">
+                  Cada idea en el medio visual que mejor la revela
+                </span>
+              </div>
+
+              {/* Boxless open-paper ledger rows */}
+              <div className="divide-y divide-dashed divide-[var(--hairline-strong)]">
+                {mod.visualSpecs.map((vs, idx) => (
+                  <div
+                    key={vs.concept}
+                    className="py-3.5 grid grid-cols-1 md:grid-cols-12 gap-2 md:gap-4 items-baseline"
+                  >
+                    <div className="md:col-span-3 flex items-baseline gap-2">
+                      <span className="font-mono-math text-[12px] text-[var(--text-muted)]">
+                        {String(idx + 1).padStart(2, '0')}
+                      </span>
+                      <span className="font-display text-[17.5px] text-[var(--text-primary)]">
+                        <GlossaryText text={vs.concept} />
+                      </span>
+                    </div>
+                    <div className="md:col-span-4 text-[15px] text-[var(--text-secondary)] leading-snug">
+                      <GlossaryText text={vs.visualization} />
+                    </div>
+                    <div className="md:col-span-1 font-mono-math text-[12px] text-[var(--ui-accent)]">
+                      {FORMAT_LABELS[vs.format] ?? vs.format}
+                    </div>
+                    <div className="md:col-span-4 text-[15px] text-[var(--text-secondary)] leading-snug">
+                      <GlossaryText text={vs.intuition} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Unboxed 2-column open spread for Syllabus & Verified References */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 pt-2">
+              <div className="space-y-2.5">
+                <h3 className="font-display text-[21px] text-[var(--text-primary)]">
+                  Temario del módulo
+                </h3>
+                <ul className="space-y-2 text-[15.5px] text-[var(--text-secondary)]">
+                  {mod.syllabus.map((item, idx) => (
+                    <li key={item} className="flex items-baseline gap-2.5">
+                      <span className="font-mono-math text-[12px] text-[var(--ui-accent)] shrink-0">
+                        {String(idx + 1).padStart(2, '0')}.
+                      </span>
+                      <span>
+                        <GlossaryText text={item} />
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="space-y-2.5 md:border-l md:border-dashed md:border-[var(--hairline-strong)] md:pl-8">
+                <h3 className="font-display text-[21px] text-[var(--text-primary)]">
+                  Bibliografía y cursos verificados
+                </h3>
+                <ul className="space-y-2.5 text-[15px] text-[var(--text-secondary)]">
+                  {mod.references.map((code) => {
+                    const ref = VERIFIED_REFERENCES[code];
+                    return (
+                      <li key={code} className="leading-snug">
+                        <span className="font-mono-math text-[12px] text-[var(--ui-accent)] mr-1.5">
+                          [{code}]
+                        </span>
+                        {ref.citation}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+          </section>
+
+          <RoughDivider theme={theme} seed={mod.number * 31 + 7} />
+
+          {/* ── CHAPTER IV: OPEN PYTHON NOTEBOOK & R-OM MASTERY STAMP ─────── */}
+          <section
+            ref={(el) => {
+              chapterRefs.current.practice = el;
+            }}
+            data-scroll-chapter="practice"
+            className="scroll-mt-16 space-y-10"
+          >
+            {/* Open Red-Margin Python Sheet (zero box!) */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <div className="text-[14px] font-hand text-[var(--ui-accent)]">
+                    Peldaños D y E · Implementación en Python y conexión con IA
+                  </div>
+                  <h2 className="font-display crayon-ink text-[24px] sm:text-[27px] text-[var(--text-primary)]">
+                    IV. {mod.pythonLab.title}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCopyCode}
+                  data-tone={copied ? 'success' : undefined}
+                  className="sketch-btn px-3 py-1 text-[14px] font-hand text-[var(--text-primary)] cursor-pointer"
+                >
+                  {copied ? '✓ Copiado al cuaderno' : 'Copiar código'}
+                </button>
+              </div>
+
+              <p className="text-[16px] text-[var(--text-secondary)] max-w-[780px]">
+                <GlossaryText text={mod.pythonLab.task} />
+              </p>
+
+              <pre className="sketch-code-open py-3 pr-4 font-mono-math text-[12.5px] sm:text-[13.5px] text-[var(--text-primary)] overflow-x-auto leading-[22px]">
+                {mod.pythonLab.code}
+              </pre>
+
+              <p className="text-[15.5px] text-[var(--text-secondary)] max-w-[820px]">
+                <strong className="font-display text-[17px] font-normal text-[var(--text-primary)]">
+                  Conexión directa con CS/ML:
+                </strong>{' '}
+                <GlossaryText text={mod.pythonLab.mlApplication} />
+              </p>
+            </div>
+
+            <RoughDivider theme={theme} seed={mod.number * 37 + 13} />
+
+            {/* Open-Paper R-OM Mastery Challenge (zero outer box!) */}
+            <div className="space-y-4 max-w-[820px]">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-1 flex-1 min-w-[240px]">
+                  <div className="text-[14px] font-hand text-[var(--ui-accent)]">
+                    Verificación de dominio · Regla R-OM
+                  </div>
+                  <p className="font-display text-[21px] sm:text-[23px] text-[var(--text-primary)] leading-snug">
+                    <GlossaryText text={mod.checkpoint.question} />
+                  </p>
+                </div>
+
+                {isCompleted && (
+                  <div className="shrink-0">
+                    <CrayonStamp
+                      title="¡Dominado!"
+                      subtitle={mod.id}
+                      crayon="sage"
+                      theme={theme}
+                      compact
+                      seed={407 + mod.number * 11}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2.5" role="radiogroup" aria-label="Opciones del reto">
+                {mod.checkpoint.options.map((opt, idx) => {
+                  const chosen = selectedOpt === idx;
+                  const revealCorrect = submitted && idx === mod.checkpoint.correctIndex;
+                  const revealWrong = submitted && chosen && idx !== mod.checkpoint.correctIndex;
+                  const optState = revealCorrect
+                    ? 'correct'
+                    : revealWrong
+                      ? 'wrong'
+                      : chosen
+                        ? 'selected'
+                        : undefined;
+                  const markerCrayon = revealCorrect
+                    ? 'sage'
+                    : revealWrong
+                      ? 'vermilion'
+                      : 'cobalt';
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      role="radio"
+                      aria-checked={chosen}
+                      data-testid={`checkpoint-opt-${idx}`}
+                      data-state={optState}
+                      onClick={() => {
+                        setSelectedOpt(idx);
+                        setSubmitted(false);
+                      }}
+                      className="sketch-option w-full text-left px-3.5 py-2.5 flex items-center gap-3 text-[15.5px] leading-snug text-[var(--text-primary)] cursor-pointer"
+                    >
+                      <CrayonStepMarker
+                        index={idx}
+                        active={chosen || revealCorrect || revealWrong}
+                        completed={revealCorrect}
+                        crayon={markerCrayon}
+                        theme={theme}
+                        label={String.fromCharCode(65 + idx)}
+                        size={26}
+                      />
+                      <span className="flex-1">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {submitted && (
+                <div
+                  data-testid="checkpoint-feedback"
+                  className="pl-4 border-l-3 py-1 text-[15.5px] leading-relaxed"
+                  style={{
+                    borderLeftColor: isCorrect ? 'var(--ui-success)' : 'var(--ui-warning)',
+                  }}
+                >
+                  <strong
+                    className="font-display text-[17.5px] font-normal"
+                    style={{ color: isCorrect ? 'var(--ui-success)' : 'var(--ui-warning)' }}
+                  >
+                    {isCorrect
+                      ? '✓ ¡Correcto! Módulo sellado como dominado.'
+                      : '✗ Aún no — revisa el matiz conceptual:'}
+                  </strong>{' '}
+                  <GlossaryText text={mod.checkpoint.explanation} />
+                </div>
+              )}
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <CrayonButton
+                  crayon="cobalt"
+                  theme={theme}
+                  seed={131 + mod.number * 7}
+                  dataTestId="checkpoint-verify-btn"
+                  disabled={selectedOpt === null}
+                  onClick={handleVerifyCheckpoint}
+                >
+                  Verificar respuesta
+                </CrayonButton>
+
+                {isCorrect && next && (
+                  <button
+                    type="button"
+                    data-tone="success"
+                    onClick={() => onSelectModule(next)}
+                    className="sketch-btn inline-flex items-center gap-1.5 px-3.5 py-1.5 font-display text-[16.5px] text-[var(--ui-success)] cursor-pointer"
+                  >
+                    <span>
+                      Continuar a {next}: {STUDY_MODULES[next].shortLabel}
+                    </span>
+                    <CrayonArrowRight size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </CrayonDictionaryProvider>
+  );
+}

@@ -1,0 +1,681 @@
+# PLAN_ESTUDIO.md: Plan de estudio de matemáticas, de los fundamentos al Machine Learning (enfoque visual)
+
+El plan recomendado tiene 7 fases (0 a 6) y 32 módulos: diagnóstico, fundamentos, matemáticas discretas, cálculo, álgebra lineal, probabilidad y estadística, y matemáticas para ML. Los prerrequisitos se tomaron de cursos abiertos verificados (MIT OCW, Stanford, Harvard, Imperial College) y de la guía ACM/IEEE-CS/AAAI CS2023. Cada concepto clave lleva una especificación visual explícita, y no se implementa nada hasta tu revisión.
+
+## TL;DR
+
+- Ruta: diagnóstico, fundamentos (aritmética, álgebra, funciones, trigonometría, lógica, demostraciones) y matemáticas discretas. Después, cálculo y álgebra lineal en paralelo (MIT 18.06SC declara que el cálculo no es necesario para aprender álgebra lineal, y que basta sentirse cómodo con vectores, matrices y coordenadas tridimensionales), luego probabilidad y estadística, y al final cálculo matricial, backpropagation, optimización, métodos numéricos y teoría de la información.
+- Duración orientativa: entre 60 y 75 semanas a 8-10 horas semanales. Cada submódulo introduce un solo concepto y sigue la escalera: imagen, cálculo concreto, formalización, código y aplicación.
+- Fuentes centrales verificadas: Lehman, Leighton y Meyer; Hammack; Velleman; Strang; Boyd y Vandenberghe; Axler; Deisenroth, Faisal y Ong; Blitzstein y Hwang; Goodfellow, Bengio y Courville. Recursos visuales verificados: 3Blue1Brown, Seeing Theory, Immersive Linear Algebra y Distill. Lo no verificado aparece aparte como pendiente.
+
+## Hallazgos clave que justifican la estructura
+
+- **Peso de lo discreto.** El informe CS2023 fija para su área Mathematical and Statistical Foundations 55 horas "CS Core" (frente a las 37 h Tier-1 de CS2013): 29 de matemáticas discretas, 11 de probabilidad, 10 de estadística y 5 de álgebra lineal. Según el propio informe, las 40 horas de discretas más probabilidad equivalen a un curso típico de un periodo. Su "KA Core" amplía álgebra lineal (35 h), estadística (30 h) y probabilidad (29 h) para programas orientados a IA y datos. Por eso las discretas forman una fase propia y temprana, y álgebra lineal y probabilidad se amplían al final.
+- **Precálculo antes de discretas.** El borrador MSF (Version Gamma) de CS2023 recomienda explícitamente precálculo como prerrequisito de matemáticas discretas. Lo considera un compromiso razonable, porque en la encuesta a docentes los prerrequisitos se repartían casi por igual entre álgebra, precálculo y cálculo. Por eso la Fase 1 cierra vacíos de álgebra y funciones antes de la Fase 2.
+- **Secuencia de MIT 6.1200J (Spring 2024, Demaine, Abel y Chapman).** Su único prerrequisito es 18.01. Sus unidades son demostraciones, análisis de algoritmos (sumas, asintótica, recurrencias), teoría de números y criptografía, grafos, conteo y probabilidad. La Fase 2 sigue ese orden.
+- **Álgebra lineal sin esperar al cálculo.** El syllabus de MIT 18.06SC indica que 18.02 es prerrequisito formal en MIT, pero que "knowledge of calculus is not required to learn the subject"; basta sentirse cómodo con vectores, matrices y sistemas de coordenadas tridimensionales. 18.065 (Strang, Spring 2018) exige 18.06 y lleva el álgebra lineal hasta SVD, mínimos cuadrados y redes neuronales. Strang se jubiló de MIT en mayo de 2023, así que sus cursos grabados en OCW son la referencia estable.
+- **Puente a ML unificado.** Deisenroth, Faisal y Ong (Cambridge University Press, 2020) reúnen álgebra lineal, geometría analítica, descomposiciones matriciales, cálculo vectorial, optimización, probabilidad y estadística. Es el texto eje de la Fase 6.
+
+## Principios de diseño pedagógico
+
+1. **Un concepto a la vez.** Cada submódulo introduce exactamente un concepto nuevo, nunca antes de dominar sus prerrequisitos.
+2. **Escalera de cinco peldaños:** (a) imagen o manipulación visual, (b) cálculo concreto con números pequeños, (c) definición formal, (d) implementación en Python, (e) aplicación en computación o ML.
+3. **Prioridad visual obligatoria.** Todo concepto con representación geométrica, estructural o dinámica tiene especificación visual, y cada visualización declara la intuición que desbloquea (nada decorativo).
+4. **Formatos visuales:** **E** ilustración estática; **A** secuencia animada paso a paso; **W** widget interactivo (se indican los parámetros manipulables); **R** recurso real de referencia verificable.
+5. **Doble enfoque en cada módulo:** matemática por sí misma (intuición y rigor) y aplicada (programación, computación, ML).
+6. **Regla fija R-OM para todo cuestionario futuro de opción múltiple.** Todas las opciones deben tener longitud, nivel de detalle y estructura gramatical similares, de modo que la correcta no pueda deducirse por extensión ni por redacción. Los distractores deben corresponder a errores conceptuales reales. Esta regla aplica a la sección 7 de todos los módulos.
+
+## Fase 0: Diagnóstico de vacíos (1 semana)
+
+Solo se describe; las preguntas no se redactan todavía.
+
+- **Qué detecta.** Dominio por bloque, mapeado a módulos: aritmética y fracciones (M1); manipulación algebraica e inecuaciones (M2); gráficas y composición de funciones (M3); trigonometría y vectores (M4); traducción de lenguaje natural a lógica (M5); lectura y escritura de argumentos (M6); nociones previas de cálculo, matrices y probabilidad (M13, M18, M24, solo para ubicar el punto de entrada).
+- **Cómo.** Prueba adaptativa por niveles (sube solo con acierto sostenido), con ítems de opción múltiple R-OM, respuesta construida corta, un ítem visual por bloque (por ejemplo, identificar la gráfica de una transformación) y un ítem de traducción a Python por bloque.
+- **Decisión.** Umbral propuesto de 80 % con justificación correcta: por encima, el módulo pasa a "repaso rápido"; por debajo, se cursa completo. El resultado se resume en un mapa de calor de bloques por nivel.
+- **Errores tipificados a aislar:** precedencia de operaciones, distribución incorrecta de potencias, inversa frente a recíproca, negación de cuantificadores, implicación frente a su recíproca.
+
+## Duración orientativa por fase (8-10 h/semana)
+
+| Fase | Contenido | Semanas |
+|---|---|---|
+| 0 | Diagnóstico | 1 |
+| 1 | Fundamentos (M1-M6) | 8-10 |
+| 2 | Matemáticas discretas (M7-M12) | 10-12 |
+| 3 | Cálculo (M13-M17) | 12-14 |
+| 4 | Álgebra lineal (M18-M23), en paralelo parcial con la Fase 3 | 10-12 |
+| 5 | Probabilidad y estadística (M24-M27) | 10-12 |
+| 6 | Matemáticas avanzadas para ML (M28-M32) | 10-14 |
+
+Con solapamiento de las Fases 3 y 4, el total queda entre 60 y 75 semanas. Son estimaciones de diseño, no datos de una fuente.
+
+## Mapa de dependencias
+
+- M1 → M2 → M3 → M4; M2 → M5 → M6.
+- M6 → M7 → M8; M3 + M7 → M9; M6 → M10; M7 → M11; M7 + M8 → M12.
+- M3 + M4 → M13 → M14 → M15 → M16; M14 + M18 → M17.
+- M4 + M6 → M18 → M19 → M20 → M21 → M22 → M23 (M22 usa M14 solo para formas cuadráticas).
+- M11 + M15 → M24 → M25 → M26 → M27 (M26 usa M17; M27 usa M21).
+- M12 + M17 + M19 + M23 → M28 → M29 (también M22); M14 + M19 → M30; M25 → M31; M6 + M10 + M16 → M32.
+- Rutas críticas: lógica → demostración → álgebra lineal → SVD/PCA; funciones → cálculo → multivariable → backpropagation; conteo → probabilidad → inferencia → entropía cruzada.
+
+## Catálogo de referencias verificadas
+
+**Textos**
+- **MCS**: Lehman, Leighton y Meyer, *Mathematics for Computer Science* (texto de MIT 6.1200J, CC BY-SA).
+- **HAM**: Hammack, *Book of Proof*, 3.ª ed. (2018), PDF gratuito, CC BY-NC-ND 4.0.
+- **VEL**: Velleman, *How to Prove It: A Structured Approach*, 3.ª ed., Cambridge University Press (2019).
+- **ROS-ES**: Rosen, *Matemática discreta y sus aplicaciones*, 5.ª ed. en español, McGraw-Hill/Interamericana de España (2004), ISBN 84-481-4073-7.
+- **STR-ILA**: Strang, *Introduction to Linear Algebra*, Wellesley-Cambridge Press; 5.ª ed. (2016, usada en 18.06SC) y 6.ª ed. (2023).
+- **STR-LALD**: Strang, *Linear Algebra and Learning from Data*, Wellesley-Cambridge Press, ISBN 9780692196380.
+- **STR-CALC**: Strang, *Calculus*, libro en línea en MIT OCW (RES.18-001).
+- **VMLS**: Boyd y Vandenberghe, *Introduction to Applied Linear Algebra: Vectors, Matrices, and Least Squares*, Cambridge University Press (2018), PDF gratuito.
+- **CVX**: Boyd y Vandenberghe, *Convex Optimization*, Cambridge University Press (2004), PDF gratuito oficial.
+- **LADR**: Axler, *Linear Algebra Done Right*, 4.ª ed., Springer UTM (2024), acceso abierto.
+- **MML**: Deisenroth, Faisal y Ong, *Mathematics for Machine Learning*, Cambridge University Press (2020), PDF gratuito.
+- **DL**: Goodfellow, Bengio y Courville, *Deep Learning*, MIT Press (2016): cap. 2 álgebra lineal, cap. 3 probabilidad e información, cap. 4 cómputo numérico, cap. 6 redes feedforward.
+- **BH**: Blitzstein y Hwang, *Introduction to Probability*, 2.ª ed., CRC Press (2019); versión en línea gratuita.
+- **CS109R**: Piech, *Probability for Computer Scientists* (lector de Stanford CS109).
+- **STW-ES**: Stewart, Clegg y Watson, *Cálculo de una variable: Trascendentes tempranas*, 9.ª ed., Cengage (2021); para varias variables, *Calculus: Early Transcendentals*, 9.ª ed. (2021).
+- **NEED**: Needham, *Visual Complex Analysis*, edición 25.º aniversario, Oxford University Press (2023).
+- **JUD**: Judson, *Abstract Algebra: Theory and Applications*, libro abierto (GNU FDL).
+
+**Cursos**
+- **OCW-1801**: MIT 18.01SC *Single Variable Calculus* (Fall 2010, David Jerison), OCW Scholar.
+- **OCW-1806**: MIT 18.06SC *Linear Algebra* (Fall 2011, Strang).
+- **OCW-18065**: MIT 18.065 *Matrix Methods in Data Analysis, Signal Processing, and Machine Learning* (Spring 2018, Strang).
+- **OCW-61200**: MIT 6.1200J *Mathematics for Computer Science* (Spring 2024).
+- **OCW-1805**: MIT 18.05 *Introduction to Probability and Statistics* (Orloff y Bloom, 2014; Orloff y French Kamrin, 2022).
+- **CS103**: Stanford, *Mathematical Foundations of Computing* (lógica, conjuntos, relaciones, funciones, cardinalidad, grafos, palomar, inducción, autómatas).
+- **CS109**: Stanford, *Probability for Computer Scientists*.
+- **CS229-LA**: Kolter, *Linear Algebra Review and Reference* (Stanford CS229, actualizado por Chuong Do y Tengyu Ma).
+- **STAT110**: Harvard Statistics 110, Joe Blitzstein.
+- **IMP**: Imperial College London en Coursera, *Mathematics for Machine Learning* (Linear Algebra; Multivariate Calculus; PCA).
+- **CS2023**: ACM/IEEE-CS/AAAI, *Computer Science Curricula 2023*, área MSF.
+
+**Visuales**
+- **3B1B**: 3Blue1Brown (Grant Sanderson): *Essence of linear algebra* (2016), *Essence of calculus* (2017), *Neural networks* (desde 2017).
+- **ST**: *Seeing Theory*, Daniel Kunin et al., Brown University; seis capítulos, de probabilidad básica a regresión.
+- **ILA**: *Immersive Linear Algebra*, Ström, Åström y Akenine-Möller (ISBN 978-91-637-9354-7).
+- **DIS-MOM**: Goh, "Why Momentum Really Works", *Distill* (2017), DOI 10.23915/distill.00006.
+
+**Pendientes de verificación** (no se usan como respaldo principal): Spivak, *Calculus*; Apostol; Lang, *Basic Mathematics*; Gelfand y Shen, *Algebra*; Graham, Knuth y Patashnik, *Concrete Mathematics*; Cormen et al., *Introduction to Algorithms*; Cover y Thomas, *Elements of Information Theory*; Trefethen y Bau, *Numerical Linear Algebra*; Wasserman, *All of Statistics*; Bishop, *Pattern Recognition and Machine Learning*; Bertsekas y Tsitsiklis, *Introduction to Probability*; Abbott, *Understanding Analysis*; MIT 18.02SC; notas de probabilidad de CS229; Explorable Explanations; Setosa.io; GeoGebra; Desmos.
+
+---
+
+## FASE 1: Fundamentos (nivel 1-2)
+
+### M1. Números, operaciones y sistemas de numeración
+1. **Nivel:** 1. 2. **Prerrequisitos:** ninguno.
+3. **Temario:** 1.1 enteros y recta numérica; 1.2 fracciones y proporciones; 1.3 potencias y raíces; 1.4 orden de operaciones; 1.5 notación científica; 1.6 bases 2, 8 y 16.
+4. **General:** el número como posición en una recta y como objeto con estructura (cierre, inversos); las leyes de potencias se justifican.
+5. **Vínculo:** binario, desbordamiento, operaciones con bits, hexadecimal (colores CSS, memoria).
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Suma con signo | Recta numérica con saltos | W: punto inicial y salto | Restar es moverse en sentido opuesto |
+| Fracción equivalente | Barras subdivididas superpuestas | W: numerador y denominador | Misma cantidad, distinta partición |
+| Potencia a^n | Árbol de duplicación | A: n de 0 a 10 | Crecimiento multiplicativo frente a aditivo |
+| Cambio de base | Tabla posicional con fichas | W: base y número | Cada posición vale base^k |
+
+7. **Práctica:** cálculo mental y conversiones; demostración de leyes de potencias; código: conversor de bases sin bibliotecas.
+8. **Bibliografía:** ROS-ES; MCS; CS2023.
+
+### M2. Álgebra elemental
+1. **Nivel:** 1. 2. **Prerrequisitos:** M1.
+3. **Temario:** 2.1 expresiones y variables; 2.2 productos notables y factorización; 2.3 ecuaciones lineales y cuadráticas; 2.4 inecuaciones y valor absoluto; 2.5 sistemas 2x2.
+4. **General:** igualdad como balanza (operaciones que preservan soluciones); factorizar es descomponer estructura.
+5. **Vínculo:** asignación frente a igualdad, simplificación de condiciones, rangos de validación de formularios.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| (a+b)^2 | Cuadrado dividido en áreas | W: a y b | 2ab son dos rectángulos |
+| Resolver ecuación | Balanza | A | Se opera en ambos lados |
+| Sistema 2x2 | Dos rectas | W: coeficientes | Solución = intersección; paralelas = sin solución |
+| Inecuación | Recta con intervalos sombreados | W: extremos | La solución es un conjunto |
+
+7. **Práctica:** factorización graduada; prueba de la fórmula cuadrática; código: resolvedor 2x2 con detección de casos.
+8. **Bibliografía:** STW-ES (apéndices); HAM (caps. 1-2); VMLS (cap. 1).
+
+### M3. Funciones y sus gráficas
+1. **Nivel:** 1-2. 2. **Prerrequisitos:** M2.
+3. **Temario:** 3.1 función como regla y como pares; 3.2 dominio y rango; 3.3 composición; 3.4 inversa; 3.5 lineales, cuadráticas, polinomiales; 3.6 exponenciales y logaritmos; 3.7 transformaciones de gráficas.
+4. **General:** función como mapeo entre conjuntos; logaritmo como inversa de la exponencial.
+5. **Vínculo:** funciones puras y composición (pipelines, map), log en complejidad (búsqueda binaria), sigmoide como anticipo.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Mapeo | Flechas entre dominio y codominio | W: arrastrar flechas | Cada entrada tiene una salida |
+| f(g(x)) | Cadena de dos máquinas | A | El orden importa |
+| Transformación | Curva base desplazada y escalada | W: a, h, k en a·f(x−h)+k | Cada parámetro, un efecto aislado |
+| Logaritmo | Reflexión de la exponencial sobre y=x | W: base | Cuántas veces multiplico |
+
+7. **Práctica:** lectura de gráficas; prueba de que la composición de inyectivas es inyectiva; código: familias de funciones con matplotlib y medición de crecimiento lineal frente a logarítmico.
+8. **Bibliografía:** STW-ES (cap. 1); STR-CALC; 3B1B *Essence of calculus*.
+
+### M4. Trigonometría, geometría analítica y vectores en el plano
+1. **Nivel:** 2. 2. **Prerrequisitos:** M3.
+3. **Temario:** 4.1 radianes y círculo unitario; 4.2 seno y coseno como coordenadas; 4.3 identidades; 4.4 distancia, recta, circunferencia; 4.5 vectores 2D; 4.6 complejos en forma polar.
+4. **General:** trigonometría como geometría del círculo; multiplicación compleja como rotación y escala.
+5. **Vínculo:** rotaciones en canvas y CSS, similitud coseno (anticipo), codificación posicional sinusoidal (mención).
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Seno y coseno | Punto girando con proyecciones que trazan ondas | W: ángulo θ | Las ondas son sombras de un giro |
+| Radián | Arco de longitud igual al radio | A | Ángulo como longitud |
+| Suma de vectores | Paralelogramo | W: arrastrar extremos | Desplazamiento compuesto |
+| Producto complejo | Rotación y escala | W: módulo y argumento | Multiplicar por i es rotar 90° |
+
+7. **Práctica:** triángulos; prueba de sen²+cos²=1; código: rotar un polígono.
+8. **Bibliografía:** STW-ES; NEED (cap. 1); ILA (cap. 2); VMLS (cap. 1).
+
+### M5. Lógica y conjuntos
+1. **Nivel:** 2. 2. **Prerrequisitos:** M2.
+3. **Temario:** 5.1 proposiciones y conectivos; 5.2 tablas de verdad y De Morgan; 5.3 implicación, recíproca, contrapositiva; 5.4 cuantificadores y su negación; 5.5 conjuntos y producto cartesiano; 5.6 conjunto potencia.
+4. **General:** precisión del lenguaje; lógica como álgebra booleana.
+5. **Vínculo:** condiciones if y cortocircuito, WHERE en SQL, JOIN como producto cartesiano filtrado, sets en Python.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Conectivos | Tabla de verdad que se rellena | W: conectivo y entradas | El valor depende solo de las entradas |
+| De Morgan | Venn con doble sombreado | W: regiones | Negar una unión es intersecar negaciones |
+| Implicación | P incluido en Q | E | "Si P entonces Q" es inclusión |
+| Cuantificadores | Cuadrícula con predicado coloreado | W: predicado | ∀ exige todo; ∃ basta un testigo |
+
+7. **Práctica:** traducción a lógica; equivalencias por tabla y por álgebra; código: generador de tablas de verdad y consultas SQL reescritas con De Morgan.
+8. **Bibliografía:** MCS (caps. 1, 3); HAM (caps. 1-2); VEL (caps. 1-2); CS103; ROS-ES (cap. 1).
+
+### M6. Técnicas de demostración
+1. **Nivel:** 2. 2. **Prerrequisitos:** M5.
+3. **Temario:** 6.1 estructura de una prueba; 6.2 directa; 6.3 contrapositiva; 6.4 contradicción (√2); 6.5 casos; 6.6 si y solo si; 6.7 contraejemplos.
+4. **General:** paso del cálculo a la argumentación; núcleo del rigor del curso.
+5. **Vínculo:** pre y postcondiciones, depuración como búsqueda de contraejemplos, pruebas unitarias frente a prueba general.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Estructura | Flujo de hipótesis a conclusión | A | Cada paso se justifica |
+| Contradicción | Árbol que termina en absurdo | A | Suponer lo contrario lleva a lo imposible |
+| Contraejemplo | Buscador sobre cuadrícula de casos | W: rango | Un caso basta para refutar |
+
+7. **Práctica:** pruebas cortas con rúbrica; detectar el error en pruebas falsas; código: búsqueda de contraejemplos por fuerza bruta frente a prueba general.
+8. **Bibliografía:** HAM (caps. 4-7); VEL (cap. 3); MCS (cap. 1); OCW-61200 (lecciones 1-2).
+
+---
+
+## FASE 2: Matemáticas discretas (nivel 2-3)
+
+### M7. Inducción, recursión e invariantes
+1. **Nivel:** 2-3. 2. **Prerrequisitos:** M6.
+3. **Temario:** 7.1 buen orden; 7.2 inducción simple; 7.3 fuerte; 7.4 definiciones recursivas; 7.5 inducción estructural; 7.6 máquinas de estado e invariantes.
+4. **General:** inducción como dominó formal; recursión como definición finita de objetos infinitos.
+5. **Vínculo:** funciones recursivas, árboles del DOM y de componentes React o Angular, invariantes de bucle.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Inducción | Dominó | A: base y paso | Base + paso cubre todo n |
+| Recursión | Árbol de llamadas (Fibonacci) | W: n, nodos repetidos resaltados | Pila de llamadas y trabajo repetido |
+| Invariante | Máquina de estados con propiedad coloreada | A | Lo que no cambia prueba corrección |
+
+7. **Práctica:** inducción graduada; código: recursión con y sin memoización, contando llamadas.
+8. **Bibliografía:** MCS (caps. 4-5, máquinas de estado); OCW-61200 (lecciones 2-4); HAM (cap. 10); CS103.
+
+### M8. Relaciones, funciones y cardinalidad
+1. **Nivel:** 3. 2. **Prerrequisitos:** M6, M7.
+3. **Temario:** 8.1 relaciones binarias; 8.2 equivalencia y particiones; 8.3 órdenes parciales; 8.4 inyectiva, sobreyectiva, biyectiva; 8.5 cardinalidad; 8.6 diagonal de Cantor.
+4. **General:** estructura abstracta de relacionar; tamaños de infinitos.
+5. **Vínculo:** modelo relacional y claves foráneas, colisiones de hash, dependencias como orden parcial, indecidibilidad (CS103).
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Tipos de función | Mapeo entre columnas de puntos | W: añadir o quitar flechas | Cada propiedad es una condición sobre flechas |
+| Equivalencia | Puntos agrupados por color | W: relación (mod n) | Una equivalencia parte el conjunto |
+| Orden parcial | Diagrama de Hasse | E | No todo par es comparable |
+| Cantor | Tabla infinita con diagonal modificada | A | Ninguna lista agota los reales |
+
+7. **Práctica:** clasificar relaciones; probar biyecciones; código: propiedades de relaciones como matrices booleanas.
+8. **Bibliografía:** MCS; HAM (caps. 11-12, 14); VEL (caps. 4-5); CS103.
+
+### M9. Sumatorias, asintótica y recurrencias
+1. **Nivel:** 3. 2. **Prerrequisitos:** M3, M7.
+3. **Temario:** 9.1 sumas aritméticas y geométricas; 9.2 cotas por integrales (intuitivo); 9.3 O, Ω, Θ; 9.4 recurrencias lineales; 9.5 divide y vencerás.
+4. **General:** formas cerradas y comparación de crecimiento.
+5. **Vínculo:** complejidad (merge sort, búsqueda binaria), SQL con y sin índices, rendimiento de renderizado.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| 1+...+n | Escalera duplicada en rectángulo | A | n(n+1)/2 por geometría |
+| Serie geométrica | Cuadrado partido a la mitad sucesivamente | A | Suma con límite |
+| Asintótica | log n, n, n log n, n², 2^n superpuestas | W: escala y rango | Las constantes dejan de importar |
+| Divide y vencerás | Árbol de recursión con costo por nivel | W: a, b, f(n) | Costo = suma por niveles |
+
+7. **Práctica:** resolver recurrencias; probar cotas O; código: tiempos empíricos y ajuste de curva.
+8. **Bibliografía:** MCS (secs. 14.1-14.7, 22.1-22.5); OCW-61200 (lecciones 5-7); CS2023.
+
+### M10. Teoría de números y criptografía
+1. **Nivel:** 3. 2. **Prerrequisitos:** M6 (M7 para pruebas).
+3. **Temario:** 10.1 divisibilidad y primos; 10.2 Euclides y MCD; 10.3 aritmética modular; 10.4 inversos modulares; 10.5 Fermat y Euler; 10.6 RSA.
+4. **General:** estructura de los enteros; aritmética circular.
+5. **Vínculo:** RSA y HTTPS, hashing, pseudoaleatorios, checksums.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Mod n | Reloj de n posiciones | W: n y operación | Sumar mod n es girar |
+| Euclides | Rectángulo dividido en cuadrados | A | El MCD embaldosa exacto |
+| Tabla mod n | Mapa de calor | W: n primo o compuesto | Con n primo todo no nulo tiene inverso |
+| RSA | Flujo de cifrado y descifrado | A | Por qué descifrar recupera el mensaje |
+
+7. **Práctica:** pruebas de divisibilidad; código: Euclides extendido, exponenciación modular, RSA de juguete.
+8. **Bibliografía:** MCS (secs. 9.1-9.11); OCW-61200 (lecciones 8-10); VEL (cap. 7); ROS-ES.
+
+### M11. Combinatoria y conteo
+1. **Nivel:** 3. 2. **Prerrequisitos:** M7.
+3. **Temario:** 11.1 suma y producto; 11.2 permutaciones y combinaciones; 11.3 binomiales y Pascal; 11.4 palomar; 11.5 inclusión-exclusión; 11.6 biyecciones para contar.
+4. **General:** contar sin enumerar; prueba combinatoria.
+5. **Vínculo:** espacios de búsqueda, contraseñas, colisiones de hash, base de la probabilidad discreta.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Producto | Árbol de decisiones | W: opciones por nivel | Hojas = producto de ramas |
+| C(n,k) | Pascal y caminos en rejilla | W: n y k | Elegir es contar caminos |
+| Palomar | Cajas y objetos | A | Más objetos que cajas fuerza colisión |
+| Inclusión-exclusión | Venn de 3 conjuntos con conteos | W | Corregir el doble conteo |
+
+7. **Práctica:** problemas de conteo; pruebas combinatorias; código: verificación con itertools.
+8. **Bibliografía:** MCS; OCW-61200 (lecciones 15-17); HAM (cap. 3); CS109R.
+
+### M12. Grafos y árboles
+1. **Nivel:** 3. 2. **Prerrequisitos:** M7, M8.
+3. **Temario:** 12.1 grafos y representación; 12.2 caminos y conectividad; 12.3 árboles y árboles generadores; 12.4 coloreo; 12.5 emparejamientos; 12.6 DAGs y orden topológico; 12.7 grafos ponderados.
+4. **General:** estructura combinatoria y pruebas sobre grafos.
+5. **Vínculo:** rutas, dependencias de build (npm), grafos de computación de redes (anticipo de M28), relaciones en bases de datos.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| BFS y DFS | Animación sobre grafo editable | W: nodo inicial | Frontera de exploración |
+| Árbol generador mínimo | Kruskal paso a paso | A | Lo voraz funciona aquí |
+| Orden topológico | DAG que se desarma | A | Sin ciclos existe orden |
+| Coloreo | Grafo con colores asignables | W | Restricciones locales, dificultad global |
+
+7. **Práctica:** pruebas sobre árboles; código: BFS, DFS y Dijkstra.
+8. **Bibliografía:** MCS; OCW-61200 (lecciones 11-14); ROS-ES; CS103.
+
+---
+
+## FASE 3: Cálculo (nivel 3-4)
+
+### M13. Límites y continuidad
+1. **Nivel:** 3. 2. **Prerrequisitos:** M3, M4.
+3. **Temario:** 13.1 aproximación; 13.2 límites laterales; 13.3 al infinito; 13.4 continuidad; 13.5 épsilon-delta (al final).
+4. **General:** formalizar "acercarse"; épsilon-delta solo después de la intuición visual.
+5. **Vínculo:** convergencia de algoritmos iterativos, redondeo, comportamiento asintótico.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Límite | Zoom progresivo | W: a y zoom | El valor al que apunta la función |
+| Épsilon-delta | Banda ε y ventana δ | W: ε; el estudiante busca δ | Desafío y respuesta |
+| Discontinuidades | Galería de tipos | E | Saltos, huecos, asíntotas |
+
+7. **Práctica:** límites; pruebas épsilon-delta sencillas; código: tablas numéricas y límites de precisión.
+8. **Bibliografía:** OCW-1801; STW-ES (cap. 2); STR-CALC; 3B1B *Essence of calculus*; HAM (cap. 13).
+
+### M14. Derivada y aplicaciones
+1. **Nivel:** 3. 2. **Prerrequisitos:** M13.
+3. **Temario:** 14.1 razón de cambio y pendiente; 14.2 reglas; 14.3 cadena; 14.4 exponencial y logaritmo; 14.5 optimización 1D; 14.6 aproximación lineal; 14.7 Newton.
+4. **General:** linealización local; la cadena como composición de razones de cambio.
+5. **Vínculo:** la regla de la cadena es la base de backpropagation (M28); minimizar pérdidas en 1D.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Derivada | Secante que converge a tangente | W: h hacia 0 | Pendiente instantánea |
+| Cadena | Tres rectas encadenadas con estiramientos | A | Las razones se multiplican |
+| Óptimo | Curva con signo de f' coloreado | W: x | Extremos donde f' cambia de signo |
+| Newton | Tangentes sucesivas | A | Linealizar y repetir |
+
+7. **Práctica:** derivación; optimización; prueba de la regla del producto; código: derivada numérica frente a SymPy y descenso de gradiente 1D.
+8. **Bibliografía:** OCW-1801; STW-ES (caps. 3-4); 3B1B *Essence of calculus*; STR-CALC.
+
+### M15. Integral y teorema fundamental
+1. **Nivel:** 3. 2. **Prerrequisitos:** M14.
+3. **Temario:** 15.1 sumas de Riemann; 15.2 integral definida; 15.3 TFC; 15.4 sustitución y partes; 15.5 impropias; 15.6 integración numérica.
+4. **General:** acumulación y su relación inversa con la derivada.
+5. **Vínculo:** densidades continuas (M25), área bajo la curva ROC, métodos numéricos.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Riemann | Rectángulos bajo la curva | W: n y muestreo | El área se aproxima refinando |
+| TFC | Área acumulada y su pendiente | A | La derivada del área es la altura |
+| Impropia | Área en dominio infinito | W: límite superior | Área finita en región infinita |
+
+7. **Práctica:** técnicas de integración; esquema de prueba del TFC; código: trapecio y Simpson con su error.
+8. **Bibliografía:** OCW-1801; STW-ES (caps. 5-7); 3B1B *Essence of calculus*.
+
+### M16. Sucesiones, series y Taylor
+1. **Nivel:** 3-4. 2. **Prerrequisitos:** M15.
+3. **Temario:** 16.1 sucesiones; 16.2 series y criterios; 16.3 series de potencias; 16.4 Taylor y error.
+4. **General:** aproximar funciones con polinomios; convergencia rigurosa.
+5. **Vínculo:** cómo se calculan exp y sin, aproximación de segundo orden (M29), error numérico.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Taylor | Polinomios que abrazan la curva | W: grado y centro | Más términos, mejor aproximación local |
+| Convergencia | Sumas parciales en una recta | A | Converger es estabilizarse |
+| Radio | Intervalo coloreado | W: x | Fuera del radio la aproximación explota |
+
+7. **Práctica:** criterios; cota del error de Taylor; código: exp(x) por Taylor frente a math.exp.
+8. **Bibliografía:** OCW-1801; STW-ES (cap. 11); 3B1B *Essence of calculus*.
+
+### M17. Cálculo multivariable y vectorial
+1. **Nivel:** 4. 2. **Prerrequisitos:** M14, M18.
+3. **Temario:** 17.1 funciones de varias variables; 17.2 curvas de nivel; 17.3 parciales; 17.4 gradiente y direccional; 17.5 Jacobiano; 17.6 cadena multivariable; 17.7 Hessiano y puntos críticos; 17.8 integrales dobles.
+4. **General:** la derivada como mejor aproximación lineal (una matriz).
+5. **Vínculo:** gradiente de la pérdida, Jacobiano en redes, Hessiano y curvatura.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Superficie y nivel | 3D sincronizada con contorno | W: cámara y nivel c | El contorno es la sombra de la superficie |
+| Gradiente | Campo vectorial sobre contorno | W: punto | Máximo ascenso, perpendicular al nivel |
+| Jacobiano | Malla deformable con zoom local | W: punto y función | Localmente todo es lineal |
+| Hessiano | Silla frente a cuenco | W: coeficientes | La curvatura decide el punto crítico |
+
+7. **Práctica:** gradientes; prueba de perpendicularidad del gradiente; código: gradiente numérico frente a analítico en NumPy.
+8. **Bibliografía:** MML (cap. 5); IMP (Multivariate Calculus); Stewart, *Calculus: Early Transcendentals* 9.ª ed.; 3B1B; DL (cap. 4).
+
+---
+
+## FASE 4: Álgebra lineal (nivel 3-5)
+
+### M18. Vectores, matrices y transformaciones lineales
+1. **Nivel:** 3. 2. **Prerrequisitos:** M4, M6.
+3. **Temario:** 18.1 vectores en R^n; 18.2 combinación lineal y span; 18.3 producto punto, norma, ángulo; 18.4 matriz como transformación; 18.5 producto como composición.
+4. **General:** la matriz es una función lineal, no una tabla.
+5. **Vínculo:** embeddings, similitud coseno, gráficos, capa densa Wx+b.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Combinación lineal | Dos vectores que barren el plano | W: escalares | El span es lo alcanzable |
+| Matriz 2x2 | Malla deformable con î y ĵ | W: entradas | Las columnas son a dónde van î y ĵ |
+| Producto de matrices | Dos transformaciones en secuencia | A | Multiplicar es componer |
+| Producto punto | Proyección | W: ángulo | Mide alineación |
+
+7. **Práctica:** productos; prueba de linealidad; código: matrices aplicadas a un polígono con NumPy.
+8. **Bibliografía:** STR-ILA (caps. 1-2); OCW-1806; 3B1B *Essence of linear algebra*; ILA; VMLS; CS229-LA.
+
+### M19. Sistemas Ax=b, eliminación e inversas
+1. **Nivel:** 3. 2. **Prerrequisitos:** M18.
+3. **Temario:** 19.1 imagen de filas y de columnas; 19.2 eliminación gaussiana; 19.3 LU; 19.4 inversa; 19.5 transpuesta y permutaciones.
+4. **General:** dos imágenes del mismo sistema.
+5. **Vínculo:** sistemas en simulación, costo O(n³), por qué no invertir explícitamente.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Filas | Planos que se cortan en 3D | W: coeficientes | Solución = punto común |
+| Columnas | Combinación de columnas que alcanza b | W: x1, x2, x3 | Resolver es hallar la receta |
+| Eliminación | Pivotes resaltados | A | Cada paso es una matriz elemental |
+| Inversa | Transformación y su deshacer | A | Volver la malla al origen |
+
+7. **Práctica:** eliminación a mano; prueba de (AB)⁻¹=B⁻¹A⁻¹; código: eliminación con pivoteo frente a numpy.linalg.solve.
+8. **Bibliografía:** STR-ILA (cap. 2); OCW-1806 (sesiones 1-5); ILA (cap. 5); VMLS (caps. 8-11).
+
+### M20. Espacios vectoriales, base, dimensión y los cuatro subespacios
+1. **Nivel:** 4. 2. **Prerrequisitos:** M19.
+3. **Temario:** 20.1 espacios y subespacios; 20.2 nulo y columna; 20.3 independencia; 20.4 base y dimensión; 20.5 rango; 20.6 cuatro subespacios.
+4. **General:** abstracción axiomática (LADR como vía rigurosa); rango-nulidad.
+5. **Vínculo:** colinealidad de features, compresión, grados de libertad.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Independencia | Vectores 3D que forman o no volumen | W: mover un vector al plano | Dependiente = redundante |
+| Espacio nulo | Recta aplastada al origen | A | Lo que la matriz borra |
+| Cuatro subespacios | Diagrama de Strang | E | Ortogonalidad por pares |
+| Rango | Malla que colapsa | W: matriz | Dimensión de la salida |
+
+7. **Práctica:** pruebas de independencia; demostración de rango-nulidad; código: rango numérico con tolerancias.
+8. **Bibliografía:** STR-ILA (cap. 3); OCW-1806 (sesiones 6-11); LADR (caps. 1-3); ILA (cap. 8).
+
+### M21. Ortogonalidad, proyecciones y mínimos cuadrados
+1. **Nivel:** 4. 2. **Prerrequisitos:** M20.
+3. **Temario:** 21.1 ortogonalidad; 21.2 proyección; 21.3 mínimos cuadrados; 21.4 Gram-Schmidt; 21.5 QR.
+4. **General:** la mejor aproximación es una proyección ortogonal.
+5. **Vínculo:** regresión lineal, ajuste de datos, clasificación por mínimos cuadrados.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Proyección | b proyectado con error perpendicular | W: mover b | El error es ortogonal al subespacio |
+| Mínimos cuadrados | Recta con residuos como cuadrados | W: pendiente e intercepto | Minimizar el área total |
+| Gram-Schmidt | Vectores enderezados uno a uno | A | Quitar componentes ya cubiertas |
+
+7. **Práctica:** derivar ecuaciones normales; código: lstsq frente a ecuaciones normales con datos reales.
+8. **Bibliografía:** STR-ILA (cap. 4); OCW-1806; VMLS (caps. 5, 12-14); MML (cap. 3).
+
+### M22. Determinantes, valores y vectores propios
+1. **Nivel:** 4. 2. **Prerrequisitos:** M21 (M14 para formas cuadráticas).
+3. **Temario:** 22.1 determinante como volumen; 22.2 valores y vectores propios; 22.3 diagonalización; 22.4 potencias y Markov; 22.5 teorema espectral; 22.6 definidas positivas.
+4. **General:** direcciones invariantes y descomposición espectral.
+5. **Vínculo:** PageRank, cadenas de Markov, estabilidad de iteraciones, curvatura.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Determinante | Área del cuadrado unidad con signo | W: matriz | det = 0 es aplastamiento |
+| Vector propio | Direcciones que no giran resaltadas | W: matriz | Solo se estiran |
+| A^k | Vector iterado hacia la dirección dominante | A | Método de potencia y PageRank |
+| Definida positiva | Superficie x^T A x | W: entradas simétricas | Valores propios positivos = cuenco |
+
+7. **Práctica:** valores propios; prueba de ortogonalidad en el caso simétrico; código: PageRank en un grafo pequeño.
+8. **Bibliografía:** STR-ILA (caps. 5-6); OCW-1806; 3B1B *Essence of linear algebra*; ILA (caps. 7, 10); IMP (Linear Algebra).
+
+### M23. SVD, aproximación de bajo rango y PCA
+1. **Nivel:** 4-5. 2. **Prerrequisitos:** M22.
+3. **Temario:** 23.1 SVD como rotar, escalar, rotar; 23.2 valores singulares; 23.3 Eckart-Young; 23.4 pseudoinversa; 23.5 PCA por covarianza y por SVD.
+4. **General:** toda matriz se descompone geométricamente; la mejor aproximación de rango k es explícita.
+5. **Vínculo:** compresión de imágenes, reducción de dimensión, recomendadores, búsqueda semántica.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| SVD | Círculo a elipse en tres etapas | A | Girar, estirar, girar |
+| Bajo rango | Imagen reconstruida con k valores | W: k | Pocas componentes capturan casi todo |
+| PCA | Nube con ejes principales | W: rotar nube, elegir componentes | Máxima varianza = dirección principal |
+| Espectro | Valores singulares decrecientes | E | Información por componente |
+
+7. **Práctica:** SVD de 2x2; prueba de la relación con A^T A; código: compresión de imágenes y PCA.
+8. **Bibliografía:** OCW-18065 (lecciones 6-7); STR-LALD; MML (caps. 4, 10); IMP (PCA); LADR (secs. 7E-7F); DL (sec. 2.12).
+
+---
+
+## FASE 5: Probabilidad y estadística (nivel 3-4)
+
+### M24. Fundamentos de probabilidad
+1. **Nivel:** 3. 2. **Prerrequisitos:** M11, M15.
+3. **Temario:** 24.1 espacio muestral y eventos; 24.2 axiomas; 24.3 condicional; 24.4 independencia; 24.5 probabilidad total; 24.6 Bayes.
+4. **General:** probabilidad como medida axiomática.
+5. **Vínculo:** filtros de spam, pruebas A/B, algoritmos aleatorizados.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Evento | Venn con área proporcional | W | Probabilidad = área relativa |
+| Condicional | Universo restringido a B | A | Condicionar es hacer zoom |
+| Bayes | Cuadrado unidad de frecuencias | W: prevalencia y sensibilidad | La tasa base domina |
+| Frecuencia | Lanzamientos simulados | W: n y p | Probabilidad como límite empírico |
+
+7. **Práctica:** condicional; prueba de Bayes; código: Monte Carlo frente a cálculo exacto.
+8. **Bibliografía:** BH (caps. 1-2); STAT110; CS109R; OCW-1805; ST (caps. 1-2); OCW-61200 (lecciones 18-20).
+
+### M25. Variables aleatorias y distribuciones
+1. **Nivel:** 3-4. 2. **Prerrequisitos:** M24.
+3. **Temario:** 25.1 discretas y continuas; 25.2 PMF, PDF, CDF; 25.3 esperanza y linealidad; 25.4 varianza; 25.5 Bernoulli, binomial, geométrica, Poisson; 25.6 uniforme, exponencial, normal.
+4. **General:** variable aleatoria como función; distribuciones como "historias" (BH).
+5. **Vínculo:** tráfico web (Poisson), inicialización de pesos, ruido en datos.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| PMF y PDF | Histograma que se suaviza | W: n, p, λ, μ, σ | Forma según parámetros |
+| CDF | Curva acumulada enlazada | W: umbral x | Área a la izquierda |
+| Esperanza | Equilibrio del histograma | W: arrastrar masas | Media = centro de masa |
+| Varianza | Barras de desviación | W | Dispersión cuadrática |
+
+7. **Práctica:** momentos; prueba de linealidad de la esperanza; código: muestreo con scipy.stats.
+8. **Bibliografía:** BH (caps. 3-5); CS109R; ST (cap. 3); OCW-1805; OCW-61200 (lecciones 21-23).
+
+### M26. Distribuciones conjuntas y teoremas límite
+1. **Nivel:** 4. 2. **Prerrequisitos:** M25, M17.
+3. **Temario:** 26.1 conjuntas y marginales; 26.2 covarianza y correlación; 26.3 normal multivariada; 26.4 Markov y Chebyshev; 26.5 LGN; 26.6 TCL.
+4. **General:** dependencia y comportamiento de promedios.
+5. **Vínculo:** covarianza hacia PCA, promedios de mini-batches, cotas de muestreo.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Conjunta y marginal | Mapa de calor con histogramas en bordes | W: ρ | Marginal = proyectar y sumar |
+| Normal multivariada | Elipses con ejes propios | W: covarianza | La covarianza es la forma de la nube |
+| TCL | Histograma de medias | W: distribución y n | Promediar produce campana |
+| LGN | Media acumulada | A | Estabilización |
+
+7. **Práctica:** covarianzas; LGN débil vía Chebyshev; código: simulación del TCL.
+8. **Bibliografía:** BH (caps. 7, 10); CS109R; ST (cap. 3); MML (cap. 6); OCW-61200 (lección 24).
+
+### M27. Inferencia estadística y regresión
+1. **Nivel:** 4. 2. **Prerrequisitos:** M26, M21.
+3. **Temario:** 27.1 estimación puntual; 27.2 MLE; 27.3 intervalos de confianza; 27.4 pruebas de hipótesis; 27.5 bootstrap; 27.6 bayesiana y MAP; 27.7 regresión probabilística.
+4. **General:** de los datos al modelo; frecuentista frente a bayesiano.
+5. **Vínculo:** entrenar es estimar (MLE), regularizar equivale a MAP, pruebas A/B, evaluación de modelos.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Verosimilitud | Curva L(θ) | W: datos y θ | El MLE es la cima |
+| Intervalo | 100 intervalos simulados | A | El 95 % habla del procedimiento |
+| Bayes | Prior, verosimilitud, posterior | W: datos y prior | Los datos mueven la creencia |
+| Bootstrap | Remuestreo | A | Incertidumbre sin fórmula |
+
+7. **Práctica:** derivar MLE simples; código: bootstrap, regresión, MLE frente a MAP.
+8. **Bibliografía:** OCW-1805; ST (caps. 4-6); MML (caps. 8-9); CS109R; BH.
+
+---
+
+## FASE 6: Matemáticas avanzadas para ML (nivel 5)
+
+### M28. Cálculo matricial, diferenciación automática y backpropagation
+1. **Nivel:** 5. 2. **Prerrequisitos:** M12, M17, M19, M23.
+3. **Temario:** 28.1 gradientes respecto de vectores y matrices; 28.2 identidades; 28.3 grafo computacional; 28.4 modo directo e inverso; 28.5 backprop en un MLP.
+4. **General:** la cadena multivariable como producto de Jacobianos.
+5. **Vínculo:** cómo funcionan PyTorch y JAX; depuración de gradientes.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Grafo computacional | DAG con valores hacia adelante | A | Una red es una composición |
+| Backprop | Gradientes fluyendo hacia atrás | A: nodo por nodo | Reutilizar parciales |
+| Red neuronal | Pesos como grosor y color | W: pesos, entrada, tasa | Cada peso recibe su culpa |
+| Directo e inverso | Costos comparados | E | Por qué el inverso conviene con muchas entradas |
+
+7. **Práctica:** derivaciones matriciales; código: mini autodiff escalar y MLP en NumPy verificado con gradientes numéricos.
+8. **Bibliografía:** MML (cap. 5); DL (cap. 6); 3B1B *Neural networks*; OCW-18065 (lecciones 26-27, 33); STR-LALD (parte VII).
+
+### M29. Optimización y convexidad
+1. **Nivel:** 5. 2. **Prerrequisitos:** M28, M22.
+3. **Temario:** 29.1 descenso de gradiente; 29.2 condicionamiento; 29.3 momentum; 29.4 SGD; 29.5 convexidad; 29.6 Lagrange; 29.7 dualidad.
+4. **General:** geometría de la optimización; garantías en el caso convexo.
+5. **Vínculo:** entrenamiento, hiperparámetros, regularización con restricciones.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Descenso | Trayectoria sobre contornos | W: tasa y punto inicial | Si es grande oscila o diverge |
+| Momentum | Con y sin momentum | W: β y α (R: DIS-MOM) | La inercia amortigua zigzags |
+| Convexidad | Cuerda sobre la curva | W: puntos | Mínimo local = global |
+| Lagrange | Contornos tangentes a la restricción | W: nivel | Gradientes paralelos en el óptimo |
+
+7. **Práctica:** probar convexidad; código: GD, SGD y momentum en regresión logística.
+8. **Bibliografía:** CVX (caps. 2-5, 9); MML (cap. 7); DIS-MOM; DL (caps. 4, 8); OCW-18065.
+
+### M30. Métodos numéricos
+1. **Nivel:** 4-5. 2. **Prerrequisitos:** M14, M19 (M16 recomendado).
+3. **Temario:** 30.1 punto flotante IEEE; 30.2 overflow y underflow; 30.3 softmax estable; 30.4 número de condición; 30.5 bisección y Newton; 30.6 método de potencia; 30.7 iterativos; 30.8 integración numérica.
+4. **General:** error, estabilidad y convergencia como objetos de estudio.
+5. **Vínculo:** por qué 0.1+0.2≠0.3 en JavaScript y Python, log-sum-exp, costo de algoritmos matriciales.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Punto flotante | Recta con representables | W: exponente y mantisa | No todo real es representable |
+| Condicionamiento | Malla casi singular con perturbación | W: perturbación de b | Problemas sensibles amplifican errores |
+| Newton frente a bisección | Error en escala log | A | Cuadrática frente a lineal |
+
+7. **Práctica:** análisis de error; código: softmax ingenuo frente a estable, método de potencia.
+8. **Bibliografía:** DL (cap. 4); OCW-1806; OCW-18065 (lecciones 10, 12-13); STR-ILA.
+
+### M31. Teoría de la información para ML
+1. **Nivel:** 5. 2. **Prerrequisitos:** M25 (M3 para logaritmos).
+3. **Temario:** 31.1 información de un evento; 31.2 entropía; 31.3 entropía cruzada; 31.4 KL; 31.5 información mutua.
+4. **General:** medir incertidumbre con logaritmos.
+5. **Vínculo:** pérdida de entropía cruzada, compresión, ganancia de información en árboles, KL en modelos generativos.
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Entropía | Barras con medidor | W: probabilidades | Máxima en la uniforme |
+| Cruzada y KL | Dos distribuciones y costo en bits | W: q frente a p | Costo del modelo equivocado |
+| Árbol de decisión | Ganancia por división | A | La pregunta que más reduce incertidumbre |
+
+7. **Práctica:** KL ≥ 0 (Jensen, guiado); código: entropía cruzada frente a MLE en clasificación.
+8. **Bibliografía:** DL (cap. 3); CS109R; BH; MML (cap. 6).
+
+### M32. Puentes al rigor: análisis real, complejos y estructuras algebraicas (optativo)
+1. **Nivel:** 5. 2. **Prerrequisitos:** M6, M10, M16.
+3. **Temario:** 32.1 completitud de los reales; 32.2 sucesiones y continuidad rigurosas; 32.3 grupos, anillos, campos; 32.4 campos finitos; 32.5 funciones complejas como transformaciones.
+4. **General:** madurez matemática; unificación (Z_n como anillo, simetrías como grupos).
+5. **Vínculo:** criptografía de curva elíptica y AES, códigos correctores, Fourier (anticipo).
+6. **Visual:**
+
+| Concepto | Visualización | Formato | Intuición |
+|---|---|---|---|
+| Grupo de simetrías | Polígono con tabla de Cayley | W: operaciones | Operaciones que se componen |
+| Función compleja | Malla transformada por f(z) | W: f | Ángulos preservados |
+| Completitud | Racionales que caen en un hueco | A | Por qué se necesitan los reales |
+
+7. **Práctica:** demostraciones formales; código: aritmética en Z_p y permutaciones.
+8. **Bibliografía:** JUD; NEED; HAM (caps. 13-14); LADR.
+
+---
+
+## Recomendaciones de uso
+
+- **Orden:** Fase 0 → 1 → 2; Fases 3 y 4 en paralelo (M18-M21 tras M14); luego Fase 5 y Fase 6. M32 al final o como reto intercalado.
+- **Ritmo:** un submódulo por sesión; no avanzar sin superar el punto de control (opción múltiple R-OM más un ejercicio de construcción).
+- **Herramientas futuras:** Python con NumPy, matplotlib y SymPy; 3B1B, Seeing Theory e Immersive Linear Algebra como referencias R antes de construir widgets propios.
+
+## Advertencias
+
+- No se verificó el pensum oficial de Ingeniería de Sistemas de la Universidad de Pamplona; la alineación debe contrastarse con él.
+- Las duraciones son estimaciones de diseño.
+- Seeing Theory ya no se mantiene. Su repositorio oficial en GitHub indica que "the site will continue to be hosted by Brown University, but the code will not be updated".
+- 3Blue1Brown es un recurso de intuición, no un curso con evaluación formal.
+- Hay una 6.ª edición de Strang (2023). La página de Cengage solo muestra la 9.ª ed. de Stewart (2021); la 10.ª ed. que anuncian algunas librerías no está confirmada por la editorial.
+- Las referencias pendientes no deben citarse en materiales del curso hasta verificarlas.
+
+---
+
+**Fin del plan.** No se ha implementado ninguna lección, ejercicio, cuestionario, prueba diagnóstica, gráfico ni código. Espero tu revisión antes de pasar a cualquier fase de implementación o enseñanza.

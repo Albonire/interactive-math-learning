@@ -254,6 +254,417 @@ body,
   .eco-mode .crayon-ink-panel::before {
     filter: none;
   }
+
+  /*
+   * Sketchbook Frame: primary interactive visual stage drawn onto cotton paper / chalkboard.
+   * Double-pass hand-inked border via ::before so inner typography & KaTeX stay razor-sharp.
+   */
+  .sketch-frame {
+    position: relative;
+    isolation: isolate;
+    border-radius: 18px 5px 15px 6px / 5px 16px 6px 18px;
+  }
+
+  .sketch-frame::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--bg-paper);
+    background-image:
+      radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(120, 112, 98, 0.055) 100%),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark));
+    background-repeat: no-repeat;
+    background-size:
+      100% 100%,
+      11px 1.6px, 1.6px 11px,
+      11px 1.6px, 1.6px 11px,
+      11px 1.6px, 1.6px 11px,
+      11px 1.6px, 1.6px 11px;
+    background-position:
+      center,
+      5px 5px, 5px 5px,
+      calc(100% - 5px) 5px, calc(100% - 5px) 5px,
+      5px calc(100% - 5px), 5px calc(100% - 5px),
+      calc(100% - 5px) calc(100% - 5px), calc(100% - 5px) calc(100% - 5px);
+    border: 1.75px solid var(--ink-frame-border);
+    box-shadow:
+      inset 0 0 0 2px var(--ink-frame-secondary),
+      3px 4px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+  }
+
+  .dark .sketch-frame::before {
+    background-image:
+      radial-gradient(ellipse at 50% 45%, rgba(200, 216, 240, 0.035) 0%, transparent 65%, rgba(0, 0, 0, 0.28) 100%),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark)),
+      linear-gradient(var(--ink-corner-mark), var(--ink-corner-mark));
+  }
+
+  /* Hand-drawn drafting control strip above diagrams */
+  .sketch-controls-bar {
+    position: relative;
+    isolation: isolate;
+    border-radius: 10px 14px 8px 12px / 6px 8px 10px 7px;
+  }
+
+  .sketch-controls-bar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+    border: 1.45px dashed var(--ink-frame-border);
+    box-shadow: 2px 2px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+  }
+
+  /* Hand-inked notebook index card (used for Pure/Applied cards, syllabus, module cards, heatmap) */
+  .sketch-card {
+    position: relative;
+    isolation: isolate;
+    border-radius: 14px 4px 12px 5px / 4px 12px 5px 14px;
+    transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sketch-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: color-mix(in srgb, var(--bg-surface) 64%, var(--bg-paper));
+    border: 1.5px solid var(--ink-frame-border);
+    box-shadow:
+      inset 0 0 0 1px var(--ink-frame-secondary),
+      2.5px 3px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+  }
+
+  .sketch-card[data-active='true']::before {
+    border-color: var(--ui-accent);
+    border-width: 2px;
+    background-color: color-mix(in srgb, var(--ui-accent) 9%, var(--bg-paper));
+  }
+
+  .sketch-card[data-tone='success']::before {
+    border-color: var(--ui-success);
+    background-color: color-mix(in srgb, var(--ui-success) 10%, var(--bg-paper));
+  }
+
+  .sketch-card[data-tone='warning']::before {
+    border-color: var(--ui-warning);
+    background-color: color-mix(in srgb, var(--ui-warning) 10%, var(--bg-paper));
+  }
+
+  /* Hand-sketched tactile ink button (replaces generic flat CSS rounded buttons) */
+  .sketch-btn {
+    position: relative;
+    isolation: isolate;
+    border-radius: 11px 4px 10px 5px / 5px 10px 4px 11px;
+    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1), color 140ms ease;
+  }
+
+  .sketch-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: color-mix(in srgb, var(--bg-paper) 88%, transparent);
+    border: 1.55px solid var(--ink-frame-border);
+    box-shadow: 1.5px 2px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+
+  .sketch-btn:hover:not(:disabled) {
+    transform: translateY(-1px) rotate(-0.35deg);
+  }
+
+  .sketch-btn:active:not(:disabled) {
+    transform: translateY(0.5px) scale(0.985);
+  }
+
+  .sketch-btn:hover:not(:disabled)::before {
+    border-color: var(--ui-accent);
+  }
+
+  .sketch-btn[data-active='true']::before,
+  .sketch-btn[data-tone='accent']::before {
+    border-color: var(--ui-accent);
+    border-width: 1.9px;
+    background-color: color-mix(in srgb, var(--ui-accent) 14%, var(--bg-paper));
+  }
+
+  .sketch-btn[data-tone='danger']::before {
+    border-color: var(--ui-warning);
+    background-color: color-mix(in srgb, var(--ui-warning) 12%, var(--bg-paper));
+  }
+
+  .sketch-btn[data-tone='success']::before {
+    border-color: var(--ui-success);
+    background-color: color-mix(in srgb, var(--ui-success) 12%, var(--bg-paper));
+  }
+
+  /* Hand-sketched answer option card for R-OM checkpoints and Diagnostic questions */
+  .sketch-option {
+    position: relative;
+    isolation: isolate;
+    border-radius: 14px 4px 13px 5px / 4px 12px 5px 13px;
+    transition: transform 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .sketch-option::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: color-mix(in srgb, var(--bg-paper) 92%, transparent);
+    border: 1.45px solid var(--ink-frame-border);
+    box-shadow: 1.5px 2px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+
+  .sketch-option:hover {
+    transform: translateX(2px);
+  }
+
+  .sketch-option[data-state='selected']::before {
+    border-color: var(--ui-accent);
+    border-width: 2px;
+    background-color: color-mix(in srgb, var(--ui-accent) 11%, var(--bg-paper));
+  }
+
+  .sketch-option[data-state='correct']::before {
+    border-color: var(--ui-success);
+    border-width: 2px;
+    background-color: color-mix(in srgb, var(--ui-success) 13%, var(--bg-paper));
+  }
+
+  .sketch-option[data-state='wrong']::before {
+    border-color: var(--ui-warning);
+    border-width: 2px;
+    background-color: color-mix(in srgb, var(--ui-warning) 13%, var(--bg-paper));
+  }
+
+  /* Lab-notebook ruled coding sheet with vertical red margin rule */
+  .sketch-code-sheet {
+    position: relative;
+    isolation: isolate;
+    border-radius: 10px 4px 12px 5px / 4px 10px 5px 12px;
+    padding-left: 1.55rem !important;
+  }
+
+  .sketch-code-sheet::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--bg-paper);
+    background-image:
+      linear-gradient(90deg, transparent 17px, var(--margin-rule) 17px, var(--margin-rule) 18.5px, transparent 18.5px),
+      repeating-linear-gradient(180deg, transparent 0px, transparent 21px, var(--grid-line) 21px, var(--grid-line) 22px);
+    border: 1.5px solid var(--ink-frame-border);
+    box-shadow: 2px 3px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+  }
+
+  /* Hand-ruled ledger table wrapper */
+  .sketch-table-wrap {
+    position: relative;
+    isolation: isolate;
+    border-radius: 14px 4px 12px 6px / 5px 13px 4px 14px;
+  }
+
+  .sketch-table-wrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: color-mix(in srgb, var(--bg-paper) 88%, var(--bg-surface));
+    border: 1.6px solid var(--ink-frame-border);
+    box-shadow: 2.5px 3.5px 0 0 var(--ink-paper-shadow);
+    filter: url(#crayon-stroke);
+  }
+
+  /* Hand-bound sketchbook folio modal */
+  .sketch-modal {
+    position: relative;
+    isolation: isolate;
+    border-radius: 16px 6px 14px 7px / 6px 15px 7px 16px;
+  }
+
+  .sketch-modal::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+    background-color: var(--bg-paper);
+    border: 2px solid var(--ink-frame-border);
+    box-shadow:
+      inset 0 0 0 3px var(--ink-frame-secondary),
+      0 18px 46px rgba(10, 12, 18, 0.28);
+    filter: url(#crayon-stroke);
+  }
+
+  /*
+   * Automatic hand-inked treatment for every interactive SVG diagram & tactile tile
+   * inside VisualStageCard and DiagnosticMiniVisual.
+   * Geometric primitives get #hand-diagram-ink (userSpaceOnUse, zero clipping);
+   * SVG text stays crisp in warm handwritten Patrick Hand typography.
+   */
+  .sketch-diagram-canvas svg {
+    overflow: visible;
+  }
+
+  .sketch-diagram-canvas svg path,
+  .sketch-diagram-canvas svg line,
+  .sketch-diagram-canvas svg rect,
+  .sketch-diagram-canvas svg circle,
+  .sketch-diagram-canvas svg polygon,
+  .sketch-diagram-canvas svg ellipse,
+  .sketch-diagram-canvas svg polyline {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: url(#hand-diagram-ink);
+  }
+
+  .sketch-diagram-canvas svg text {
+    font-family: var(--font-sans) !important;
+    letter-spacing: 0.015em;
+  }
+
+  /* Tactile cut-cardboard / cotton-stock look for interactive HTML tiles inside module visuals (bits, matrices, proof steps) */
+  .sketch-diagram-canvas button:not(.sketch-btn),
+  .sketch-diagram-canvas .sketch-tile {
+    border-radius: 10px 4px 9px 5px / 4px 9px 5px 10px;
+    box-shadow: 1.5px 2px 0 0 var(--ink-paper-shadow);
+    border-width: 1.5px;
+  }
+
+  /*
+   * Open-page boxless controls shelf: no closed dashed box, just a light graphite rule underneath.
+   */
+  .sketch-open-shelf {
+    border-bottom: 1.5px dashed var(--hairline-strong);
+    padding-bottom: 0.75rem;
+  }
+
+  /*
+   * Open-page lab notebook code block: just a hand-ruled red margin line + subtle notebook lines
+   * directly on the cotton paper / dark chalkboard (zero outer rectangular box).
+   */
+  .sketch-code-open {
+    position: relative;
+    padding-left: 1.5rem;
+    border-left: 2px solid var(--margin-rule);
+    background-image: repeating-linear-gradient(
+      180deg,
+      transparent 0px,
+      transparent 21px,
+      var(--grid-line) 21px,
+      var(--grid-line) 22px
+    );
+  }
+
+  /*
+   * Floating handwritten margin note slip for 'Crayón Diccionario'.
+   * No backdrop-blur (stays crisp over SVG filters); subtle paper warmth + slight organic tilt.
+   */
+  @keyframes marginNoteSlideIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px) rotate(-0.8deg);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) rotate(-0.35deg);
+    }
+  }
+
+  .margin-note-slip {
+    border-radius: 14px 4px 12px 5px / 4px 12px 5px 14px;
+    background-color: rgba(253, 250, 241, 0.97);
+    border: 1.5px solid var(--ink-frame-border);
+    box-shadow:
+      4px 6px 20px rgba(20, 22, 28, 0.14),
+      inset 0 0 0 1px var(--ink-frame-secondary);
+    animation: marginNoteSlideIn 210ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  .dark .margin-note-slip {
+    background-color: rgba(20, 25, 34, 0.97);
+    box-shadow:
+      0 12px 32px rgba(0, 0, 0, 0.45),
+      inset 0 0 0 1px var(--ink-frame-secondary);
+  }
+
+  /* Interactive glossary keyword highlight inline inside text */
+  .glossary-keyword {
+    display: inline;
+    padding: 0 2px;
+    border-bottom: 1.6px dashed color-mix(in srgb, var(--ui-accent) 70%, transparent);
+    color: inherit;
+    transition: background-color 140ms ease, color 140ms ease;
+    cursor: pointer;
+  }
+
+  .glossary-keyword:hover,
+  .glossary-keyword[data-open='true'] {
+    color: var(--ui-accent);
+    background-color: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+    border-radius: 3px;
+  }
+
+  /* Scroll-driven narrative beat transition */
+  .scroll-beat {
+    transition: opacity 280ms ease, transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  /* Tactile direct-drag handle inside SVG math diagrams */
+  .hand-drag-handle:hover circle:nth-of-type(2) {
+    fill-opacity: 0.28;
+  }
+
+  .eco-mode .sketch-frame::before,
+  .eco-mode .sketch-controls-bar::before,
+  .eco-mode .sketch-card::before,
+  .eco-mode .sketch-btn::before,
+  .eco-mode .sketch-option::before,
+  .eco-mode .sketch-code-sheet::before,
+  .eco-mode .sketch-table-wrap::before,
+  .eco-mode .sketch-modal::before {
+    filter: none;
+  }
 }
 
 .font-display {

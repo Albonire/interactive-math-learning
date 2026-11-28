@@ -1,5 +1,6 @@
 import { SCENES } from '../core/curriculum';
-import { GUIDED_LESSONS } from '../core/lessons';
+import { STUDY_MODULES } from '../core/studyPlan';
+import type { StudyModuleId } from '../core/studyPlanTypes';
 import type { SceneId, ThemeMode } from '../core/types';
 import {
   CrayonLeaf,
@@ -12,16 +13,23 @@ import {
 import { RoughDivider, RoughUnderline } from './RoughElements';
 
 interface TopBarProps {
+  appView: 'module' | 'lab3d';
+  activeModuleId: StudyModuleId;
   activeSceneId: SceneId;
   drawerMode: 'closed' | 'computational' | 'challenge';
   mapOpen: boolean;
+  diagnosticOpen: boolean;
+  diagnosticDone: boolean;
   rhythmOpen: boolean;
   rhythmPlaying: boolean;
   rhythmBpm: number | null;
   theme: ThemeMode;
   ecoMode: boolean;
   audioEnabled: boolean;
+  onBackToModule: () => void;
   onToggleMap: () => void;
+  onToggleDiagnostic: () => void;
+  onOpenLinked3D: () => void;
   onOpenIntro: () => void;
   onToggleInspector: () => void;
   onToggleTheme: () => void;
@@ -31,22 +39,29 @@ interface TopBarProps {
 }
 
 /**
- * Calm, Intuitive 3-Zone Sketchbook Top Bar (converged graphite + cobalt palette):
- * - Zone 1: BIBIFOLD wordmark + quiet current lesson indicator (opens Índice)
- * - Zone 2: 3 clean editorial links (Índice · Teoría · Código)
- * - Zone 3: Subtle environment switches (Sonido · Eco · Pizarra/Papel)
+ * Calm, Intuitive 3-Zone Sketchbook Top Bar:
+ * - Zone 1: BIBIFOLD wordmark + active module/lab indicator
+ * - Zone 2: Clean editorial navigation (Plan · Diagnóstico · Lab 3D OR ← M# · Plan · Teoría · Código)
+ * - Zone 3: Environment switches (Ritmo · Sonido · Eco · Pizarra/Papel)
  */
 export function TopBar({
+  appView,
+  activeModuleId,
   activeSceneId,
   drawerMode,
   mapOpen,
+  diagnosticOpen,
+  diagnosticDone,
   rhythmOpen,
   rhythmPlaying,
   rhythmBpm,
   theme,
   ecoMode,
   audioEnabled,
+  onBackToModule,
   onToggleMap,
+  onToggleDiagnostic,
+  onOpenLinked3D,
   onOpenIntro,
   onToggleInspector,
   onToggleTheme,
@@ -54,8 +69,8 @@ export function TopBar({
   onToggleAudio,
   onToggleRhythm,
 }: TopBarProps) {
-  const meta = SCENES[activeSceneId];
-  const lesson = GUIDED_LESSONS[activeSceneId];
+  const mod = STUDY_MODULES[activeModuleId];
+  const sceneMeta = SCENES[activeSceneId];
   const audioEffectivelyOn = audioEnabled && !ecoMode;
 
   const linkClass = (isActive: boolean) =>
@@ -67,15 +82,16 @@ export function TopBar({
 
   return (
     <header className="relative z-30 w-full crayon-surface shrink-0">
-      <div className="h-[50px] sm:h-[54px] px-2.5 sm:px-5 lg:px-6 flex items-center justify-between gap-2 sm:gap-4 lg:gap-8">
-        {/* Zone 1: Brand + quiet current lesson marker */}
+      <div className="h-[50px] sm:h-[54px] px-2 sm:px-5 lg:px-6 flex items-center justify-between gap-1.5 sm:gap-4 lg:gap-8">
+        {/* Zone 1: Brand + quiet active module marker */}
         <div className="flex items-baseline gap-2 sm:gap-3 min-w-0 shrink-0 lg:shrink">
           <button
             type="button"
             onClick={() => {
               if (mapOpen) onToggleMap();
+              if (appView === 'lab3d') onBackToModule();
             }}
-            className="font-display crayon-ink text-[19px] sm:text-[24px] lg:text-[27px] leading-none tracking-wide text-[var(--text-primary)] whitespace-nowrap shrink-0 cursor-pointer"
+            className="font-display crayon-ink text-[18px] sm:text-[24px] lg:text-[27px] leading-none tracking-wide text-[var(--text-primary)] whitespace-nowrap shrink-0 cursor-pointer"
           >
             BIBIFOLD
           </button>
@@ -87,54 +103,107 @@ export function TopBar({
           <button
             type="button"
             onClick={onToggleMap}
-            title="Abrir Índice del Curso"
+            title="Abrir Plan Curricular (7 Fases, 32 Módulos)"
             className="hidden lg:inline-flex items-baseline gap-1.5 text-[15px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] truncate cursor-pointer transition-colors"
           >
-            <span className="text-[var(--text-muted)] whitespace-nowrap">
-              Lección {lesson.lessonNumber}/8
+            <span className="text-[var(--text-muted)] whitespace-nowrap font-mono text-[13px]">
+              {appView === 'lab3d' ? `Lab 3D · ${mod.id}` : `${mod.id}/32`}
             </span>
             <span className="font-display text-[17.5px] text-[var(--text-primary)] truncate">
-              {meta.shortLabel}
+              {appView === 'lab3d' ? sceneMeta.shortLabel : mod.shortLabel}
             </span>
           </button>
         </div>
 
-        {/* Zone 2: Clean 3-Link Editorial Navigation (converged cobalt active underline) */}
-        <nav aria-label="Navegación de la lección" className="flex items-center gap-3 sm:gap-5 lg:gap-7 shrink-0">
-          <button type="button" onClick={onToggleMap} className={linkClass(mapOpen)}>
-            Índice
+        {/* Zone 2: Clean Editorial Navigation */}
+        <nav aria-label="Navegación principal" className="flex items-center gap-2.5 sm:gap-5 lg:gap-7 shrink-0">
+          {appView === 'lab3d' && (
+            <button
+              type="button"
+              data-testid="back-to-module-btn"
+              onClick={onBackToModule}
+              className={linkClass(false)}
+            >
+              ← {mod.id}
+            </button>
+          )}
+
+          <button
+            type="button"
+            data-testid="nav-plan-btn"
+            onClick={onToggleMap}
+            className={linkClass(mapOpen)}
+          >
+            Plan
             {mapOpen && (
-              <span className="absolute left-0 right-0 -bottom-0.5">
+              <span aria-hidden="true" className="absolute left-0 right-0 -bottom-0.5">
                 <RoughUnderline crayon="cobalt" theme={theme} seed={31} />
               </span>
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenIntro}
-            title="Ver introducción teórica en pantalla completa"
-            className={linkClass(false)}
-          >
-            Teoría
-          </button>
+          {appView === 'module' ? (
+            <>
+              <button
+                type="button"
+                data-testid="nav-diagnostic-btn"
+                onClick={onToggleDiagnostic}
+                className={linkClass(diagnosticOpen)}
+              >
+                <span className="hidden sm:inline">Diagnóstico</span>
+                <span className="sm:hidden">Diag.</span>
+                {diagnosticDone && !diagnosticOpen && (
+                  <span className="ml-0.5 sm:ml-1 text-[12px] text-[var(--ui-success)]" aria-label="completado">
+                    ✓
+                  </span>
+                )}
+                {diagnosticOpen && (
+                  <span aria-hidden="true" className="absolute left-0 right-0 -bottom-0.5">
+                    <RoughUnderline crayon="cobalt" theme={theme} seed={43} />
+                  </span>
+                )}
+              </button>
 
-          <button
-            type="button"
-            onClick={onToggleInspector}
-            aria-expanded={drawerMode === 'computational'}
-            className={linkClass(drawerMode === 'computational')}
-          >
-            Código
-            {drawerMode === 'computational' && (
-              <span className="absolute left-0 right-0 -bottom-0.5">
-                <RoughUnderline crayon="cobalt" theme={theme} seed={43} />
-              </span>
-            )}
-          </button>
+              <button
+                type="button"
+                data-testid="nav-lab3d-btn"
+                onClick={onOpenLinked3D}
+                title="Abrir laboratorio 3D interactivo"
+                className={linkClass(false)}
+              >
+                <span className="hidden sm:inline">Lab 3D</span>
+                <span className="sm:hidden">3D</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onOpenIntro}
+                title="Ver introducción teórica en pantalla completa"
+                className={linkClass(false)}
+              >
+                Teoría
+              </button>
+
+              <button
+                type="button"
+                onClick={onToggleInspector}
+                aria-expanded={drawerMode === 'computational'}
+                className={linkClass(drawerMode === 'computational')}
+              >
+                Código
+                {drawerMode === 'computational' && (
+                  <span className="absolute left-0 right-0 -bottom-0.5">
+                    <RoughUnderline crayon="cobalt" theme={theme} seed={43} />
+                  </span>
+                )}
+              </button>
+            </>
+          )}
         </nav>
 
-        {/* Zone 3: Quiet Environment Switches (icon-only on phones for generous tap room) */}
+        {/* Zone 3: Quiet Environment Switches */}
         <div className="flex items-center gap-1.5 sm:gap-3.5 lg:gap-5 shrink-0">
           <button
             type="button"
