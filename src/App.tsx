@@ -76,6 +76,8 @@ import {
   type ProjectedAnnotation,
 } from './rendering/sceneAnnotations';
 import { TopBar } from './ui/TopBar';
+import { AnatomyScrollRail } from './ui/AnatomyScrollRail';
+import { useScrollAnatomy } from './rendering/useScrollAnatomy';
 import { EMPTY_RHYTHM, replaceStudyRhythm } from './storage/studyRhythm';
 import { CoursePipelineDock } from './ui/CoursePipelineDock';
 import { SlideDrawer } from './ui/SlideDrawer';
@@ -273,6 +275,20 @@ export default function App() {
   // Three.js isolated host container
   const canvasHostRef = useRef<HTMLDivElement | null>(null);
   const managerRef = useRef<SceneManager | null>(null);
+
+  // Scroll-driven Modo Anatomía: while "Separar vista" is on, vertical scroll peels the model apart.
+  const applyExplodeAmount = useCallback((amount: number | null) => {
+    managerRef.current?.setExplodeAmount(amount);
+  }, []);
+  const setWheelZoom = useCallback((enabledZoom: boolean) => {
+    managerRef.current?.setWheelZoomEnabled(enabledZoom);
+  }, []);
+  const anatomyScroll = useScrollAnatomy({
+    enabled: appView === 'lab3d' && exploded && !webglLost && !introOpen,
+    hostRef: canvasHostRef,
+    apply: applyExplodeAmount,
+    setWheelZoom,
+  });
 
   const sceneMeta = SCENES[sceneId];
   const activeLesson = GUIDED_LESSONS[sceneId];
@@ -1748,6 +1764,15 @@ export default function App() {
               className="absolute inset-0 w-full h-full touch-none"
             />
           </SketchAnimationWrapper>
+        )}
+
+        {appView === 'lab3d' && exploded && !webglLost && !introOpen && (
+          <AnatomyScrollRail
+            theme={theme}
+            amount={anatomyScroll.amount}
+            scrolled={anatomyScroll.scrolled}
+            onSetTarget={anatomyScroll.setTarget}
+          />
         )}
 
         {appView === 'lab3d' && webglLost && (
