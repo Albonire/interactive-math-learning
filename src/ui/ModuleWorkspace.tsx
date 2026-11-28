@@ -17,6 +17,7 @@ import { HandCrafted3DStage } from '../visuals/HandCrafted3DStage';
 import { ModuleVisualDispatcher } from '../visuals/ModuleVisualDispatcher';
 import { VisualStateReportProvider } from '../visuals/VisualHelpers';
 import { IntuitionChallenge } from './IntuitionChallenge';
+import { PythonLab } from './PythonLab';
 import { CrayonDictionaryProvider, GlossaryText } from './CrayonDictionary';
 import {
   CrayonArrowLeft,
@@ -95,7 +96,6 @@ export function ModuleWorkspace({
   const [attempt, setAttempt] = useState(0);
   const [eliminated, setEliminated] = useState<ReadonlySet<number>>(() => new Set());
   const [solved, setSolved] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [sessionSalt] = useState(createSessionSalt);
 
   // Scroll-driven state
@@ -121,7 +121,6 @@ export function ModuleWorkspace({
     setEliminated(new Set());
     setSolved(false);
     setLastWrong(null);
-    setCopied(false);
     setPageProgress(0);
     setStoryProgress(0);
     setActiveBeat(0);
@@ -317,13 +316,6 @@ export function ModuleWorkspace({
     setRoundOutcome(null);
   };
 
-  const handleCopyCode = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      void navigator.clipboard.writeText(mod.pythonLab.code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    }
-  };
 
   return (
     <CrayonDictionaryProvider
@@ -995,23 +987,13 @@ export function ModuleWorkspace({
                     IV. {mod.pythonLab.title}
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  data-tone={copied ? 'success' : undefined}
-                  className="sketch-btn px-3 py-1 text-[14px] font-hand text-[var(--text-primary)] cursor-pointer"
-                >
-                  {copied ? '✓ Copiado al cuaderno' : 'Copiar código'}
-                </button>
               </div>
 
               <p className="text-[16px] text-[var(--text-secondary)] max-w-[780px]">
                 <GlossaryText text={mod.pythonLab.task} />
               </p>
 
-              <pre className="sketch-code-open py-3 pr-4 font-mono-math text-[12.5px] sm:text-[13.5px] text-[var(--text-primary)] overflow-x-auto leading-[22px]">
-                {mod.pythonLab.code}
-              </pre>
+              <PythonLab moduleId={moduleId} original={mod.pythonLab.code} />
 
               <p className="text-[15.5px] text-[var(--text-secondary)] max-w-[820px]">
                 <strong className="font-display text-[17px] font-normal text-[var(--text-primary)]">
