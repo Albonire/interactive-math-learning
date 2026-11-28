@@ -66,14 +66,38 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
   {
     id: 'biyeccion',
     term: 'Biyección',
-    aliases: ['biyección', 'biyectiva', 'biyectivo', 'inyectiva', 'sobreyectiva'],
+    aliases: ['biyección', 'biyecciones', 'biyectiva', 'biyectivo'],
     category: 'Teoría de Conjuntos',
     crayon: 'sage',
     intuition:
       'Emparejamiento perfecto uno a uno entre dos conjuntos: nada queda sin pareja y ninguna salida se repite, por lo que existe función inversa.',
     latex: 'f^{-1}(f(x)) = x \\quad \\forall x \\in A',
     marginExample: 'Una matriz invertible es una biyección lineal entre ℝⁿ y ℝⁿ.',
-    relatedModuleId: 'M3',
+    relatedModuleId: 'M8',
+  },
+  {
+    id: 'inyectiva',
+    term: 'Función inyectiva',
+    aliases: ['inyectiva', 'inyectivas', 'inyectivo', 'inyección'],
+    category: 'Teoría de Conjuntos',
+    crayon: 'sage',
+    intuition:
+      'Ninguna salida recibe dos flechas: entradas distintas siempre producen salidas distintas. Puede sobrar codominio sin flecha.',
+    latex: 'f(a) = f(b) \\implies a = b',
+    marginExample: 'x ↦ 2x en los enteros es inyectiva, pero no sobreyectiva: ningún entero va al 3.',
+    relatedModuleId: 'M8',
+  },
+  {
+    id: 'sobreyectiva',
+    term: 'Función sobreyectiva',
+    aliases: ['sobreyectiva', 'sobreyectivas', 'sobreyectivo', 'suprayectiva'],
+    category: 'Teoría de Conjuntos',
+    crayon: 'sage',
+    intuition:
+      'Todo elemento del codominio recibe al menos una flecha: la imagen cubre el codominio completo. Puede haber salidas con varias flechas.',
+    latex: '\\forall y \\in B\\; \\exists x \\in A:\\; f(x) = y',
+    marginExample: 'x ↦ x² de ℝ en [0, ∞) es sobreyectiva, pero no inyectiva: 2 y −2 caen en 4.',
+    relatedModuleId: 'M8',
   },
   {
     id: 'cuantificador',
@@ -90,7 +114,7 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
   {
     id: 'contradiccion',
     term: 'Demostración por contradicción',
-    aliases: ['contradicción', 'contraejemplo', 'contrapositiva'],
+    aliases: ['contradicción', 'reducción al absurdo'],
     category: 'Demostración',
     crayon: 'vermilion',
     intuition:
@@ -100,15 +124,51 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
     relatedModuleId: 'M6',
   },
   {
+    id: 'contrapositiva',
+    term: 'Contrapositiva',
+    aliases: ['contrapositiva', 'contrarrecíproca', 'contrarrecíproco'],
+    category: 'Lógica',
+    crayon: 'plum',
+    intuition:
+      'La implicación "si P entonces Q" es lógicamente equivalente a "si no Q entonces no P". La recíproca "si Q entonces P", en cambio, no lo es.',
+    latex: '(P \\Rightarrow Q) \\iff (\\neg Q \\Rightarrow \\neg P)',
+    marginExample: 'Para probar "si n² es par, n es par" basta probar "si n es impar, n² es impar".',
+    relatedModuleId: 'M6',
+  },
+  {
+    id: 'contraejemplo',
+    term: 'Contraejemplo',
+    aliases: ['contraejemplo', 'contraejemplos'],
+    category: 'Lógica',
+    crayon: 'vermilion',
+    intuition:
+      'Un único caso concreto donde la hipótesis se cumple y la conclusión falla basta para refutar una afirmación universal. Mil ejemplos a favor no la prueban.',
+    latex: '\\neg\\,\\forall x\\, P(x) \\iff \\exists x\\, \\neg P(x)',
+    marginExample: '"n² + n + 41 siempre es primo" falla en n = 40: da 1681 = 41².',
+    relatedModuleId: 'M6',
+  },
+  {
     id: 'induccion',
     term: 'Inducción matemática',
-    aliases: ['inducción', 'inductivo', 'recursión', 'recursiva', 'memoización'],
+    aliases: ['inducción', 'inductivo', 'inductiva', 'paso inductivo', 'caso base'],
     category: 'Matemática Discreta',
     crayon: 'ochre',
     intuition:
       'Efecto dominó formal: pruebas que cae la primera ficha (caso base) y que cualquier ficha derriba a la siguiente (paso inductivo).',
     latex: 'P(1) \\land \\forall k\\,(P(k)\\Rightarrow P(k+1)) \\implies \\forall n\\, P(n)',
-    marginExample: 'Es la gemela teórica de la recursión y la programación dinámica en código.',
+    marginExample: 'Es la gemela teórica de la recursión: el caso base detiene la cadena y el paso la propaga.',
+    relatedModuleId: 'M7',
+  },
+  {
+    id: 'recursion',
+    term: 'Recursión y memoización',
+    aliases: ['recursión', 'recursiva', 'recursivo', 'recursivas', 'recursivos', 'memoización'],
+    category: 'Discretas y Computación',
+    crayon: 'ochre',
+    intuition:
+      'Definir un objeto o un cálculo en términos de versiones más pequeñas de sí mismo, con un caso base que corta la cadena. Memoizar guarda resultados ya calculados para no repetirlos.',
+    latex: 'F(n) = F(n-1) + F(n-2),\\quad F(0)=0,\\; F(1)=1',
+    marginExample: 'Fibonacci recursivo ingenuo hace un número exponencial de llamadas; memoizado hace n + 1.',
     relatedModuleId: 'M7',
   },
   {
@@ -131,14 +191,14 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
     crayon: 'cobalt',
     intuition:
       'Describe cómo crece el costo de un algoritmo o una suma cuando el tamaño de entrada n se vuelve muy grande, ignorando constantes menores.',
-    latex: 'f(n) = O(g(n)) \\iff \\exists c, n_0:\\; f(n) \\le c\\,g(n)',
+    latex: 'f(n) = O(g(n)) \\iff \\exists\\, c > 0,\\, n_0:\\; \\forall n \\ge n_0,\\; f(n) \\le c\\,g(n)',
     marginExample: 'Búsqueda binaria O(log n) encuentra 1 elemento entre 1 millón en solo 20 pasos.',
     relatedModuleId: 'M9',
   },
   {
     id: 'modular',
     term: 'Aritmética modular',
-    aliases: ['aritmética modular', 'modular', 'congruencia', 'módulo', 'residuo'],
+    aliases: ['aritmética modular', 'modular', 'congruencia', 'congruencias', 'módulo n'],
     category: 'Teoría de Números',
     crayon: 'ochre',
     intuition:
@@ -156,7 +216,7 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
     intuition:
       'Colección de vértices unidos por aristas que modela redes, rutas y dependencias. Un DAG es un grafo dirigido sin ciclos.',
     latex: 'G = (V, E)',
-    marginExample: 'Toda red neuronal y todo gestor de paquetes (npm) se evalúan sobre un DAG.',
+    marginExample: 'Una red feedforward y el árbol de dependencias de npm se ordenan y evalúan sobre un DAG.',
     relatedModuleId: 'M12',
   },
   {
@@ -198,13 +258,25 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
   {
     id: 'taylor',
     term: 'Serie de Taylor',
-    aliases: ['serie de Taylor', 'polinomio de Taylor', 'Taylor', 'convergencia'],
+    aliases: ['serie de Taylor', 'polinomio de Taylor', 'Taylor'],
     category: 'Análisis',
     crayon: 'plum',
     intuition:
       'Aproxima funciones complejas (como sen x o eˣ) mediante polinomios construidos con sus derivadas en un punto.',
     latex: 'f(x) \\approx \\sum_{k=0}^{n} \\frac{f^{(k)}(a)}{k!}(x-a)^k',
     marginExample: 'Con solo x − x³/6, ya aproximas sin(x) con gran precisión cerca del origen.',
+    relatedModuleId: 'M16',
+  },
+  {
+    id: 'convergencia',
+    term: 'Convergencia',
+    aliases: ['convergencia', 'converge', 'convergen', 'convergente', 'radio de convergencia'],
+    category: 'Cálculo y Análisis',
+    crayon: 'sage',
+    intuition:
+      'Una sucesión, serie o algoritmo converge cuando sus valores se estabilizan cada vez más cerca de un único límite, tan cerca como se exija.',
+    latex: '\\forall \\varepsilon > 0\\; \\exists N:\\; n \\ge N \\implies |a_n - L| < \\varepsilon',
+    marginExample: '1/2 + 1/4 + 1/8 + ⋯ converge a 1; en cambio 1 + 1/2 + 1/3 + ⋯ crece sin cota.',
     relatedModuleId: 'M16',
   },
   {
@@ -274,9 +346,9 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
     category: 'Álgebra Lineal',
     crayon: 'plum',
     intuition:
-      'Direcciones privilegiadas que una matriz NO rota: solo las estira o encoge por un factor escalar λ (su eigenvalor).',
+      'Direcciones privilegiadas que una matriz no saca de su recta: solo las estira, encoge o invierte por un factor escalar λ (su eigenvalor).',
     latex: 'A\\vec{v} = \\lambda\\vec{v}',
-    marginExample: 'El eje de rotación de un trompo es su eigenvector real con λ = 1.',
+    marginExample: 'Una rotación en 3D deja fijo su eje: ese eje es un eigenvector con λ = 1.',
     relatedModuleId: 'M22',
   },
   {
@@ -300,13 +372,13 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
     intuition:
       'Regla matemática para actualizar tus creencias cuando llega evidencia nueva, ponderando cuán rara era la hipótesis inicialmente.',
     latex: 'P(H\\mid E) = \\frac{P(E\\mid H)\\,P(H)}{P(E)}',
-    marginExample: 'Un test con 95% de precisión puede dar mayoría de falsos positivos si la condición es rara (1%).',
+    marginExample: 'Con sensibilidad y especificidad del 95% y una prevalencia del 1%, solo ~16% de los positivos están realmente enfermos.',
     relatedModuleId: 'M24',
   },
   {
     id: 'distribucion',
     term: 'Distribución y esperanza',
-    aliases: ['distribución', 'distribuciones', 'esperanza', 'varianza', 'covarianza', 'gaussiana', 'normal'],
+    aliases: ['distribución', 'distribuciones', 'esperanza', 'varianza', 'gaussiana', 'distribución normal', 'campana normal'],
     category: 'Probabilidad y Estadística',
     crayon: 'cobalt',
     intuition:
@@ -316,15 +388,39 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
     relatedModuleId: 'M25',
   },
   {
+    id: 'covarianza',
+    term: 'Covarianza y correlación',
+    aliases: ['covarianza', 'covarianzas', 'correlación', 'matriz de covarianza'],
+    category: 'Probabilidad',
+    crayon: 'ochre',
+    intuition:
+      'Mide si dos variables tienden a moverse juntas (positiva) u opuestas (negativa). La correlación la normaliza a [−1, 1] y solo detecta relaciones lineales.',
+    latex: '\\operatorname{Cov}(X,Y) = \\mathbb{E}[(X-\\mu_X)(Y-\\mu_Y)],\\quad \\rho = \\frac{\\operatorname{Cov}(X,Y)}{\\sigma_X\\sigma_Y}',
+    marginExample: 'Si Y = X² con X simétrica en torno a 0, la correlación es 0 aunque Y dependa por completo de X.',
+    relatedModuleId: 'M26',
+  },
+  {
     id: 'tlc',
     term: 'Teorema del Límite Central',
-    aliases: ['límite central', 'TLC', 'ley de grandes números'],
+    aliases: ['límite central', 'TLC', 'teorema del límite central'],
     category: 'Inferencia Estadística',
     crayon: 'sage',
     intuition:
-      'Al promediar muchas variables independientes con cualquier forma inicial, la distribución de sus medias converge a una campana normal.',
+      'Al promediar muchas variables independientes e idénticamente distribuidas con varianza finita, la media estandarizada converge a una campana normal, sea cual sea la forma inicial.',
     latex: '\\frac{\\bar{X}_n - \\mu}{\\sigma/\\sqrt{n}} \\xrightarrow{d} \\mathcal{N}(0, 1)',
-    marginExample: 'Por eso el error estándar se reduce como 1/√n al cuadruplicar el tamaño de muestra.',
+    marginExample: 'Medias de dados (uniformes) ya forman una campana con n ≈ 30; el ancho se reduce como σ/√n.',
+    relatedModuleId: 'M26',
+  },
+  {
+    id: 'lgn',
+    term: 'Ley de los grandes números',
+    aliases: ['ley de grandes números', 'ley de los grandes números', 'LGN'],
+    category: 'Probabilidad',
+    crayon: 'cobalt',
+    intuition:
+      'La media muestral de observaciones independientes se acerca a la esperanza verdadera a medida que crece n. Habla del valor de la media, no de su forma (eso es el TLC).',
+    latex: '\\bar{X}_n \\xrightarrow{p} \\mu \\quad (n \\to \\infty)',
+    marginExample: 'La fracción de caras de una moneda justa se estabiliza cerca de 0.5, aunque las rachas nunca desaparecen.',
     relatedModuleId: 'M26',
   },
   {
@@ -378,13 +474,25 @@ export const GLOSSARY_ENTRIES: ReadonlyArray<GlossaryEntry> = [
   {
     id: 'grupo',
     term: 'Grupos y simetría',
-    aliases: ['grupo', 'grupos', 'simetría', 'simetrías', 'Cayley', 'conforme', 'análisis complejo'],
+    aliases: ['teoría de grupos', 'grupo diédrico', 'grupos de simetría', 'grupo de simetrías', 'estructura de grupo', 'tabla de Cayley'],
     category: 'Álgebra Abstracta',
     crayon: 'ochre',
     intuition:
       'Estructura algebraica que captura todas las transformaciones reversibles (rotaciones, reflexiones) que dejan invariante un objeto.',
     latex: 'r\\cdot s \\neq s\\cdot r \\quad (D_4\\text{ no es abeliano})',
     marginExample: 'Girar un cuadrado 90° y voltearlo produce un resultado distinto a voltearlo primero y girarlo.',
+    relatedModuleId: 'M32',
+  },
+  {
+    id: 'conforme',
+    term: 'Transformación conforme',
+    aliases: ['transformación conforme', 'mapeo conforme', 'función conforme', 'conformes'],
+    category: 'Análisis Complejo',
+    crayon: 'plum',
+    intuition:
+      'Una función compleja derivable con f′(z) ≠ 0 conserva ángulos (y orientación) en cada punto: localmente gira y escala, como multiplicar por el número complejo f′(z).',
+    latex: 'f(z) \\approx f(z_0) + f\'(z_0)\\,(z - z_0)',
+    marginExample: 'z ↦ z² dobla los ángulos en el origen (allí f′ = 0), pero los conserva en cualquier otro punto.',
     relatedModuleId: 'M32',
   },
 ];
