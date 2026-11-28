@@ -16,7 +16,7 @@ interface Props {
   theme: ThemeMode;
   state: VisualState | null;
   /** Called once per solved step (counts as study activity for the streak). */
-  onStepSolved: () => void;
+  onStepSolved: (stepIndex: number) => void;
 }
 
 export function IntuitionChallenge({ moduleId, theme, state, onStepSolved }: Props) {
@@ -40,7 +40,7 @@ export function IntuitionChallenge({ moduleId, theme, state, onStepSolved }: Pro
     if (steps[stepIdx].check(state)) {
       setSolvedIdx(stepIdx);
       setShowHint(false);
-      onSolvedRef.current();
+      onSolvedRef.current(stepIdx);
     }
   }, [steps, done, state, stepIdx, solvedIdx]);
 

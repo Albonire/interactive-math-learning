@@ -1,4 +1,5 @@
 import { getStudyRhythmSnapshot, sanitizeStudyRhythm, type StudyRhythmState } from './studyRhythm';
+import { getGameSnapshot, sanitizeGame, type GameState } from './gameProgress';
 import type { BktSkillState, SceneId, SkillId } from '../core/types';
 import type { StudyModuleId } from '../core/studyPlanTypes';
 import { isValidStudyModuleId } from '../core/studyPlan';
@@ -33,6 +34,8 @@ export interface PortableProgressBundle {
   completedStepIds: string[];
   /** Streak and spaced-review schedule (optional: older backups do not have it). */
   studyRhythm?: StudyRhythmState;
+  /** Trazos, daily goal and achievements (optional: older backups do not have it). */
+  game?: GameState;
 }
 
 const VALID_SCENE_IDS: ReadonlySet<string> = new Set<SceneId>([
@@ -180,7 +183,8 @@ export function savePersistedAiData(data: PersistedAiData): void {
 export function exportProgressJson(
   aiData: PersistedAiData,
   completedStepIds: Iterable<string>,
-  studyRhythm: StudyRhythmState = getStudyRhythmSnapshot()
+  studyRhythm: StudyRhythmState = getStudyRhythmSnapshot(),
+  game: GameState = getGameSnapshot()
 ): string {
   const bundle: PortableProgressBundle = {
     schema: 'bibifold-progress',
@@ -189,6 +193,7 @@ export function exportProgressJson(
     aiData,
     completedStepIds: Array.from(completedStepIds),
     studyRhythm,
+    game,
   };
   return JSON.stringify(bundle, null, 2);
 }
@@ -199,6 +204,8 @@ export function parseImportedProgressJson(rawJson: string): {
   completedStepIds: string[];
   /** null when the backup predates the study rhythm: keep the local one. */
   studyRhythm: StudyRhythmState | null;
+  /** null when the backup predates the game layer: keep the local one. */
+  game: GameState | null;
 } | {
   ok: false;
   error: string;
@@ -216,7 +223,8 @@ export function parseImportedProgressJson(rawJson: string): {
       ? parsed.completedStepIds.filter((s): s is string => typeof s === 'string')
       : [];
     const studyRhythm = parsed.studyRhythm === undefined ? null : sanitizeStudyRhythm(parsed.studyRhythm);
-    return { ok: true, aiData: migrated, completedStepIds: steps, studyRhythm };
+    const game = parsed.game === undefined ? null : sanitizeGame(parsed.game);
+    return { ok: true, aiData: migrated, completedStepIds: steps, studyRhythm, game };
   } catch {
     return { ok: false, error: 'No se pudo leer el JSON. Verifica que no esté dañado.' };
   }

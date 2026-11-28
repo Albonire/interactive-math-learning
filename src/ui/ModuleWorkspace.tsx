@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSessionSalt, hashStringSeed, shuffledOptionOrder } from '../core/optionShuffle';
 import { getModuleQuestions, pickQuestionIndex } from '../core/questionBank';
-import { REVIEW_INTERVALS_DAYS, useStudyRhythm } from '../storage/studyRhythm';
+import { REVIEW_INTERVALS_DAYS, localDay, useStudyRhythm } from '../storage/studyRhythm';
+import { XP, getGameSnapshot, useGameProgress, xpOnDay } from '../storage/gameProgress';
+import { INTUITION_CHALLENGES } from '../core/intuitionChallenges';
+import { STUDY_PHASES } from '../core/studyPlan';
+import { GameHud, GameToasts, useGameToasts } from './GameHud';
+import { WelcomeGuide, hasSeenWelcome, markWelcomeSeen, shouldAutoShowWelcome } from './WelcomeGuide';
 import {
   STUDY_MODULES,
   STUDY_PHASES_MAP,
@@ -17,6 +22,7 @@ import { HandCrafted3DStage } from '../visuals/HandCrafted3DStage';
 import { ModuleVisualDispatcher } from '../visuals/ModuleVisualDispatcher';
 import { VisualStateReportProvider } from '../visuals/VisualHelpers';
 import { IntuitionChallenge } from './IntuitionChallenge';
+import { PythonLab } from './PythonLab';
 import { CrayonDictionaryProvider, GlossaryText } from './CrayonDictionary';
 import {
   CrayonArrowLeft,
@@ -95,7 +101,6 @@ export function ModuleWorkspace({
   const [attempt, setAttempt] = useState(0);
   const [eliminated, setEliminated] = useState<ReadonlySet<number>>(() => new Set());
   const [solved, setSolved] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [sessionSalt] = useState(createSessionSalt);
 
   // Scroll-driven state
@@ -121,7 +126,6 @@ export function ModuleWorkspace({
     setEliminated(new Set());
     setSolved(false);
     setLastWrong(null);
-    setCopied(false);
     setPageProgress(0);
     setStoryProgress(0);
     setActiveBeat(0);
@@ -238,6 +242,75 @@ export function ModuleWorkspace({
 
   // ── Study rhythm: streak + spaced re-checks of sealed modules ──
   const rhythm = useStudyRhythm(completedModuleIds);
+
+  // ── Game layer: trazos only for learning actions, each granted once (see gameProgress.ts) ──
+  const game = useGameProgress();
+  const { toasts, push: pushToast } = useGameToasts();
+  const grant = useCallback(
+    (key: string, xp: number, label: string) => {
+      const before = xpOnDay(getGameSnapshot(), localDay());
+      if (!game.award(key, xp)) return;
+      pushToast({ tone: 'xp', title: `+${xp} trazos`, detail: label });
+      const goal = getGameSnapshot().goal;
+      if (before < goal && before + xp >= goal) {
+        pushToast({ tone: 'goal', title: 'Meta del día cumplida', detail: `${goal} trazos hoy. Lo que sumes ahora es extra.` });
+      }
+    },
+    [game, pushToast]
+  );
+  const [welcomeOpen, setWelcomeOpen] = useState(() =>
+    shouldAutoShowWelcome({ seen: hasSeenWelcome(), sealed: completedModuleIds.size, trazos: game.total })
+  );
+  const closeWelcome = useCallback(() => {
+    markWelcomeSeen();
+    setWelcomeOpen(false);
+  }, []);
+
+  const completedPhases = useMemo(
+    () => STUDY_PHASES.filter((ph) => ph.moduleIds.length > 0 && ph.moduleIds.every((id) => completedModuleIds.has(id))).length,
+    [completedModuleIds]
+  );
+  useEffect(() => {
+    const fresh = game.syncAchievements({ sealedCount: completedModuleIds.size, completedPhases, streak: rhythm.streak });
+    // On a first load with lots of earlier progress, celebrate at most two and summarize the rest.
+    fresh.slice(0, 2).forEach((a) => pushToast({ tone: 'achievement', title: `Logro: ${a.title}`, detail: a.detail }));
+    if (fresh.length > 2) pushToast({ tone: 'achievement', title: `+${fresh.length - 2} logros más`, detail: 'Míralos en el cuaderno de logros.' });
+  }, [completedModuleIds.size, completedPhases, rhythm.streak, game.total, game, pushToast]);
+
+  const challengeSteps = INTUITION_CHALLENGES[moduleId]?.length ?? 0;
+  const chapterDone: Record<ChapterId, boolean> = {
+    intuition: challengeSteps > 0 && Array.from({ length: challengeSteps }, (_, i) => game.has(`ch:${moduleId}:${i}`)).every(Boolean),
+    story3d: game.has(`story:${moduleId}`),
+    atlas: false,
+    practice: isCompleted,
+  };
+
+  // Chapter II counts as read only when each of its four beats was actually on screen for a while,
+  // so jumping past it with the chapter navigation (a smooth scroll through it) does not count.
+  const beatDwell = useRef<number[]>([0, 0, 0, 0]);
+  const beatSince = useRef<{ beat: number; t: number } | null>(null);
+  useEffect(() => {
+    beatDwell.current = [0, 0, 0, 0];
+    beatSince.current = null;
+  }, [moduleId]);
+  useEffect(() => {
+    const now = performance.now();
+    const prev = beatSince.current;
+    if (prev) beatDwell.current[prev.beat] += now - prev.t;
+    beatSince.current = { beat: activeBeat, t: now };
+    // Credit the current beat even if the reader rests on it without scrolling again.
+    const id = window.setTimeout(() => {
+      const cur = beatSince.current;
+      if (!cur) return;
+      const dwell = [...beatDwell.current];
+      dwell[cur.beat] += performance.now() - cur.t;
+      if (dwell.every((ms) => ms >= 1500)) grant(`story:${moduleId}`, XP.story, 'Recorriste el capítulo 3D completo');
+    }, 1600);
+    const dwellNow = beatDwell.current;
+    if (dwellNow.every((ms) => ms >= 1500)) grant(`story:${moduleId}`, XP.story, 'Recorriste el capítulo 3D completo');
+    return () => window.clearTimeout(id);
+  }, [activeBeat, moduleId, grant]);
+
   const [visualState, setVisualState] = useState<Record<string, unknown> | null>(null);
   useEffect(() => setVisualState(null), [moduleId]);
   const reviewMode = isCompleted && rhythm.isDue(moduleId);
@@ -293,12 +366,15 @@ export function ModuleWorkspace({
         const nextStage = firstTry ? Math.min(REVIEW_INTERVALS_DAYS.length - 1, stage + 1) : 0;
         rhythm.onReviewed(moduleId, firstTry);
         setRoundOutcome({ kind: 'review', firstTry, nextDays: REVIEW_INTERVALS_DAYS[nextStage] });
+        if (firstTry) grant(`review:${moduleId}:${localDay()}`, XP.review, 'Lo recordabas en el repaso');
       } else if (firstTry) {
         if (!isCompleted) {
           onMarkModuleCompleted(moduleId);
           rhythm.onSealed(moduleId);
           setRoundOutcome({ kind: 'seal' });
+          grant(`seal:${moduleId}`, XP.seal, `Sellaste ${moduleId}`);
         }
+        grant(`q:${q.id}`, XP.practice, 'Pregunta nueva acertada a la primera');
       }
     } else {
       // Cross the distractor out, but never reveal which option is right.
@@ -317,13 +393,6 @@ export function ModuleWorkspace({
     setRoundOutcome(null);
   };
 
-  const handleCopyCode = () => {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      void navigator.clipboard.writeText(mod.pythonLab.code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    }
-  };
 
   return (
     <CrayonDictionaryProvider
@@ -363,6 +432,11 @@ export function ModuleWorkspace({
                     }`}
                   >
                     {ch.label}
+                    {chapterDone[ch.id] && (
+                      <span className="ml-1 text-[var(--ui-success)]" aria-label="completado">
+                        ✓
+                      </span>
+                    )}
                     {isAct && (
                       <span aria-hidden="true" className="absolute left-0 right-0 -bottom-1">
                         <RoughUnderline crayon="cobalt" theme={theme} seed={ch.id.length * 13 + 5} />
@@ -373,10 +447,15 @@ export function ModuleWorkspace({
               })}
             </nav>
 
-            <div className="hidden md:flex items-center gap-2 text-[13px] font-hand text-[var(--text-muted)]">
-              <CrayonPencil size={13} className="text-[var(--ui-accent)] opacity-80" />
-              <span>Toca palabras subrayadas para el Crayón Diccionario</span>
-            </div>
+            <GameHud
+              theme={theme}
+              state={game.state}
+              total={game.total}
+              todayXp={game.todayXp}
+              level={game.level}
+              onSetGoal={game.setGoal}
+              onShowGuide={() => setWelcomeOpen(true)}
+            />
           </div>
 
           {/* Continuous hand-drawn wavy crayon scroll progress thread */}
@@ -640,7 +719,10 @@ export function ModuleWorkspace({
               moduleId={moduleId}
               theme={theme}
               state={visualState}
-              onStepSolved={rhythm.markActive}
+              onStepSolved={(i) => {
+                rhythm.markActive();
+                grant(`ch:${moduleId}:${i}`, XP.challengeStep, `Paso ${i + 1} del reto de intuición`);
+              }}
             />
 
             <VisualStateReportProvider value={setVisualState}>
@@ -873,7 +955,7 @@ export function ModuleWorkspace({
                   <div className="font-hand text-[14px] text-[var(--ui-accent)]">
                     Peldaño C · Definición formal
                   </div>
-                  <div className="py-2.5 px-3 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto text-[18px] text-[var(--text-primary)]">
+                  <div className="formula-nowrap py-2.5 px-3 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto text-[18px] text-[var(--text-primary)]">
                     <KatexInline latex={mod.concreteExample.latex} />
                   </div>
                   <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed">
@@ -995,23 +1077,17 @@ export function ModuleWorkspace({
                     IV. {mod.pythonLab.title}
                   </h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCopyCode}
-                  data-tone={copied ? 'success' : undefined}
-                  className="sketch-btn px-3 py-1 text-[14px] font-hand text-[var(--text-primary)] cursor-pointer"
-                >
-                  {copied ? '✓ Copiado al cuaderno' : 'Copiar código'}
-                </button>
               </div>
 
               <p className="text-[16px] text-[var(--text-secondary)] max-w-[780px]">
                 <GlossaryText text={mod.pythonLab.task} />
               </p>
 
-              <pre className="sketch-code-open py-3 pr-4 font-mono-math text-[12.5px] sm:text-[13.5px] text-[var(--text-primary)] overflow-x-auto leading-[22px]">
-                {mod.pythonLab.code}
-              </pre>
+              <PythonLab
+                moduleId={moduleId}
+                original={mod.pythonLab.code}
+                onRunSuccess={() => grant(`lab:${moduleId}`, XP.lab, 'Ejecutaste el laboratorio')}
+              />
 
               <p className="text-[15.5px] text-[var(--text-secondary)] max-w-[820px]">
                 <strong className="font-display text-[17px] font-normal text-[var(--text-primary)]">
@@ -1204,6 +1280,23 @@ export function ModuleWorkspace({
           </section>
         </div>
       </div>
+      <GameToasts toasts={toasts} />
+      {welcomeOpen && (
+        <WelcomeGuide
+          theme={theme}
+          goal={game.state.goal}
+          onSetGoal={game.setGoal}
+          onStartDiagnostic={() => {
+            closeWelcome();
+            onOpenDiagnostic();
+          }}
+          onStartHere={() => {
+            closeWelcome();
+            if (moduleId !== 'M1') onSelectModule('M1');
+          }}
+          onClose={closeWelcome}
+        />
+      )}
     </CrayonDictionaryProvider>
   );
 }
