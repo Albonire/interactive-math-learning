@@ -8,6 +8,7 @@ import {
   VisualStageCard,
   clientToSvgPoint,
   useDiagramDrag,
+  useReportVisualState,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -51,6 +52,7 @@ export function M13Visual({ theme }: ModuleVisualProps) {
     else setDeltaSafe(invX(pt.x) - a);
   });
 
+  useReportVisualState({ kind, eps, delta, insideBand });
   return (
     <VisualStageCard
       controls={
@@ -331,6 +333,7 @@ export function M15Visual({ theme }: ModuleVisualProps) {
   // Drag the upper limit b along the axis: the accumulated area grows at rate f(b) (TFC).
   const drag = useDiagramDrag<'b'>((_, pt) => setB(((pt.x - 55) / 470) * 3.2));
 
+  useReportVisualState({ b: upperB, n: nRect, approx, exact: exactF(upperB) });
   return (
     <VisualStageCard
       controls={
@@ -503,6 +506,7 @@ export function M17Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   // Walk the point across the contour map: the gradient arrow follows your finger.
   const drag = useDiagramDrag<'p'>((_, pt) => setPoint((pt.x - 170) / 62, (115 - pt.y) / 50));
 
+  useReportVisualState({ surface, px, py, gx, gy });
   return (
     <VisualStageCard
       controls={

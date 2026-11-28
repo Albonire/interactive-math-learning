@@ -4,6 +4,7 @@ import {
   ParamSlider,
   VisualModeTabs,
   VisualStageCard,
+  useReportVisualState,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -408,6 +409,7 @@ export function M10Visual({ theme }: ModuleVisualProps) {
   const bigH = Math.min(eucA, eucB);
   const tileScale = Math.min(420 / bigW, 175 / bigH);
 
+  useReportVisualState({ tab, n: modM, a: multA, hasInverse: inverse !== null, inverse });
   return (
     <div>
       <VisualModeTabs

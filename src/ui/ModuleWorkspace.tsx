@@ -15,6 +15,8 @@ import { SCENES } from '../core/curriculum';
 import type { SceneId, ThemeMode } from '../core/types';
 import { HandCrafted3DStage } from '../visuals/HandCrafted3DStage';
 import { ModuleVisualDispatcher } from '../visuals/ModuleVisualDispatcher';
+import { VisualStateReportProvider } from '../visuals/VisualHelpers';
+import { IntuitionChallenge } from './IntuitionChallenge';
 import { CrayonDictionaryProvider, GlossaryText } from './CrayonDictionary';
 import {
   CrayonArrowLeft,
@@ -201,6 +203,8 @@ export function ModuleWorkspace({
 
   // ── Study rhythm: streak + spaced re-checks of sealed modules ──
   const rhythm = useStudyRhythm(completedModuleIds);
+  const [visualState, setVisualState] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => setVisualState(null), [moduleId]);
   const reviewMode = isCompleted && rhythm.isDue(moduleId);
   const [roundOutcome, setRoundOutcome] = useState<
     { kind: 'review'; firstTry: boolean; nextDays: number } | { kind: 'seal' } | null
@@ -580,12 +584,21 @@ export function ModuleWorkspace({
               </span>
             </div>
 
-            <ModuleVisualDispatcher
+            <IntuitionChallenge
               moduleId={moduleId}
               theme={theme}
-              onOpen3DLab={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
-              linked3DLabel={linkedScene ? `Abrir Lab 3D: ${linkedScene.shortLabel}` : undefined}
+              state={visualState}
+              onStepSolved={rhythm.markActive}
             />
+
+            <VisualStateReportProvider value={setVisualState}>
+              <ModuleVisualDispatcher
+                moduleId={moduleId}
+                theme={theme}
+                onOpen3DLab={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
+                linked3DLabel={linkedScene ? `Abrir Lab 3D: ${linkedScene.shortLabel}` : undefined}
+              />
+            </VisualStateReportProvider>
           </section>
 
           <RoughDivider theme={theme} seed={mod.number * 23 + 11} />
