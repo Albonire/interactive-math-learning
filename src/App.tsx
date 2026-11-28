@@ -79,6 +79,7 @@ import { TopBar } from './ui/TopBar';
 import { AnatomyScrollRail } from './ui/AnatomyScrollRail';
 import { useScrollAnatomy } from './rendering/useScrollAnatomy';
 import { EMPTY_RHYTHM, replaceStudyRhythm } from './storage/studyRhythm';
+import { EMPTY_GAME, replaceGame } from './storage/gameProgress';
 import { CoursePipelineDock } from './ui/CoursePipelineDock';
 import { SlideDrawer } from './ui/SlideDrawer';
 import { CurriculumMapModal } from './ui/CurriculumMapModal';
@@ -1511,6 +1512,7 @@ export default function App() {
       setCompletedStepIds(nextSteps);
       saveCompletedSteps(nextSteps);
       if (res.studyRhythm) replaceStudyRhythm(res.studyRhythm);
+      if (res.game) replaceGame(res.game);
       return { ok: true, message: 'Progreso restaurado en tu cuaderno local.' };
     },
     []
@@ -2173,6 +2175,7 @@ export default function App() {
           setCompletedStepIds(emptySteps);
           saveCompletedSteps(emptySteps);
           replaceStudyRhythm(EMPTY_RHYTHM);
+          replaceGame(EMPTY_GAME);
           seenIntrosRef.current = new Set();
           setParamValues(defaultParamsFor(sceneId));
           setLayers(SCENES[sceneId].defaultLayers.map((l) => ({ ...l })));
