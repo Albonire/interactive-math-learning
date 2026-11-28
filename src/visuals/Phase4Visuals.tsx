@@ -499,26 +499,48 @@ export function M23Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
           </div>
         </div>
 
-        <div className="w-full max-w-[260px] space-y-1.5 font-mono text-[12px] tabular-nums">
-          <div className="text-[var(--text-muted)]">Espectro de valores singulares σᵢ</div>
-          {sigmas.map((s, idx) => {
-            const active = idx < rankK;
-            return (
-              <div key={idx} className="flex items-center gap-2">
-                <span className="w-7">σ{idx + 1}</span>
-                <div className="flex-1 h-4 rounded bg-[var(--bg-surface)] overflow-hidden border border-[var(--hairline)]">
-                  <div
-                    className="h-full transition-all"
-                    style={{
-                      width: `${(s / sigmas[0]) * 100}%`,
-                      backgroundColor: active ? p.sage : p.grid,
-                    }}
+        <div className="w-full max-w-[270px] space-y-1">
+          <div className="font-hand text-[14px] text-[var(--text-muted)]">Espectro de valores singulares σᵢ</div>
+          <svg viewBox="0 0 260 128" className="w-full h-auto max-h-[140px]" role="img" aria-label="Espectro de valores singulares dibujado a mano">
+            {sigmas.map((s, idx) => {
+              const active = idx < rankK;
+              const y = 8 + idx * 28;
+              const barW = Math.max(8, (s / sigmas[0]) * 164);
+              const strokeCol = active ? p.sage : p.pencil;
+              return (
+                <g key={idx}>
+                  <text x="24" y={y + 14} textAnchor="end" fontSize="13" fill={active ? p.ink : p.pencil}>
+                    σ{idx + 1}
+                  </text>
+                  <rect
+                    x="34"
+                    y={y + 2}
+                    width="164"
+                    height="16"
+                    rx="2"
+                    fill="none"
+                    stroke={p.grid}
+                    strokeWidth="1.2"
+                    strokeDasharray="4 4"
                   />
-                </div>
-                <span className="w-10 text-right">{s.toFixed(1)}</span>
-              </div>
-            );
-          })}
+                  <rect
+                    x="34"
+                    y={y + 2}
+                    width={barW}
+                    height="16"
+                    rx="2"
+                    fill={strokeCol}
+                    fillOpacity={active ? '0.26' : '0.1'}
+                    stroke={strokeCol}
+                    strokeWidth={active ? '1.9' : '1.2'}
+                  />
+                  <text x="206" y={y + 14} textAnchor="start" fontSize="12.5" fill={active ? p.ink : p.pencil}>
+                    {s.toFixed(1)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
         </div>
       </div>
     </VisualStageCard>

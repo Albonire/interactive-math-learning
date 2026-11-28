@@ -4,6 +4,8 @@ import type { StudyModuleId } from '../core/studyPlanTypes';
 import type { ThemeMode } from '../core/types';
 import { CrayonArrowRight, CrayonReset } from '../ui/CrayonIcons';
 import { GlossaryText } from '../ui/CrayonDictionary';
+import { CrayonGuide } from '../ui/CrayonGuide';
+import { CRAYON_GUIDE_IDLE_MS } from '../ui/crayonGuideLogic';
 import { CrayonButton, RoughUnderline } from '../ui/RoughElements';
 import {
   buildHand3DScene,
@@ -19,9 +21,13 @@ interface HandCrafted3DStageProps {
   scrollProgress: number;
   /** Active narrative beat index 0..3 */
   activeBeat?: number;
+  /** Synchronized narrative beat title shown gently beside the 3D header */
+  activeBeatLabel?: string;
   /** Optional button to jump into full Three.js WebGL Lab 3D */
   onOpenWebGL?: () => void;
   webGLLabel?: string;
+  /** Idle delay in ms before floating Crayón Guía appears (defaults to 5000ms) */
+  idleDelayMs?: number;
 }
 
 function deterministicJitter(seed: number): number {
@@ -140,24 +146,88 @@ export function HandCrafted3DStage({
   theme,
   scrollProgress,
   activeBeat = 0,
+  activeBeatLabel,
   onOpenWebGL,
   webGLLabel,
+  idleDelayMs = CRAYON_GUIDE_IDLE_MS,
 }: HandCrafted3DStageProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [size, setSize] = useState<{ w: number; h: number }>({ w: 420, h: 330 });
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 420, h: 344 });
   const [yawOffset, setYawOffset] = useState(0);
   const [pitchOffset, setPitchOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [manualProgress, setManualProgress] = useState<number | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [idleGuideActive, setIdleGuideActive] = useState(false);
+  const [activityTick, setActivityTick] = useState(0);
   const dragRef = useRef<{ x: number; y: number; yaw: number; pitch: number } | null>(null);
+
+  const registerActivity = () => {
+    setIdleGuideActive(false);
+    setActivityTick((t) => t + 1);
+  };
 
   // Reset orbit & manual override when switching module
   useEffect(() => {
     setYawOffset(0);
     setPitchOffset(0);
     setManualProgress(null);
+    setIdleGuideActive(false);
+    setActivityTick((t) => t + 1);
   }, [moduleId]);
+
+  // Observe whether the 3D viewport is actually visible on screen before arming the 5s Crayón Guía timer
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') {
+      setIsVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = Boolean(entries[0]?.isIntersecting);
+        setIsVisible(visible);
+        if (!visible) setIdleGuideActive(false);
+      },
+      { threshold: 0.25 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  // 5-second inactivity timer for floating 'Crayón Guía' inside the embedded 3D viewport
+  useEffect(() => {
+    if (!isVisible || dragging) {
+      setIdleGuideActive(false);
+      return;
+    }
+
+    let timerId: number | null = null;
+    const armTimer = () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      setIdleGuideActive(false);
+      timerId = window.setTimeout(() => {
+        setIdleGuideActive(true);
+      }, idleDelayMs);
+    };
+
+    armTimer();
+    const onWindowActivity = () => armTimer();
+    const opts: AddEventListenerOptions = { capture: true, passive: true };
+    window.addEventListener('pointerdown', onWindowActivity, opts);
+    window.addEventListener('keydown', onWindowActivity, opts);
+    window.addEventListener('wheel', onWindowActivity, opts);
+    window.addEventListener('touchstart', onWindowActivity, opts);
+
+    return () => {
+      if (timerId !== null) window.clearTimeout(timerId);
+      window.removeEventListener('pointerdown', onWindowActivity, { capture: true });
+      window.removeEventListener('keydown', onWindowActivity, { capture: true });
+      window.removeEventListener('wheel', onWindowActivity, { capture: true });
+      window.removeEventListener('touchstart', onWindowActivity, { capture: true });
+    };
+  }, [isVisible, dragging, idleDelayMs, moduleId, activityTick]);
 
   // Responsive ResizeObserver for crisp retina canvas
   useEffect(() => {
@@ -170,8 +240,8 @@ export function HandCrafted3DStage({
       // On phones the stage is pinned while the text scrolls, so it stays compact there.
       const h =
         w < 560
-          ? Math.max(190, Math.min(240, Math.round(w * 0.6)))
-          : Math.max(260, Math.min(390, Math.round(w * 0.78)));
+          ? Math.max(196, Math.min(248, Math.round(w * 0.62)))
+          : Math.max(272, Math.min(410, Math.round(w * 0.8)));
       setSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
     });
     ro.observe(el);
@@ -343,6 +413,7 @@ export function HandCrafted3DStage({
   }, [scene, size, theme, effectiveProgress, activeBeat, yawOffset, pitchOffset]);
 
   const handlePointerDown = (e: PointerEvent<HTMLCanvasElement>) => {
+    registerActivity();
     e.currentTarget.setPointerCapture(e.pointerId);
     setDragging(true);
     dragRef.current = {
@@ -381,6 +452,7 @@ export function HandCrafted3DStage({
       setYawOffset(0);
       setPitchOffset(0);
     } else return;
+    registerActivity();
     e.preventDefault();
   };
 
@@ -391,17 +463,26 @@ export function HandCrafted3DStage({
       ref={containerRef}
       data-testid="hand-3d-stage"
       data-scroll-progress={effectiveProgress.toFixed(2)}
+      data-guide-active={idleGuideActive ? 'true' : 'false'}
       className="w-full select-none space-y-2.5"
     >
       {/* Header whisper — completely boxless */}
       <div className="flex items-start justify-between gap-2 px-1">
         <div className="min-w-0">
-          <div className="hidden sm:flex font-hand text-[13.5px] text-[var(--ui-accent)] items-center gap-1.5">
+          <div className="hidden sm:flex font-hand text-[13.5px] text-[var(--ui-accent)] items-center gap-1.5 flex-wrap">
             <span>Estudio 3D a mano alzada</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono-math text-[11.5px] text-[var(--text-muted)]">
               {Math.round(effectiveProgress * 100)}%
             </span>
+            {activeBeatLabel && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="text-[var(--text-secondary)] truncate max-w-[200px]">
+                  0{activeBeat + 1} {activeBeatLabel}
+                </span>
+              </>
+            )}
           </div>
           <h3 className="font-display crayon-ink text-[20px] sm:text-[22px] leading-tight text-[var(--text-primary)]">
             {scene.title}
@@ -415,6 +496,7 @@ export function HandCrafted3DStage({
           <button
             type="button"
             onClick={() => {
+              registerActivity();
               setYawOffset(0);
               setPitchOffset(0);
               setManualProgress(null);
@@ -444,7 +526,26 @@ export function HandCrafted3DStage({
           className={`block w-full rounded-sm focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-[var(--ui-accent)] ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
           aria-label={`Escultura matemática 3D: ${scene.title}. ${scene.subtitle} Arrastra o usa las flechas para girar.`}
         />
-        <span className="hidden sm:block pointer-events-none absolute bottom-2 right-3 font-hand text-[12.5px] text-[var(--text-muted)] opacity-80">
+
+        {/* Floating 'Crayón Guía' after 5 seconds of inactivity — non-obstructive hand-drawn orbit cue */}
+        {idleGuideActive && (
+          <CrayonGuide
+            mode="orbit"
+            width={size.w}
+            height={size.h}
+            theme={theme}
+            crayon="cobalt"
+            label="Arrastra para girar 3D"
+            seed={moduleId.charCodeAt(1) * 17 + 707}
+            testId="crayon-guide-floating"
+          />
+        )}
+
+        <span
+          className={`hidden sm:block pointer-events-none absolute bottom-2 right-3 font-hand text-[12.5px] text-[var(--text-muted)] transition-opacity duration-300 ${
+            idleGuideActive ? 'opacity-0' : 'opacity-80'
+          }`}
+        >
           <span className="hidden sm:inline">Arrastra o usa las flechas para girar · </span>el scroll transforma la escena
         </span>
       </div>
@@ -461,7 +562,10 @@ export function HandCrafted3DStage({
               <button
                 key={stop}
                 type="button"
-                onClick={() => setManualProgress(stop)}
+                onClick={() => {
+                  registerActivity();
+                  setManualProgress(stop);
+                }}
                 className={`flex-1 py-1 text-center font-mono-math text-[11.5px] border-b-2 transition-colors cursor-pointer ${
                   active
                     ? 'border-[var(--ui-accent)] text-[var(--ui-accent)] font-semibold'
@@ -475,7 +579,10 @@ export function HandCrafted3DStage({
           {manualProgress !== null && (
             <button
               type="button"
-              onClick={() => setManualProgress(null)}
+              onClick={() => {
+                registerActivity();
+                setManualProgress(null);
+              }}
               className="font-hand text-[12.5px] text-[var(--ui-accent)] underline decoration-dotted cursor-pointer shrink-0"
             >
               Seguir scroll

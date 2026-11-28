@@ -57,8 +57,8 @@ export function IntuitionChallenge({ moduleId, theme, state, onStepSolved }: Pro
 
   return (
     <div
-      className="flex flex-wrap items-start justify-between gap-3 pl-4 border-l-[3px] py-1"
-      style={{ borderLeftColor: done || justSolved ? 'var(--ui-success)' : 'var(--ui-accent)' }}
+      className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-dashed"
+      style={{ borderColor: done || justSolved ? 'var(--ui-success)' : 'var(--hairline-strong)' }}
       data-testid="intuition-challenge"
       data-step={stepIdx}
       role="status"

@@ -155,9 +155,19 @@ export function CrayonDictionaryProvider({
       setLookup(null);
       return;
     }
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const r = anchorEl.getBoundingClientRect();
+    const zoomHost = document.getElementById('root') ?? document.documentElement;
+    const rawZoom = Number.parseFloat(window.getComputedStyle(zoomHost).zoom || '1');
+    const zoom = Number.isFinite(rawZoom) && rawZoom > 0.1 ? rawZoom : 1;
+    const vw = window.innerWidth / zoom;
+    const vh = window.innerHeight / zoom;
+    const rawRect = anchorEl.getBoundingClientRect();
+    const r = {
+      left: rawRect.left / zoom,
+      right: rawRect.right / zoom,
+      top: rawRect.top / zoom,
+      bottom: rawRect.bottom / zoom,
+      width: rawRect.width / zoom,
+    };
 
     // The word left the visible page: fold the note away rather than leave it orphaned.
     if (r.bottom < 0 || r.top > vh) {

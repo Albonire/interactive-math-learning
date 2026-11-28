@@ -61,6 +61,13 @@ const CHAPTERS = [
   { id: 'practice', label: 'IV. Python y Sello' },
 ] as const;
 
+const STORY_BEAT_TITLES = [
+  'Matemática pura',
+  'Computación e IA',
+  'Cálculo concreto',
+  'Definición formal',
+] as const;
+
 type ChapterId = (typeof CHAPTERS)[number]['id'];
 
 export function ModuleWorkspace({
@@ -222,6 +229,13 @@ export function ModuleWorkspace({
     }
   }, []);
 
+  const scrollToBeat = useCallback((beatIndex: number) => {
+    const el = beatRefs.current[beatIndex];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
   // ── Study rhythm: streak + spaced re-checks of sealed modules ──
   const rhythm = useStudyRhythm(completedModuleIds);
   const [visualState, setVisualState] = useState<Record<string, unknown> | null>(null);
@@ -365,16 +379,33 @@ export function ModuleWorkspace({
             </div>
           </div>
 
-          {/* Continuous hand-inked scroll progress thread */}
-          <div className="h-[2.5px] w-full bg-transparent">
-            <div
-              className="h-full transition-[width] duration-75 ease-out"
-              style={{
-                width: `${Math.round(pageProgress * 100)}%`,
-                backgroundColor: 'var(--ui-accent)',
-                opacity: 0.72,
-              }}
-            />
+          {/* Continuous hand-drawn wavy crayon scroll progress thread */}
+          <div className="h-[5px] w-full overflow-hidden" aria-hidden="true">
+            <svg
+              viewBox="0 0 1000 6"
+              preserveAspectRatio="none"
+              className="block w-full h-full"
+            >
+              <path
+                d="M 0 3.2 Q 125 1.4 250 3.3 T 500 2.9 T 750 3.4 T 1000 2.8"
+                fill="none"
+                stroke="var(--hairline)"
+                strokeWidth="1.2"
+                strokeDasharray="6 6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M 0 3.2 Q 125 1.4 250 3.3 T 500 2.9 T 750 3.4 T 1000 2.8"
+                fill="none"
+                stroke="var(--ui-accent)"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                pathLength={100}
+                strokeDasharray="100"
+                strokeDashoffset={Math.max(0, 100 - pageProgress * 100)}
+                style={{ opacity: 0.82 }}
+              />
+            </svg>
           </div>
         </div>
 
@@ -649,31 +680,75 @@ export function ModuleWorkspace({
                   theme={theme}
                   scrollProgress={storyProgress}
                   activeBeat={activeBeat}
+                  activeBeatLabel={STORY_BEAT_TITLES[activeBeat]}
                   onOpenWebGL={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
                   webGLLabel={linkedScene ? `Explorar en Lab 3D WebGL: ${linkedScene.shortLabel}` : undefined}
                 />
               </div>
 
-              {/* Left Open-Page Scrollytelling Narrative Beats — ZERO rectangular boxes */}
-              <div className="lg:col-span-6 lg:order-1 space-y-10 sm:space-y-12">
+              {/* Left Open-Page Scrollytelling Narrative Beats connected by a continuous hand-drawn crayon spine */}
+              <div className="relative lg:col-span-6 lg:order-1 pl-9 sm:pl-11 space-y-10 sm:space-y-12">
+                {/* Continuous hand-sketched vertical crayon ink spine growing smoothly with storyProgress */}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 18 400"
+                  preserveAspectRatio="none"
+                  className="pointer-events-none absolute left-[11px] sm:left-[13px] top-3 bottom-4 w-[18px] h-[calc(100%-28px)]"
+                >
+                  <path
+                    d="M 9 0 Q 6 65 10.5 130 T 7.5 265 T 9.5 400"
+                    fill="none"
+                    stroke="var(--hairline-strong)"
+                    strokeWidth="1.4"
+                    strokeDasharray="5 6"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M 9 0 Q 6 65 10.5 130 T 7.5 265 T 9.5 400"
+                    fill="none"
+                    stroke="var(--ui-accent)"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    pathLength={100}
+                    strokeDasharray="100"
+                    strokeDashoffset={Math.max(0, 100 - Math.max(8, storyProgress * 100))}
+                    style={{ opacity: 0.82 }}
+                  />
+                </svg>
+
                 {/* Beat 01: Enfoque de matemática pura */}
                 <article
                   ref={(el) => {
                     beatRefs.current[0] = el;
                   }}
                   data-beat-active={activeBeat === 0 ? 'true' : undefined}
-                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 transition-colors ${
+                  className={`relative scroll-beat ${
                     activeBeat === 0
-                      ? 'border-[var(--ui-accent)] opacity-100'
-                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                      ? 'opacity-100 translate-x-0.5'
+                      : 'opacity-76 hover:opacity-100'
                   }`}
                 >
-                  <div className="flex items-center gap-2 text-[14px] font-mono-math text-[var(--ui-accent)] mb-1">
-                    <span>01</span>
+                  <button
+                    type="button"
+                    onClick={() => scrollToBeat(0)}
+                    aria-label="Ir al peldaño 1: Enfoque de matemática pura"
+                    className="absolute -left-9 sm:-left-11 top-0.5 cursor-pointer bg-[var(--bg-paper)] rounded-full"
+                  >
+                    <CrayonStepMarker
+                      index={0}
+                      active={activeBeat === 0}
+                      completed={activeBeat > 0}
+                      crayon="cobalt"
+                      theme={theme}
+                      label="01"
+                      size={26}
+                    />
+                  </button>
+                  <div className="flex items-center gap-2 text-[14px] font-hand text-[var(--ui-accent)] mb-1">
                     <CrayonPencil size={14} />
-                    <span className="font-hand text-[15px]">Enfoque de matemática pura</span>
+                    <span>Enfoque de matemática pura</span>
                   </div>
-                  <h3 className="font-display text-[21px] text-[var(--text-primary)] mb-1.5">
+                  <h3 className="font-display text-[21.5px] text-[var(--text-primary)] mb-1.5">
                     La estructura detrás del trazo
                   </h3>
                   <p className="text-[16px] text-[var(--text-primary)] leading-relaxed">
@@ -687,18 +762,33 @@ export function ModuleWorkspace({
                     beatRefs.current[1] = el;
                   }}
                   data-beat-active={activeBeat === 1 ? 'true' : undefined}
-                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 transition-colors ${
+                  className={`relative scroll-beat ${
                     activeBeat === 1
-                      ? 'border-[var(--ui-success)] opacity-100'
-                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                      ? 'opacity-100 translate-x-0.5'
+                      : 'opacity-76 hover:opacity-100'
                   }`}
                 >
-                  <div className="flex items-center gap-2 text-[14px] font-mono-math text-[var(--ui-success)] mb-1">
-                    <span>02</span>
+                  <button
+                    type="button"
+                    onClick={() => scrollToBeat(1)}
+                    aria-label="Ir al peldaño 2: Puente con computación e IA"
+                    className="absolute -left-9 sm:-left-11 top-0.5 cursor-pointer bg-[var(--bg-paper)] rounded-full"
+                  >
+                    <CrayonStepMarker
+                      index={1}
+                      active={activeBeat === 1}
+                      completed={activeBeat > 1}
+                      crayon="sage"
+                      theme={theme}
+                      label="02"
+                      size={26}
+                    />
+                  </button>
+                  <div className="flex items-center gap-2 text-[14px] font-hand text-[var(--ui-success)] mb-1">
                     <CrayonLightbulb size={14} />
-                    <span className="font-hand text-[15px]">Puente con computación e IA</span>
+                    <span>Puente con computación e IA</span>
                   </div>
-                  <h3 className="font-display text-[21px] text-[var(--text-primary)] mb-1.5">
+                  <h3 className="font-display text-[21.5px] text-[var(--text-primary)] mb-1.5">
                     Dónde cobra vida en software y modelos
                   </h3>
                   <p className="text-[16px] text-[var(--text-primary)] leading-relaxed">
@@ -712,14 +802,30 @@ export function ModuleWorkspace({
                     beatRefs.current[2] = el;
                   }}
                   data-beat-active={activeBeat === 2 ? 'true' : undefined}
-                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 space-y-2.5 transition-colors ${
+                  className={`relative scroll-beat space-y-2.5 ${
                     activeBeat === 2
-                      ? 'border-[var(--ui-accent)] opacity-100'
-                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                      ? 'opacity-100 translate-x-0.5'
+                      : 'opacity-76 hover:opacity-100'
                   }`}
                 >
-                  <div className="font-mono-math text-[13.5px] text-[var(--ui-accent)]">
-                    03 · Peldaño B · Cálculo con números pequeños
+                  <button
+                    type="button"
+                    onClick={() => scrollToBeat(2)}
+                    aria-label="Ir al peldaño 3: Cálculo con números pequeños"
+                    className="absolute -left-9 sm:-left-11 top-0.5 cursor-pointer bg-[var(--bg-paper)] rounded-full"
+                  >
+                    <CrayonStepMarker
+                      index={2}
+                      active={activeBeat === 2}
+                      completed={activeBeat > 2}
+                      crayon="ochre"
+                      theme={theme}
+                      label="03"
+                      size={26}
+                    />
+                  </button>
+                  <div className="font-hand text-[14px] text-[var(--ui-accent)]">
+                    Peldaño B · Cálculo con números pequeños
                   </div>
                   <h3 className="font-display text-[22px] text-[var(--text-primary)] leading-snug">
                     {mod.concreteExample.title}
@@ -742,14 +848,30 @@ export function ModuleWorkspace({
                     beatRefs.current[3] = el;
                   }}
                   data-beat-active={activeBeat === 3 ? 'true' : undefined}
-                  className={`scroll-beat pl-4 sm:pl-5 border-l-2 space-y-3 transition-colors ${
+                  className={`relative scroll-beat space-y-3 ${
                     activeBeat === 3
-                      ? 'border-[var(--crayon-plum)] opacity-100'
-                      : 'border-dashed border-[var(--hairline-strong)] opacity-78 hover:opacity-100'
+                      ? 'opacity-100 translate-x-0.5'
+                      : 'opacity-76 hover:opacity-100'
                   }`}
                 >
-                  <div className="font-mono-math text-[13.5px] text-[var(--ui-accent)]">
-                    04 · Peldaño C · Definición formal
+                  <button
+                    type="button"
+                    onClick={() => scrollToBeat(3)}
+                    aria-label="Ir al peldaño 4: Definición formal"
+                    className="absolute -left-9 sm:-left-11 top-0.5 cursor-pointer bg-[var(--bg-paper)] rounded-full"
+                  >
+                    <CrayonStepMarker
+                      index={3}
+                      active={activeBeat === 3}
+                      completed={false}
+                      crayon="plum"
+                      theme={theme}
+                      label="04"
+                      size={26}
+                    />
+                  </button>
+                  <div className="font-hand text-[14px] text-[var(--ui-accent)]">
+                    Peldaño C · Definición formal
                   </div>
                   <div className="py-2.5 px-3 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto text-[18px] text-[var(--text-primary)]">
                     <KatexInline latex={mod.concreteExample.latex} />
@@ -986,9 +1108,9 @@ export function ModuleWorkspace({
                 <div
                   data-testid="checkpoint-feedback"
                   role="status"
-                  className="pl-4 border-l-3 py-1 text-[15.5px] leading-relaxed"
+                  className="py-2.5 border-y border-dashed text-[15.5px] leading-relaxed"
                   style={{
-                    borderLeftColor: cleanSolve ? 'var(--ui-success)' : 'var(--ui-warning)',
+                    borderColor: cleanSolve ? 'var(--ui-success)' : 'var(--ui-warning)',
                   }}
                 >
                   <strong

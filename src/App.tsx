@@ -864,16 +864,23 @@ export default function App() {
   // Toggle 3D-to-2D annotation projection when Legend or 5s idle Crayón Guía is active
   useEffect(() => {
     const needsProjection =
+      appView === 'lab3d' &&
       !introOpen &&
       workspaceMode === 'webgl3d' &&
       drawerMode === 'closed' &&
       (legendOpen || idleGuideActive);
     managerRef.current?.setAnnotationsEnabled(needsProjection);
-  }, [legendOpen, idleGuideActive, introOpen, workspaceMode, drawerMode]);
+  }, [appView, legendOpen, idleGuideActive, introOpen, workspaceMode, drawerMode]);
 
   // 5-second inactivity timer for 'Crayón Guía' during open hands-on 3D practice
   useEffect(() => {
-    if (introOpen || workspaceMode !== 'webgl3d' || mapOpen || drawerMode !== 'closed') {
+    if (
+      appView !== 'lab3d' ||
+      introOpen ||
+      workspaceMode !== 'webgl3d' ||
+      mapOpen ||
+      drawerMode !== 'closed'
+    ) {
       setIdleGuideActive(false);
       return;
     }
@@ -902,14 +909,14 @@ export default function App() {
       window.removeEventListener('wheel', onUserActivity, { capture: true });
       window.removeEventListener('touchstart', onUserActivity, { capture: true });
     };
-  }, [introOpen, workspaceMode, mapOpen, drawerMode, sceneId, paramValues, exploded, legendOpen, activeStepIdx]);
+  }, [appView, introOpen, workspaceMode, mapOpen, drawerMode, sceneId, paramValues, exploded, legendOpen, activeStepIdx]);
 
   // Play delicate pencil/crayon flick when Crayón Guía draws in (if unlocked and not in Eco Mode)
   useEffect(() => {
-    if (idleGuideActive && !introOpen && workspaceMode === 'webgl3d' && drawerMode === 'closed') {
+    if (appView === 'lab3d' && idleGuideActive && !introOpen && workspaceMode === 'webgl3d' && drawerMode === 'closed') {
       audioEngineRef.current?.playAnnotationSketch(theme, performance.now());
     }
-  }, [idleGuideActive, introOpen, workspaceMode, drawerMode, theme]);
+  }, [appView, idleGuideActive, introOpen, workspaceMode, drawerMode, theme]);
 
   // Center the 3D diagram cleanly in the open stage above the bottom narration bar during Intro
   useEffect(() => {
@@ -1610,7 +1617,7 @@ export default function App() {
   return (
     <div
       ref={rootRef}
-      className={`h-[100dvh] w-screen flex flex-col overflow-hidden bg-[var(--bg-paper)] text-[var(--text-primary)] ${
+      className={`h-full w-full flex flex-col overflow-hidden bg-[var(--bg-paper)] text-[var(--text-primary)] ${
         ecoMode ? 'eco-mode' : ''
       }`}
       data-app-view={appView}

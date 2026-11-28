@@ -345,27 +345,58 @@ export function M9Visual({ theme }: ModuleVisualProps) {
           }
           caption="Compara el número exacto de operaciones para n: observa cómo 2ⁿ domina de golpe a cualquier polinomio."
         >
-          <div className="space-y-2.5 font-mono text-[13px] tabular-nums">
-            {bigOCurves.map((c) => {
+          <svg viewBox="0 0 540 164" className="w-full h-auto max-h-[210px]" role="img" aria-label="Comparación Big-O dibujada a mano">
+            {bigOCurves.map((c, idx) => {
               const val = c.fn(nBigO);
               const maxVal = Math.pow(2, nBigO);
               const pct = logScale
                 ? (Math.log10(val + 1) / Math.log10(maxVal + 1)) * 100
                 : Math.min(100, (val / maxVal) * 100);
+              const y = 14 + idx * 36;
+              const barW = Math.max(8, (Math.max(2, pct) / 100) * 340);
               return (
-                <div key={c.label} className="flex items-center gap-3">
-                  <span className="w-20 text-right shrink-0" style={{ color: c.color }}>{c.label}</span>
-                  <div className="flex-1 h-5 rounded bg-[var(--bg-surface)] overflow-hidden border border-[var(--hairline)]">
-                    <div
-                      className="h-full transition-all duration-200"
-                      style={{ width: `${Math.max(2, pct)}%`, backgroundColor: c.color }}
-                    />
-                  </div>
-                  <span className="w-20 text-right text-[var(--text-primary)]">{Math.round(val).toLocaleString()}</span>
-                </div>
+                <g key={c.label}>
+                  <text x="88" y={y + 16} textAnchor="end" fontSize="13.5" fontWeight="600" fill={c.color}>
+                    {c.label}
+                  </text>
+                  <rect
+                    x="98"
+                    y={y + 2}
+                    width="340"
+                    height="20"
+                    rx="3"
+                    fill="none"
+                    stroke={p.grid}
+                    strokeWidth="1.3"
+                    strokeDasharray="5 4"
+                  />
+                  <rect
+                    x="98"
+                    y={y + 2}
+                    width={barW}
+                    height="20"
+                    rx="3"
+                    fill={c.color}
+                    fillOpacity="0.24"
+                    stroke={c.color}
+                    strokeWidth="2"
+                  />
+                  <line
+                    x1="102"
+                    y1={y + 12}
+                    x2={Math.max(104, 98 + barW - 4)}
+                    y2={y + 12}
+                    stroke={c.color}
+                    strokeWidth="3.2"
+                    strokeOpacity="0.6"
+                  />
+                  <text x="450" y={y + 16} textAnchor="start" fontSize="13" fill={p.ink}>
+                    {Math.round(val).toLocaleString()}
+                  </text>
+                </g>
               );
             })}
-          </div>
+          </svg>
         </VisualStageCard>
       )}
     </div>

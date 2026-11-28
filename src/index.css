@@ -92,8 +92,8 @@
 }
 
 html,
-body,
-#root {
+body {
+  width: 100%;
   height: 100%;
   height: 100dvh;
   margin: 0;
@@ -104,6 +104,21 @@ body,
   font-size: 16px;
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#root {
+  zoom: 1.04;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-paper);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.45;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -703,7 +718,84 @@ body,
   animation: crayonSketchLabelIn 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* Movimiento sutil artesanal para la flecha 'Crayón Guía' tras 5s de inactividad */
+/* Entrada suave y trazo artesanal progresivo para el componente flotante 'Crayón Guía' */
+@keyframes crayonGuideEnter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.crayon-guide-enter {
+  animation: crayonGuideEnter 320ms ease-out both;
+}
+
+@keyframes crayonGuideStrokeDraw {
+  0% {
+    stroke-dashoffset: var(--cg-len, 160);
+    opacity: 0.25;
+  }
+  32% {
+    stroke-dashoffset: 0;
+    opacity: 0.96;
+  }
+  84% {
+    stroke-dashoffset: 0;
+    opacity: 0.92;
+  }
+  100% {
+    stroke-dashoffset: var(--cg-len, 160);
+    opacity: 0.25;
+  }
+}
+
+.crayon-guide-stroke-draw {
+  stroke-dasharray: var(--cg-len, 160);
+  stroke-dashoffset: 0;
+  animation: crayonGuideStrokeDraw 4.2s cubic-bezier(0.22, 1, 0.36, 1) var(--cg-delay, 0ms) infinite;
+}
+
+@keyframes crayonGuideNibTrace {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+    transform: scale(0.86) rotate(-6deg);
+  }
+  8% {
+    opacity: 0.96;
+    transform: scale(1) rotate(0deg);
+  }
+  34% {
+    offset-distance: 100%;
+    opacity: 0.98;
+    transform: scale(1) rotate(5deg);
+  }
+  44% {
+    offset-distance: 100%;
+    opacity: 0.92;
+    transform: scale(0.98) translate3d(2px, -2px, 0) rotate(2deg);
+  }
+  58% {
+    offset-distance: 100%;
+    opacity: 0;
+    transform: scale(0.88) translate3d(4px, -6px, 0) rotate(-4deg);
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+    transform: scale(0.88) rotate(-6deg);
+  }
+}
+
+.crayon-guide-nib {
+  offset-distance: 0%;
+  animation: crayonGuideNibTrace 4.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  will-change: offset-distance, transform, opacity;
+}
+
+/* Movimiento sutil artesanal para 'Crayón Guía' tras 5s de inactividad */
 @keyframes crayonGuideNudge {
   0%,
   100% {
@@ -711,19 +803,23 @@ body,
     opacity: 0.88;
   }
   50% {
-    transform: translate3d(3px, -3px, 0);
+    transform: translate3d(2.5px, -2.5px, 0);
     opacity: 1;
   }
 }
 
 .crayon-guide-nudge {
-  animation: crayonGuideNudge 2.1s ease-in-out infinite;
+  animation: crayonGuideNudge 2.4s ease-in-out infinite;
   will-change: transform, opacity;
 }
 
-.eco-mode .crayon-guide-nudge {
+.eco-mode .crayon-guide-nudge,
+.eco-mode .crayon-guide-stroke-draw,
+.eco-mode .crayon-guide-nib {
   animation: none;
-  opacity: 0.78;
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  opacity: 0.82;
 }
 
 /* Resplandor artesanal tipo crayón de cera al alcanzar la zona óptima en un Reto */

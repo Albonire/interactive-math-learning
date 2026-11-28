@@ -12,6 +12,7 @@ import {
   type ProjectedAnnotation,
 } from '../rendering/sceneAnnotations';
 import { CrayonLightbulb, CrayonNote, CrayonPencil } from './CrayonIcons';
+import { CrayonGuide } from './CrayonGuide';
 import { RoughUnderline } from './RoughElements';
 
 interface ViewportAnnotationsOverlayProps {
@@ -58,7 +59,6 @@ export function ViewportAnnotationsOverlay({
 }: ViewportAnnotationsOverlayProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const guideSvgRef = useRef<SVGSVGElement | null>(null);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [ecoPointer, setEcoPointer] = useState<EcoPointerState>({ x: 0, y: 0, active: false });
 
@@ -94,10 +94,13 @@ export function ViewportAnnotationsOverlay({
       if (now - lastMoveMs < 80) return;
       lastMoveMs = now;
 
-      const rect = hostRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
+      const host = hostRef.current;
+      const rect = host?.getBoundingClientRect();
+      if (!host || !rect || rect.width <= 0 || rect.height <= 0) return;
+      const scaleX = host.clientWidth > 0 ? rect.width / host.clientWidth : 1;
+      const scaleY = host.clientHeight > 0 ? rect.height / host.clientHeight : 1;
+      const x = (e.clientX - rect.left) / scaleX;
+      const y = (e.clientY - rect.top) / scaleY;
 
       setEcoPointer({ x, y, active: true });
 
@@ -264,68 +267,6 @@ export function ViewportAnnotationsOverlay({
     return computeGuideArrowGeometry(guideTarget, viewportSize.width, viewportSize.height);
   }, [guideTarget, viewportSize.width, viewportSize.height]);
 
-  // Draw the small handcrafted 'Crayón Guía' arrow onto the highest-weight 3D component
-  useEffect(() => {
-    const svg = guideSvgRef.current;
-    if (!svg) return;
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    if (!guideTarget || !guideGeom || hidden) return;
-
-    const rc = rough.svg(svg);
-    const strokeHex = getCrayonHex(guideTarget.crayon, theme);
-
-    const pathD = `M ${guideGeom.startX.toFixed(1)} ${guideGeom.startY.toFixed(1)} Q ${guideGeom.ctrlX.toFixed(1)} ${guideGeom.ctrlY.toFixed(1)} ${guideGeom.tipX.toFixed(1)} ${guideGeom.tipY.toFixed(1)}`;
-    svg.appendChild(
-      rc.path(pathD, {
-        seed: 707,
-        stroke: strokeHex,
-        strokeWidth: 2.5,
-        roughness: ecoMode ? 1.0 : 1.5,
-        bowing: 0.8,
-      })
-    );
-
-    const dx = guideGeom.tipX - guideGeom.ctrlX;
-    const dy = guideGeom.tipY - guideGeom.ctrlY;
-    const len = Math.hypot(dx, dy) || 1;
-    const ux = dx / len;
-    const uy = dy / len;
-    const headLen = 10.5;
-    const spread = 0.46;
-    const cosS = Math.cos(spread);
-    const sinS = Math.sin(spread);
-
-    const lx = guideGeom.tipX - (ux * cosS - uy * sinS) * headLen;
-    const ly = guideGeom.tipY - (ux * sinS + uy * cosS) * headLen;
-    const rx = guideGeom.tipX - (ux * cosS + uy * sinS) * headLen;
-    const ry = guideGeom.tipY - (-ux * sinS + uy * cosS) * headLen;
-
-    svg.appendChild(
-      rc.linearPath(
-        [
-          [lx, ly],
-          [guideGeom.tipX, guideGeom.tipY],
-          [rx, ry],
-        ],
-        {
-          seed: 719,
-          stroke: strokeHex,
-          strokeWidth: 2.5,
-          roughness: ecoMode ? 0.9 : 1.2,
-        }
-      )
-    );
-
-    svg.appendChild(
-      rc.circle(guideTarget.anchorX, guideTarget.anchorY, 16, {
-        seed: 733,
-        stroke: strokeHex,
-        strokeWidth: 1.7,
-        roughness: ecoMode ? 1.0 : 1.45,
-      })
-    );
-  }, [guideTarget, guideGeom, hidden, theme, ecoMode]);
-
   if (hidden) return null;
 
   const haloShadow =
@@ -343,8 +284,8 @@ export function ViewportAnnotationsOverlay({
       data-eco-pointer-active={ecoPointer.active ? 'true' : 'false'}
       data-guide-active={guideTarget ? 'true' : 'false'}
     >
-      {/* Quiet 3D viewport tools: bottom-right above dock on phones, top-right below mode switcher on sm+ */}
-      <div className="pointer-events-auto absolute bottom-9 right-3 sm:bottom-auto sm:top-[56px] sm:right-6 z-20 flex items-center gap-2 sm:gap-3 px-2 sm:px-2.5 py-1 rounded bg-[var(--bg-paper)]/94 border border-dashed border-[var(--hairline)]">
+      {/* Open hand-inked 3D viewport tools ribbon (zero closed rectangular box) */}
+      <div className="pointer-events-auto absolute bottom-9 right-3 sm:bottom-auto sm:top-[56px] sm:right-6 z-20 flex items-center gap-2 sm:gap-3 px-2.5 py-1 border-b border-dashed border-[var(--hairline-strong)] bg-[var(--bg-paper)]/92">
         {onToggleFreehand && (
           <button
             type="button"
@@ -512,46 +453,28 @@ export function ViewportAnnotationsOverlay({
           );
         })}
 
-      {/* 'Crayón Guía': subtle animated crayon arrow over highest-interaction-weight 3D component after 5s idle */}
+      {/* 'Crayón Guía': animated hand-drawn wax crayon stroke over highest-interaction-weight 3D component after 5s idle */}
       {guideTarget && guideGeom && viewportSize.width > 0 && viewportSize.height > 0 && (
-        <div
-          data-testid="crayon-guide-arrow"
-          data-guide-target={guideTarget.id}
-          className="absolute inset-0 pointer-events-none crayon-label-reveal"
-        >
-          <svg
-            ref={guideSvgRef}
-            width={viewportSize.width}
-            height={viewportSize.height}
-            viewBox={`0 0 ${viewportSize.width} ${viewportSize.height}`}
-            aria-hidden="true"
-            className={`absolute inset-0 w-full h-full pointer-events-none crayon-guide-nudge ${
-              ecoMode ? '' : 'crayon-stroke-svg'
-            }`}
-          />
-          {!open && (
-            <div
-              style={{
-                left: guideGeom.labelAlign === 'left' ? `${guideGeom.labelX}px` : undefined,
-                right:
-                  guideGeom.labelAlign === 'right'
-                    ? `${Math.max(18, viewportSize.width - guideGeom.labelX)}px`
-                    : undefined,
-                top: `${guideGeom.labelY}px`,
-                transform: 'translateY(-50%)',
-                textShadow: haloShadow,
-                color: getCrayonHex(guideTarget.crayon, theme),
-              }}
-              className={`absolute max-w-[164px] pointer-events-none crayon-guide-nudge ${
-                guideGeom.labelAlign === 'left' ? 'text-left' : 'text-right'
-              }`}
-            >
-              <span className="font-display text-[15px] leading-tight block">
-                Explora {guideTarget.label}
-              </span>
-            </div>
-          )}
-        </div>
+        <CrayonGuide
+          mode="target"
+          width={viewportSize.width}
+          height={viewportSize.height}
+          theme={theme}
+          crayon={guideTarget.crayon}
+          start={{ x: guideGeom.startX, y: guideGeom.startY }}
+          ctrl={{ x: guideGeom.ctrlX, y: guideGeom.ctrlY }}
+          tip={{ x: guideGeom.tipX, y: guideGeom.tipY }}
+          anchor={{ x: guideTarget.anchorX, y: guideTarget.anchorY }}
+          label={`Explora ${guideTarget.label}`}
+          labelX={guideGeom.labelX}
+          labelY={guideGeom.labelY}
+          labelAlign={guideGeom.labelAlign}
+          showLabel={!open}
+          targetId={guideTarget.id}
+          ecoMode={ecoMode}
+          seed={707}
+          testId="crayon-guide-arrow"
+        />
       )}
     </div>
   );
