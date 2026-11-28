@@ -2,6 +2,7 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { getCrayonHex, THEME_PALETTES } from '../core/palette';
 import type { CrayonToken, ThemeMode } from '../core/types';
 import { CrayonNote } from '../ui/CrayonIcons';
+import { handifySvgTree } from './handDrawnSvg';
 import { GlossaryText } from '../ui/CrayonDictionary';
 import { CrayonSlider, CrayonStepMarker, RoughDivider, RoughUnderline } from '../ui/RoughElements';
 export {
@@ -238,7 +239,7 @@ export function VisualStageCard({
         </div>
       )}
       <div className="sketch-diagram-canvas py-2 sm:py-3 overflow-x-auto">
-        {children}
+        {handifySvgTree(children)}
       </div>
       {(caption || footer) && (
         <div className="flex flex-wrap items-start justify-between gap-2.5 pt-1 text-[15px] text-[var(--text-secondary)]">

@@ -882,3 +882,8 @@ select:focus-visible,
   stroke-dasharray: none;
   fill-opacity: 0.3;
 }
+
+/* Strokes redrawn by handDrawnSvg are already irregular: skip the per-element displacement filter. */
+.sketch-diagram-canvas svg .hand-ink path {
+  filter: none;
+}
