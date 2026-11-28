@@ -1,3 +1,4 @@
+import { StudyTrail } from './StudyTrail';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import rough from 'roughjs';
 import {
@@ -228,6 +229,7 @@ export function CurriculumMapModal({
   onResetProgress,
 }: CurriculumMapModalProps) {
   const [selectedPhase, setSelectedPhase] = useState<'all' | StudyPhaseId>('all');
+  const [view, setView] = useState<'trail' | 'list'>('trail');
   const [showRefs, setShowRefs] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [importFeedback, setImportFeedback] = useState<{ ok: boolean; text: string } | null>(null);
@@ -345,6 +347,40 @@ export function CurriculumMapModal({
             />
           </div>
 
+          {/* Trail (default) or the detailed list */}
+          <div className="flex items-center gap-4 text-[15px]" role="tablist" aria-label="Vista del plan">
+            {(['trail', 'list'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="tab"
+                aria-selected={view === v}
+                data-testid={`plan-view-${v}`}
+                onClick={() => setView(v)}
+                className={`cursor-pointer pb-0.5 ${
+                  view === v
+                    ? 'font-display text-[var(--ui-accent)] border-b-2 border-[var(--ui-accent)]'
+                    : 'font-hand text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {v === 'trail' ? 'Camino' : 'Lista detallada'}
+              </button>
+            ))}
+          </div>
+
+          {view === 'trail' && (
+            <StudyTrail
+              theme={theme}
+              activeModuleId={activeModuleId}
+              completedModuleIds={completedModuleIds}
+              onSelectModule={(id) => {
+                onSelectModule(id);
+                onClose();
+              }}
+            />
+          )}
+
+          {view === 'list' && (<>
           {/* Phase Filter Tabs */}
           <div className="flex flex-wrap items-center gap-2 text-[14px]">
             <button
@@ -496,6 +532,7 @@ export function CurriculumMapModal({
               );
             })}
           </div>
+          </>)}
 
           {/* Collapsible Verified References & Methodology Notes */}
           <div className="pt-2 space-y-2">

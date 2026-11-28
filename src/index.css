@@ -875,3 +875,15 @@ select:focus-visible,
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Keyboard focus for draggable diagram handles (DiagramDragHandle with onKeyStep). */
+.hand-drag-handle:focus-visible > circle:nth-child(2) {
+  stroke-width: 2.4;
+  stroke-dasharray: none;
+  fill-opacity: 0.3;
+}
+
+/* Strokes redrawn by handDrawnSvg are already irregular: skip the per-element displacement filter. */
+.sketch-diagram-canvas svg .hand-ink path {
+  filter: none;
+}

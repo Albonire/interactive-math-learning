@@ -2,10 +2,12 @@ import { createContext, useContext, type ReactNode } from 'react';
 import { getCrayonHex, THEME_PALETTES } from '../core/palette';
 import type { CrayonToken, ThemeMode } from '../core/types';
 import { CrayonNote } from '../ui/CrayonIcons';
+import { handifySvgTree } from './handDrawnSvg';
 import { GlossaryText } from '../ui/CrayonDictionary';
-import { CrayonSlider, RoughDivider, RoughUnderline } from '../ui/RoughElements';
+import { CrayonSlider, CrayonStepMarker, RoughDivider, RoughUnderline } from '../ui/RoughElements';
 export {
   DiagramDragHandle,
+  useDiagramDrag,
   InkScrubNumber,
   SketchDial,
   SketchXYPad,
@@ -130,6 +132,71 @@ export function ParamSlider({
   const theme = useContext(VisualThemeContext);
   const seed = hashLabelSeed(label);
 
+  // Small discrete domains (n = 2…8, grado 0…9, k = 1…6…) read better as a row of tappable
+  // hand-circled numbers: the learner sees every possible value and picks one in a single tap,
+  // instead of hunting for a position on a track.
+  const count = step > 0 ? Math.round((max - min) / step) + 1 : Infinity;
+  if (count >= 2 && count <= 10) {
+    const values = Array.from({ length: count }, (_, i) => Number((min + i * step).toFixed(6)));
+    const current = values.reduce((best, v) => (Math.abs(v - value) < Math.abs(best - value) ? v : best), values[0]);
+    const pick = (v: number) => {
+      if (v !== value) onChange(v);
+    };
+    return (
+      <div className="flex flex-col gap-1 min-w-[148px]">
+        <div className="flex items-baseline justify-between gap-2 text-[14px] text-[var(--text-secondary)]">
+          <span className="font-hand leading-tight">{label}</span>
+          {displayValue && (
+            <span className="font-mono-math text-[13px] font-medium text-[var(--text-primary)] tabular-nums">
+              {displayValue}
+            </span>
+          )}
+        </div>
+        <div
+          role="radiogroup"
+          aria-label={label}
+          className="flex flex-wrap items-center gap-0.5"
+          onKeyDown={(e) => {
+            const idx = values.indexOf(current);
+            if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+              e.preventDefault();
+              pick(values[Math.min(values.length - 1, idx + 1)]);
+            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+              e.preventDefault();
+              pick(values[Math.max(0, idx - 1)]);
+            }
+          }}
+        >
+          {values.map((v, i) => {
+            const selected = v === current;
+            return (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                aria-label={`${label}: ${v}${unit}`}
+                tabIndex={selected ? 0 : -1}
+                onClick={() => pick(v)}
+                className="p-0.5 cursor-pointer rounded-full transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-[var(--ui-accent)]"
+              >
+                <CrayonStepMarker
+                  index={i + seed}
+                  active={selected}
+                  completed={false}
+                  crayon={crayon}
+                  theme={theme}
+                  label={String(v).replace('.', ',')}
+                  size={selected ? 30 : 26}
+                />
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-0.5 min-w-[148px] flex-1">
       <div className="flex items-baseline justify-between gap-2 text-[14px] text-[var(--text-secondary)]">
@@ -172,7 +239,7 @@ export function VisualStageCard({
         </div>
       )}
       <div className="sketch-diagram-canvas py-2 sm:py-3 overflow-x-auto">
-        {children}
+        {handifySvgTree(children)}
       </div>
       {(caption || footer) && (
         <div className="flex flex-wrap items-start justify-between gap-2.5 pt-1 text-[15px] text-[var(--text-secondary)]">

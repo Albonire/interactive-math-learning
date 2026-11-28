@@ -7,9 +7,13 @@ import {
   VisualModeTabs,
   VisualStageCard,
   clientToSvgPoint,
+  useDiagramDrag,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
+
+const snapTo = (v: number, step: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, Math.round(v / step) * step));
 
 /* ── M13: Límites y Continuidad ───────────────────────────────────────────── */
 export function M13Visual({ theme }: ModuleVisualProps) {
@@ -37,6 +41,15 @@ export function M13Visual({ theme }: ModuleVisualProps) {
 
   const mapX = (x: number) => 60 + ((x + 0.5) / 3) * 460;
   const mapY = (y: number) => 185 - (y / 2.6) * 165;
+  const invX = (sx: number) => ((sx - 60) / 460) * 3 - 0.5;
+  const invY = (sy: number) => ((185 - sy) / 165) * 2.6;
+  const setEpsSafe = (v: number) => setEps(snapTo(v, 0.05, 0.15, 1.0));
+  const setDeltaSafe = (v: number) => setDelta(snapTo(v, 0.05, 0.05, 0.9));
+  // Direct manipulation: the challenger drags the ε band edge, you answer by dragging the δ edge.
+  const drag = useDiagramDrag<'eps' | 'delta'>((key, pt) => {
+    if (key === 'eps') setEpsSafe(invY(pt.y) - L);
+    else setDeltaSafe(invX(pt.x) - a);
+  });
 
   return (
     <VisualStageCard
@@ -47,8 +60,10 @@ export function M13Visual({ theme }: ModuleVisualProps) {
             <ActionBtn active={kind === 'hole'} onClick={() => setKind('hole')}>Hueco removible</ActionBtn>
             <ActionBtn active={kind === 'jump'} onClick={() => setKind('jump')}>Salto (sin límite)</ActionBtn>
           </div>
-          <ParamSlider label="Banda objetivo ε" value={eps} min={0.15} max={1.0} step={0.05} onChange={setEps} />
-          <ParamSlider label="Tu radio δ" value={delta} min={0.05} max={0.9} step={0.05} onChange={setDelta} />
+          <span className="font-hand text-[14px] text-[var(--text-secondary)]">
+            Arrastra el borde de la banda <strong style={{ color: p.sage }}>ε = {eps.toFixed(2)}</strong> y responde
+            moviendo tu ventana <strong style={{ color: insideBand ? p.cobalt : p.vermilion }}>δ = {delta.toFixed(2)}</strong>.
+          </span>
         </>
       }
       caption={
@@ -56,10 +71,11 @@ export function M13Visual({ theme }: ModuleVisualProps) {
           ? '⚡ Discontinuidad de salto: por pequeño que hagas δ, los límites laterales (0.6 y 1.5) no coinciden.'
           : insideBand
             ? `✓ ¡Banda superada! Para 0 < |x − 1| < ${delta.toFixed(2)}, toda la curva queda dentro de |f(x) − 1| < ${eps.toFixed(2)}.`
-            : `✗ La curva escapa de la banda ε = ${eps.toFixed(2)}. Reduce δ por debajo de ${(eps / 1.4).toFixed(2)}.`
+            : // |f(x) − 1| = ½|x − 1||x + 1| < ε holds for every |x − 1| < δ iff δ ≤ √(1 + 2ε) − 1.
+              `✗ La curva escapa de la banda ε = ${eps.toFixed(2)}. Funciona cualquier δ ≤ √(1 + 2ε) − 1 ≈ ${(Math.sqrt(1 + 2 * eps) - 1).toFixed(3)}.`
       }
     >
-      <svg viewBox="0 0 560 210" className="w-full h-auto max-h-[230px]">
+      <svg viewBox="0 0 560 210" className="w-full h-auto max-h-[230px]" {...drag.svgProps}>
         {/* Epsilon horizontal band */}
         <rect
           x="40"
@@ -116,6 +132,27 @@ export function M13Visual({ theme }: ModuleVisualProps) {
 
         <text x="524" y={mapY(L) + 4} fontSize="11" fill={p.sage} fontFamily="monospace">L±ε</text>
         <text x={mapX(a)} y="202" textAnchor="middle" fontSize="11" fill={p.cobalt} fontFamily="monospace">a±δ</text>
+
+        <DiagramDragHandle
+          cx={500}
+          cy={mapY(L + eps)}
+          color={p.sage}
+          paperBg={p.bg}
+          label="Borde de la banda ε (arrastra en vertical)"
+          valueText={`ε = ${eps.toFixed(2)}`}
+          onKeyStep={(_, dy) => setEpsSafe(eps + dy * 0.05)}
+          {...drag.bind('eps')}
+        />
+        <DiagramDragHandle
+          cx={mapX(a + delta)}
+          cy={30}
+          color={insideBand ? p.cobalt : p.vermilion}
+          paperBg={p.bg}
+          label="Borde de la ventana δ (arrastra en horizontal)"
+          valueText={`δ = ${delta.toFixed(2)}`}
+          onKeyStep={(dx) => setDeltaSafe(delta + dx * 0.05)}
+          {...drag.bind('delta')}
+        />
       </svg>
     </VisualStageCard>
   );
@@ -290,13 +327,18 @@ export function M15Visual({ theme }: ModuleVisualProps) {
 
   const mapX = (x: number) => 55 + (x / 3.2) * 470;
   const mapY = (y: number) => 190 - (y / 4.8) * 165;
+  const setB = (v: number) => setUpperB(snapTo(v, 0.1, 0.6, 3.0));
+  // Drag the upper limit b along the axis: the accumulated area grows at rate f(b) (TFC).
+  const drag = useDiagramDrag<'b'>((_, pt) => setB(((pt.x - 55) / 470) * 3.2));
 
   return (
     <VisualStageCard
       controls={
         <>
           <ParamSlider label="Subdivisiones n" value={nRect} min={2} max={32} onChange={setNRect} />
-          <ParamSlider label="Límite superior b" value={upperB} min={0.6} max={3.0} step={0.1} onChange={setUpperB} />
+          <span className="font-hand text-[14px] text-[var(--text-secondary)]">
+            Arrastra la línea <strong style={{ color: p.vermilion }}>b = {upperB.toFixed(1)}</strong> para acumular área.
+          </span>
           <div className="flex gap-1.5">
             {(['left', 'mid', 'right'] as const).map((r) => (
               <ActionBtn key={r} active={rule === r} onClick={() => setRule(r)}>
@@ -308,7 +350,7 @@ export function M15Visual({ theme }: ModuleVisualProps) {
       }
       caption={`Riemann (${nRect} rect.) = ${approx.toFixed(4)} · Integral exacta F(${upperB.toFixed(1)}) = ${exactF(upperB).toFixed(4)} · TFC: dF/db = f(${upperB.toFixed(1)}) = ${f(upperB).toFixed(3)}.`}
     >
-      <svg viewBox="0 0 560 210" className="w-full h-auto max-h-[235px]">
+      <svg viewBox="0 0 560 210" className="w-full h-auto max-h-[235px]" {...drag.svgProps}>
         <line x1="40" y1={mapY(0)} x2="535" y2={mapY(0)} stroke={p.ink} strokeWidth="1.5" />
         <line x1={mapX(0)} y1="16" x2={mapX(0)} y2="198" stroke={p.ink} strokeWidth="1.5" />
         {rects.map((r, i) => (
@@ -336,6 +378,16 @@ export function M15Visual({ theme }: ModuleVisualProps) {
         <text x={mapX(upperB)} y="205" textAnchor="middle" fontSize="11" fill={p.vermilion} fontFamily="monospace">
           b={upperB.toFixed(1)}
         </text>
+        <DiagramDragHandle
+          cx={mapX(upperB)}
+          cy={mapY(f(upperB))}
+          color={p.vermilion}
+          paperBg={p.bg}
+          label="Límite superior b (arrastra en horizontal)"
+          valueText={`b = ${upperB.toFixed(1)}`}
+          onKeyStep={(dx) => setB(upperB + dx * 0.1)}
+          {...drag.bind('b')}
+        />
       </svg>
     </VisualStageCard>
   );
@@ -444,6 +496,12 @@ export function M17Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
 
   const mapX = (x: number) => 170 + x * 62;
   const mapY = (y: number) => 115 - y * 50;
+  const setPoint = (x: number, y: number) => {
+    setPx(snapTo(x, 0.05, -1.8, 1.8));
+    setPy(snapTo(y, 0.05, -1.6, 1.6));
+  };
+  // Walk the point across the contour map: the gradient arrow follows your finger.
+  const drag = useDiagramDrag<'p'>((_, pt) => setPoint((pt.x - 170) / 62, (115 - pt.y) / 50));
 
   return (
     <VisualStageCard
@@ -457,8 +515,9 @@ export function M17Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
               Punto silla x² − y² (det H &lt; 0)
             </ActionBtn>
           </div>
-          <ParamSlider label="x" value={px} min={-1.8} max={1.8} step={0.1} onChange={setPx} />
-          <ParamSlider label="y" value={py} min={-1.6} max={1.6} step={0.1} onChange={setPy} />
+          <span className="font-hand text-[14px] text-[var(--text-secondary)]">
+            Arrastra el punto sobre el mapa de curvas de nivel.
+          </span>
           {onOpen3DLab && (
             <ActionBtn tone="accent" onClick={onOpen3DLab}>
               {linked3DLabel ?? 'Abrir Superficie 3D'} →
@@ -468,7 +527,7 @@ export function M17Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
       }
       caption={`En (${px.toFixed(1)}, ${py.toFixed(1)}): f = ${fVal.toFixed(2)}, ∇f = (${gx.toFixed(2)}, ${gy.toFixed(2)}). Observa que ∇f siempre es perpendicular a la curva de nivel.`}
     >
-      <svg viewBox="0 0 340 230" className="w-full max-w-[380px] mx-auto h-auto">
+      <svg viewBox="0 0 340 230" className="w-full max-w-[380px] mx-auto h-auto" {...drag.svgProps}>
         {surface === 'bowl'
           ? [0.4, 1.0, 1.8, 2.8, 4.0].map((c) => (
               <ellipse
@@ -518,7 +577,16 @@ export function M17Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
           stroke={p.vermilion}
           strokeWidth="3"
         />
-        <circle cx={mapX(px)} cy={mapY(py)} r="5.5" fill={p.cobalt} />
+        <DiagramDragHandle
+          cx={mapX(px)}
+          cy={mapY(py)}
+          color={p.cobalt}
+          paperBg={p.bg}
+          label="Punto (x, y) sobre el mapa de nivel"
+          valueText={`x = ${px.toFixed(2)}, y = ${py.toFixed(2)}`}
+          onKeyStep={(dx, dy) => setPoint(px + dx * 0.1, py + dy * 0.1)}
+          {...drag.bind('p')}
+        />
         <text x={mapX(px + gx * 0.24)} y={mapY(py + gy * 0.24) - 4} fontSize="11.5" fontWeight="700" fill={p.vermilion} fontFamily="monospace">
           ∇f
         </text>

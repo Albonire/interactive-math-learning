@@ -5,6 +5,8 @@ import {
   SketchXYPad,
   VisualModeTabs,
   VisualStageCard,
+  DiagramDragHandle,
+  useDiagramDrag,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -305,37 +307,72 @@ export function M31Visual({ theme }: ModuleVisualProps) {
   const CE = -(p1 * Math.log2(q1) + p2 * Math.log2(q2));
   const KL = CE - H;
 
+  // Each distribution is a stick of length 1 split into A | B: drag the split to move mass.
+  const X0 = 70;
+  const X1 = 510;
+  const toX = (prob: number) => X0 + prob * (X1 - X0);
+  const toProb = (x: number) => Math.min(0.95, Math.max(0.05, Math.round(((x - X0) / (X1 - X0)) * 20) / 20));
+  const drag = useDiagramDrag<'p' | 'q'>((key, pt) => (key === 'p' ? setP1(toProb(pt.x)) : setQ1(toProb(pt.x))));
+
+  const BIT_W = 80; // px per bit; CE peaks near 4.1 bits at p = 0.95, q = 0.05, which still fits
+  const sticks: Array<{ key: 'p' | 'q'; y: number; val: number; color: string; name: string; set: (v: number) => void }> = [
+    { key: 'p', y: 40, val: p1, color: p.cobalt, name: 'Realidad p', set: setP1 },
+    { key: 'q', y: 92, val: q1, color: p.ochre, name: 'Modelo q', set: setQ1 },
+  ];
+  const bars = [
+    { label: 'H(p)', note: 'incertidumbre propia de los datos', val: H, color: p.cobalt, y: 150 },
+    { label: 'D_KL(p ‖ q)', note: 'bits extra por usar q en vez de p', val: KL, color: p.vermilion, y: 180 },
+    { label: 'H(p, q)', note: 'cross-entropy = H(p) + D_KL', val: CE, color: p.sage, y: 210 },
+  ];
+
   return (
     <VisualStageCard
       controls={
         <>
-          <ParamSlider label="Realidad p(A)" value={p1} min={0.05} max={0.95} step={0.05} onChange={setP1} />
-          <ParamSlider label="Modelo q(A)" value={q1} min={0.05} max={0.95} step={0.05} onChange={setQ1} />
+          <span className="font-hand text-[14px] text-[var(--text-secondary)]">
+            Arrastra el corte A | B de cada barra para repartir la probabilidad.
+          </span>
           <ActionBtn onClick={() => setQ1(p1)}>Igualar q = p (KL = 0)</ActionBtn>
         </>
       }
       caption={`H(p, q) = H(p) + D_KL(p || q) → ${CE.toFixed(3)} = ${H.toFixed(3)} + ${KL.toFixed(3)} bits. Minimizar cross-entropy equivale a reducir a 0 los bits extra de KL.`}
     >
-      <div className="space-y-3 font-mono text-[13px] tabular-nums">
-        {[
-          { label: 'Entropía H(p) (incertidumbre intrínseca)', val: H, color: p.cobalt, max: 3.5 },
-          { label: 'Divergencia D_KL(p ‖ q) (penalización extra)', val: KL, color: p.vermilion, max: 3.5 },
-          { label: 'Cross-Entropy H(p, q) = H(p) + D_KL', val: CE, color: p.sage, max: 3.5 },
-        ].map((row) => (
-          <div key={row.label} className="space-y-1">
-            <div className="flex justify-between">
-              <span style={{ color: row.color }}>{row.label}</span>
-              <strong>{row.val.toFixed(3)} bits</strong>
-            </div>
-            <div className="h-5 rounded bg-[var(--bg-surface)] overflow-hidden border border-[var(--hairline)]">
-              <div
-                className="h-full transition-all"
-                style={{ width: `${Math.min(100, (row.val / row.max) * 100)}%`, backgroundColor: row.color }}
-              />
-            </div>
-          </div>
+      <svg viewBox="0 0 560 230" className="w-full h-auto" {...drag.svgProps}>
+        {sticks.map((st) => (
+          <g key={st.key}>
+            <text x={X0} y={st.y - 14} fontSize="12" fill={st.color} fontFamily="monospace">
+              {st.name}: A = {st.val.toFixed(2)} · B = {(1 - st.val).toFixed(2)}
+            </text>
+            <rect x={X0} y={st.y - 8} width={toX(st.val) - X0} height={16} fill={st.color} fillOpacity={0.32} stroke={st.color} strokeWidth={1.4} rx={3} />
+            <rect x={toX(st.val)} y={st.y - 8} width={X1 - toX(st.val)} height={16} fill={st.color} fillOpacity={0.08} stroke={st.color} strokeWidth={1.2} strokeDasharray="4 3" rx={3} />
+            <text x={X0 - 12} y={st.y + 4} textAnchor="end" fontSize="12" fill={p.ink} fontFamily="monospace">A</text>
+            <text x={X1 + 12} y={st.y + 4} fontSize="12" fill={p.ink} fontFamily="monospace">B</text>
+            <DiagramDragHandle
+              cx={toX(st.val)}
+              cy={st.y}
+              color={st.color}
+              paperBg={p.bg}
+              label={`${st.name}: probabilidad de A`}
+              valueText={`${st.name}(A) = ${st.val.toFixed(2)}`}
+              onKeyStep={(dx) => st.set(Math.min(0.95, Math.max(0.05, Math.round((st.val + dx * 0.05) * 20) / 20)))}
+              {...drag.bind(st.key)}
+            />
+          </g>
         ))}
-      </div>
+        <text x={X0} y={130} fontSize="11.5" fill={p.pencil} fontFamily="monospace">
+          H(p): incertidumbre de los datos · D_KL: bits extra por usar q · H(p, q) = H(p) + D_KL
+        </text>
+        {bars.map((b) => (
+          <g key={b.label}>
+            <text x={X0 - 8} y={b.y + 4} textAnchor="end" fontSize="12" fill={b.color} fontFamily="monospace">{b.label}</text>
+            <rect x={X0} y={b.y - 8} width={Math.max(1, Math.min(X1 - X0, b.val * BIT_W))} height={16} fill={b.color} fillOpacity={0.55} rx={2} />
+            <text x={X0 + Math.min(X1 - X0, b.val * BIT_W) + 8} y={b.y + 4} fontSize="12" fill={p.ink} fontFamily="monospace">
+              {b.val.toFixed(3)} bits
+            </text>
+            <title>{b.note}</title>
+          </g>
+        ))}
+      </svg>
     </VisualStageCard>
   );
 }

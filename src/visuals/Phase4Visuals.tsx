@@ -6,9 +6,13 @@ import {
   SketchXYPad,
   VisualStageCard,
   clientToSvgPoint,
+  useDiagramDrag,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
+
+const snapTo = (v: number, step: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, Math.round(v / step) * step));
 
 /* ── M18: Vectores y Matrices como Transformaciones ───────────────────────── */
 export function M18Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualProps) {
@@ -129,13 +133,28 @@ export function M19Visual({ theme }: ModuleVisualProps) {
   const cx = 140;
   const cy = 145;
   const s = 26;
+  const setWeights = (x: number, y: number) => {
+    setXWeight(snapTo(x, 0.5, -1, 3));
+    setYWeight(snapTo(y, 0.5, -1, 3));
+  };
+  // Row picture: drag the guess (x, y) onto the crossing of the two lines.
+  const rowDrag = useDiagramDrag<'guess'>((_, pt) => setWeights((pt.x - cx) / s, (cy - pt.y) / s));
+  // Column picture: drag where x·c₁ + y·c₂ lands; the recipe (x, y) = A⁻¹·tip is solved for you.
+  // A = [[2, −1], [−1, 2]] ⇒ A⁻¹ = (1/3)·[[2, 1], [1, 2]].
+  const colDrag = useDiagramDrag<'tip'>((_, pt) => {
+    const tx = (pt.x - cx) / s;
+    const ty = (cy - pt.y) / s;
+    setWeights((2 * tx + ty) / 3, (tx + 2 * ty) / 3);
+  });
 
   return (
     <VisualStageCard
       controls={
         <>
-          <ParamSlider label="Peso x de col₁=[2, −1]" value={xWeight} min={-1} max={3} step={0.5} onChange={setXWeight} />
-          <ParamSlider label="Peso y de col₂=[−1, 2]" value={yWeight} min={-1} max={3} step={0.5} onChange={setYWeight} />
+          <span className="font-hand text-[14px] text-[var(--text-secondary)]">
+            Receta actual: x = <strong style={{ color: p.cobalt }}>{xWeight}</strong>, y ={' '}
+            <strong style={{ color: p.sage }}>{yWeight}</strong>. Arrastra el punto en cualquiera de las dos imágenes.
+          </span>
           <ActionBtn onClick={() => { setXWeight(1); setYWeight(2); }}>Solución exacta (1, 2)</ActionBtn>
         </>
       }
@@ -146,7 +165,7 @@ export function M19Visual({ theme }: ModuleVisualProps) {
       }
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <svg viewBox="0 0 280 205" className="w-full h-auto">
+        <svg viewBox="0 0 280 205" className="w-full h-auto" {...rowDrag.svgProps}>
           <text x="14" y="18" fontSize="11.5" fontWeight="700" fill={p.ink} fontFamily="monospace">Imagen de Filas (rectas)</text>
           <line x1="20" y1={cy} x2="260" y2={cy} stroke={p.grid} />
           <line x1={cx} y1="26" x2={cx} y2="195" stroke={p.grid} />
@@ -155,10 +174,19 @@ export function M19Visual({ theme }: ModuleVisualProps) {
           {/* -x + 2y = 3 => y = (x+3)/2 */}
           <line x1={cx - 4 * s} y1={cy + 0.5 * s} x2={cx + 4 * s} y2={cy - 3.5 * s} stroke={p.sage} strokeWidth="2.2" />
           <circle cx={cx + 1 * s} cy={cy - 2 * s} r="5.5" fill={p.vermilion} />
-          <circle cx={cx + xWeight * s} cy={cy - yWeight * s} r="4.5" fill="none" stroke={p.ink} strokeWidth="2" />
+          <DiagramDragHandle
+            cx={cx + xWeight * s}
+            cy={cy - yWeight * s}
+            color={p.ink}
+            paperBg={p.bg}
+            label="Tu candidato (x, y) en la imagen de filas"
+            valueText={`x = ${xWeight}, y = ${yWeight}`}
+            onKeyStep={(dx, dy) => setWeights(xWeight + dx * 0.5, yWeight + dy * 0.5)}
+            {...rowDrag.bind('guess')}
+          />
         </svg>
 
-        <svg viewBox="0 0 280 205" className="w-full h-auto">
+        <svg viewBox="0 0 280 205" className="w-full h-auto" {...colDrag.svgProps}>
           <text x="14" y="18" fontSize="11.5" fontWeight="700" fill={p.ink} fontFamily="monospace">Imagen de Columnas (x·c₁ + y·c₂)</text>
           <line x1="20" y1={cy} x2="260" y2={cy} stroke={p.grid} />
           <line x1={cx} y1="26" x2={cx} y2="195" stroke={p.grid} />
@@ -176,6 +204,16 @@ export function M19Visual({ theme }: ModuleVisualProps) {
           {/* Target b = [0, 3] */}
           <circle cx={cx} cy={cy - 3 * s} r="6" fill={p.vermilion} />
           <text x={cx + 9} y={cy - 3 * s + 4} fontSize="11" fill={p.vermilion} fontFamily="monospace">b=[0,3]</text>
+          <DiagramDragHandle
+            cx={cx + rx * s}
+            cy={cy - ry * s}
+            color={p.sage}
+            paperBg={p.bg}
+            label="Punta de x·c₁ + y·c₂ en la imagen de columnas"
+            valueText={`x·c₁ + y·c₂ = [${rx}, ${ry}]`}
+            onKeyStep={(dx, dy) => setWeights(xWeight + dx * 0.5, yWeight + dy * 0.5)}
+            {...colDrag.bind('tip')}
+          />
         </svg>
       </div>
     </VisualStageCard>

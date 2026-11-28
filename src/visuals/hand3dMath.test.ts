@@ -32,3 +32,18 @@ test('buildHand3DScene generates valid non-empty 3D geometry for all 32 modules 
     }
   }
 });
+
+test('no study module falls back to the generic placeholder sculpture', () => {
+  for (const mod of STUDY_MODULES_LIST) {
+    const scene = buildHand3DScene(mod.id, 0.5);
+    assert.ok(!scene.title.startsWith('Escultura geométrica'), `${mod.id} still uses the placeholder`);
+  }
+});
+
+test('modules that share a topic area still get their own scene', () => {
+  const titles = (ids: Array<'M20' | 'M21' | 'M22' | 'M23' | 'M25' | 'M26' | 'M27'>) =>
+    new Set(ids.map((id) => buildHand3DScene(id, 0.5).title));
+  assert.equal(titles(['M20', 'M21']).size, 2);
+  assert.equal(titles(['M22', 'M23']).size, 2);
+  assert.equal(titles(['M25', 'M26', 'M27']).size, 3);
+});

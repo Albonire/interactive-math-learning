@@ -87,7 +87,7 @@ export function M1Visual({ theme }: ModuleVisualProps) {
                       isOn ? '' : 'opacity-72'
                     }`}
                   >
-                    <div className="text-[11.5px] font-mono-math text-[var(--text-muted)]">2^{bit}</div>
+                    <div className="text-[12.5px] font-mono-math text-[var(--text-muted)]">2<sup>{bit}</sup></div>
                     <div className="font-display text-[25px] leading-tight text-[var(--text-primary)] tabular-nums">
                       {isOn ? '1' : '0'}
                     </div>
@@ -111,7 +111,7 @@ export function M1Visual({ theme }: ModuleVisualProps) {
                       <span key={`${d}-${idx}`} className="inline-flex items-center gap-1">
                         {idx > 0 && <span className="text-[var(--text-muted)]">+</span>}
                         <span className="sketch-tile px-2 py-0.5 border border-dashed border-[var(--hairline-strong)] bg-[var(--bg-surface)]/70">
-                          {d}·{base}^{exp}
+                          {d}·{base}<sup>{exp}</sup>
                         </span>
                       </span>
                     );
@@ -334,7 +334,9 @@ export function M1Visual({ theme }: ModuleVisualProps) {
               return (
                 <g key={level}>
                   <text x="10" y={y + 4} fontSize="11" fill={p.pencil} fontFamily="monospace">
-                    {powBase}^{level}={count}
+                    {powBase}
+                    <tspan baselineShift="super" fontSize="8">{level}</tspan>
+                    <tspan> = {count}</tspan>
                   </text>
                   {Array.from({ length: capped }, (_, i) => {
                     const x = 110 + ((i + 0.5) / capped) * 510;
@@ -634,6 +636,24 @@ export function M3Visual({ theme }: ModuleVisualProps) {
   const inCounts = [0, 1, 2].map((v) => arrows.filter(([, b]) => b === v).length);
   const isFunction = outCounts.every((c) => c === 1);
   const isInjective = isFunction && inCounts.every((c) => c <= 1);
+  const isSurjective = isFunction && inCounts.every((c) => c >= 1);
+  const mappingCaption = !isFunction
+    ? '✗ No es función: cada x debe tener exactamente una flecha de salida (las rojas tienen 0 o más de 1).'
+    : isInjective && isSurjective
+      ? '✓ Biyectiva: cada x tiene una salida, ninguna y recibe dos flechas y ninguna queda sin flecha. Existe la inversa: invierte las flechas.'
+      : isInjective
+        ? '✓ Función inyectiva, pero no sobreyectiva: alguna y queda sin flecha.'
+        : isSurjective
+          ? '✓ Función sobreyectiva, pero no inyectiva: alguna y recibe dos flechas.'
+          : '✓ Es función, pero ni inyectiva ni sobreyectiva: hay un choque en una y, y otra y queda sin flecha.';
+
+  // Arrow-drawing state for the mapping diagram.
+  const mapSvgRef = useRef<SVGSVGElement | null>(null);
+  const [dragFrom, setDragFrom] = useState<number | null>(null);
+  const [dragPt, setDragPt] = useState<{ x: number; y: number } | null>(null);
+  const DOM_X = 110;
+  const CO_X = 330;
+  const NODE_Y = (i: number) => 62 + i * 62;
 
   const gx = compX + 1;
   const fgx = gx * gx;
@@ -657,64 +677,131 @@ export function M3Visual({ theme }: ModuleVisualProps) {
         <VisualStageCard
           controls={
             <div className="flex flex-wrap items-center gap-2 text-[13px]">
+              <span className="font-hand text-[14px] text-[var(--text-secondary)] mr-1">
+                Arrastra desde una x hasta una y para trazar una flecha; toca una flecha para borrarla.
+              </span>
               <ActionBtn onClick={() => setArrows([[0, 0], [1, 1], [2, 2]])}>Biyectiva</ActionBtn>
-              <ActionBtn onClick={() => setArrows([[0, 0], [1, 0], [2, 2]])}>Función no inyectiva</ActionBtn>
+              <ActionBtn onClick={() => setArrows([[0, 0], [1, 0], [2, 2]])}>Dos entradas chocan</ActionBtn>
               <ActionBtn onClick={() => setArrows([[0, 0], [0, 1], [1, 2], [2, 2]])}>Romper función</ActionBtn>
             </div>
           }
-          caption={
-            isFunction
-              ? isInjective
-                ? '✓ Es función válida e inyectiva: cada elemento del dominio sale una sola vez y llega a destinos distintos.'
-                : '✓ Es función válida, pero NO inyectiva (dos entradas chocan en la misma salida).'
-              : '✗ No es función: algún elemento del dominio tiene 0 o más de 1 flecha de salida.'
-          }
+          caption={mappingCaption}
         >
-          <div className="flex flex-col sm:flex-row items-center gap-5 justify-between">
-            <svg viewBox="0 0 360 190" className="w-full max-w-[360px] h-auto">
-              <ellipse cx="75" cy="95" rx="48" ry="78" fill={`${p.cobalt}12`} stroke={p.cobalt} strokeWidth="1.6" strokeDasharray="4 3" />
-              <ellipse cx="285" cy="95" rx="48" ry="78" fill={`${p.sage}12`} stroke={p.sage} strokeWidth="1.6" strokeDasharray="4 3" />
-              <text x="75" y="14" textAnchor="middle" fontSize="11" fill={p.cobalt} fontFamily="monospace">Dominio X</text>
-              <text x="285" y="14" textAnchor="middle" fontSize="11" fill={p.sage} fontFamily="monospace">Codominio Y</text>
+          <svg
+            ref={mapSvgRef}
+            viewBox="0 0 440 236"
+            className="w-full max-w-[560px] mx-auto h-auto select-none"
+            style={{ touchAction: dragFrom !== null ? 'none' : 'pan-y' }}
+            onPointerMove={(e) => {
+              if (dragFrom === null) return;
+              setDragPt(clientToSvgPoint(e.currentTarget, e.clientX, e.clientY));
+            }}
+            onPointerUp={(e) => {
+              if (dragFrom === null) return;
+              const pt = clientToSvgPoint(e.currentTarget, e.clientX, e.clientY);
+              const target = [0, 1, 2].find((j) => Math.hypot(pt.x - CO_X, pt.y - NODE_Y(j)) < 30);
+              if (target !== undefined) toggleArrow(dragFrom, target);
+              setDragFrom(null);
+              setDragPt(null);
+            }}
+            onPointerCancel={() => {
+              setDragFrom(null);
+              setDragPt(null);
+            }}
+          >
+            <ellipse cx={DOM_X} cy="124" rx="62" ry="98" fill={`${p.cobalt}14`} stroke={p.cobalt} strokeWidth="1.8" strokeDasharray="5 4" />
+            <ellipse cx={CO_X} cy="124" rx="62" ry="98" fill={`${p.sage}14`} stroke={p.sage} strokeWidth="1.8" strokeDasharray="5 4" />
+            <text x={DOM_X} y="16" textAnchor="middle" fontSize="15" fill={p.cobalt} className="font-hand">Dominio X</text>
+            <text x={CO_X} y="16" textAnchor="middle" fontSize="15" fill={p.sage} className="font-hand">Codominio Y</text>
 
-              {arrows.map(([u, v]) => (
-                <line
+            {arrows.map(([u, v]) => {
+              const bad = outCounts[u] > 1;
+              const color = bad ? p.vermilion : p.ink;
+              const x1 = DOM_X + 20;
+              const y1 = NODE_Y(u);
+              const x2 = CO_X - 22;
+              const y2 = NODE_Y(v);
+              // Gentle arc so crossing arrows stay readable; the head follows the arc's end tangent.
+              const mx = (x1 + x2) / 2;
+              const my = (y1 + y2) / 2 - 16;
+              const ang = Math.atan2(y2 - my, x2 - mx);
+              const head = (da: number) => ({ x: x2 - 11 * Math.cos(ang + da), y: y2 - 11 * Math.sin(ang + da) });
+              const h1 = head(0.45);
+              const h2 = head(-0.45);
+              return (
+                <g
                   key={`${u}-${v}`}
-                  x1="90"
-                  y1={48 + u * 48}
-                  x2="268"
-                  y2={48 + v * 48}
-                  stroke={outCounts[u] > 1 ? p.vermilion : p.ink}
-                  strokeWidth="2.2"
-                />
-              ))}
-
-              {[0, 1, 2].map((i) => (
-                <g key={i}>
-                  <circle cx="75" cy={48 + i * 48} r="14" fill={p.bg} stroke={outCounts[i] === 1 ? p.cobalt : p.vermilion} strokeWidth="2" />
-                  <text x="75" y={52 + i * 48} textAnchor="middle" fontSize="12" fill={p.ink} fontFamily="monospace">x{i + 1}</text>
-                  <circle cx="285" cy={48 + i * 48} r="14" fill={p.bg} stroke={p.sage} strokeWidth="2" />
-                  <text x="285" y={52 + i * 48} textAnchor="middle" fontSize="12" fill={p.ink} fontFamily="monospace">y{i + 1}</text>
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Flecha x${u + 1} → y${v + 1}. Pulsa para borrarla.`}
+                  className="cursor-pointer outline-none"
+                  onClick={() => toggleArrow(u, v)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Delete' || e.key === 'Backspace') {
+                      e.preventDefault();
+                      toggleArrow(u, v);
+                    }
+                  }}
+                >
+                  <path d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`} fill="none" stroke="transparent" strokeWidth="16" data-crisp="" />
+                  <path d={`M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`} fill="none" stroke={color} strokeWidth="2.4" />
+                  <line x1={x2} y1={y2} x2={h1.x} y2={h1.y} stroke={color} strokeWidth="2.4" />
+                  <line x1={x2} y1={y2} x2={h2.x} y2={h2.y} stroke={color} strokeWidth="2.4" />
                 </g>
-              ))}
-            </svg>
+              );
+            })}
 
-            <div className="space-y-2 text-[12.5px] font-mono">
-              <div className="text-[var(--text-secondary)]">Activa o desactiva flechas (xᵢ → yⱼ):</div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[0, 1, 2].map((u) =>
-                  [0, 1, 2].map((v) => {
-                    const on = arrows.some(([a, b]) => a === u && b === v);
-                    return (
-                      <ActionBtn key={`${u}-${v}`} active={on} onClick={() => toggleArrow(u, v)}>
-                        x{u + 1}→y{v + 1}
-                      </ActionBtn>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
+            {dragFrom !== null && dragPt && (
+              <line x1={DOM_X + 20} y1={NODE_Y(dragFrom)} x2={dragPt.x} y2={dragPt.y} stroke={p.cobalt} strokeWidth="2" strokeDasharray="6 5" />
+            )}
+
+            {[0, 1, 2].map((i) => {
+              const outs = outCounts[i];
+              const ins = inCounts[i];
+              const domColor = outs === 1 ? p.cobalt : p.vermilion;
+              const coColor = ins > 1 ? p.ochre : p.sage;
+              return (
+                <g key={i}>
+                  <g
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`x${i + 1}: ${outs} ${outs === 1 ? 'flecha' : 'flechas'} de salida. Teclas 1, 2 o 3 trazan o borran la flecha hacia y1, y2 o y3.`}
+                    className="cursor-grab outline-none"
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                      mapSvgRef.current?.setPointerCapture(e.pointerId);
+                      setDragFrom(i);
+                      setDragPt({ x: DOM_X + 20, y: NODE_Y(i) });
+                    }}
+                    onKeyDown={(e) => {
+                      const j = ['1', '2', '3'].indexOf(e.key);
+                      if (j >= 0) {
+                        e.preventDefault();
+                        toggleArrow(i, j);
+                      }
+                    }}
+                  >
+                    <circle cx={DOM_X} cy={NODE_Y(i)} r="26" fill="transparent" data-crisp="" />
+                    <circle cx={DOM_X} cy={NODE_Y(i)} r="17" fill={p.bg} stroke={domColor} strokeWidth={dragFrom === i ? 3 : 2.2} />
+                    <text x={DOM_X} y={NODE_Y(i) + 5} textAnchor="middle" fontSize="15" fill={p.ink} className="font-hand">x{i + 1}</text>
+                  </g>
+                  {outs !== 1 && (
+                    <text x={DOM_X - 30} y={NODE_Y(i) + 5} textAnchor="end" fontSize="13" fill={p.vermilion} className="font-hand" stroke={p.bg} strokeWidth="4" style={{ paintOrder: 'stroke' }}>
+                      {outs === 0 ? 'sin salida' : `${outs} salidas`}
+                    </text>
+                  )}
+                  <circle cx={CO_X} cy={NODE_Y(i)} r="17" fill={p.bg} stroke={coColor} strokeWidth="2.2" strokeDasharray={ins === 0 ? '4 3' : undefined} />
+                  <text x={CO_X} y={NODE_Y(i) + 5} textAnchor="middle" fontSize="15" fill={p.ink} className="font-hand">y{i + 1}</text>
+                  {ins !== 1 && (
+                    <text x={CO_X + 30} y={NODE_Y(i) + 5} fontSize="13" fill={ins > 1 ? p.ochre : p.pencil} className="font-hand" stroke={p.bg} strokeWidth="4" style={{ paintOrder: 'stroke' }}>
+                      {ins === 0 ? 'nadie llega' : `${ins} llegan`}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
         </VisualStageCard>
       )}
 
