@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createSessionSalt, shuffledOptionOrder } from '../core/optionShuffle';
+import { REVIEW_INTERVALS_DAYS, useStudyRhythm } from '../storage/studyRhythm';
 import {
   STUDY_MODULES,
   STUDY_PHASES_MAP,
@@ -196,6 +197,31 @@ export function ModuleWorkspace({
     }
   }, []);
 
+  // ── Study rhythm: streak + spaced re-checks of sealed modules ──
+  const rhythm = useStudyRhythm(completedModuleIds);
+  const reviewMode = isCompleted && rhythm.isDue(moduleId);
+  const [roundOutcome, setRoundOutcome] = useState<
+    { kind: 'review'; firstTry: boolean; nextDays: number } | { kind: 'seal' } | null
+  >(null);
+  const pendingChapterRef = useRef<ChapterId | null>(null);
+  useEffect(() => {
+    setRoundOutcome(null);
+    const pending = pendingChapterRef.current;
+    if (!pending) return;
+    pendingChapterRef.current = null;
+    // After the module swap renders and the scroll resets, glide to the requested chapter.
+    const id = window.setTimeout(() => scrollToChapter(pending), 60);
+    return () => window.clearTimeout(id);
+  }, [moduleId, scrollToChapter]);
+  const goToReview = (id: StudyModuleId) => {
+    if (id === moduleId) {
+      scrollToChapter('practice');
+    } else {
+      pendingChapterRef.current = 'practice';
+      onSelectModule(id);
+    }
+  };
+
   const diagBlock = diagnosticReport?.blocks.find((b) => b.moduleId === moduleId) ?? null;
   const linkedScene = mod.linked3DSceneId ? SCENES[mod.linked3DSceneId] : null;
   const secondaryScene = mod.secondary3DSceneId ? SCENES[mod.secondary3DSceneId] : null;
@@ -212,9 +238,22 @@ export function ModuleWorkspace({
   const handleVerifyCheckpoint = () => {
     if (selectedOpt === null || solved) return;
     setSubmitted(true);
+    rhythm.markActive();
     if (selectedOpt === mod.checkpoint.correctIndex) {
       setSolved(true);
-      if (wrongTries === 0) onMarkModuleCompleted(moduleId);
+      const firstTry = wrongTries === 0;
+      if (reviewMode) {
+        const stage = rhythm.stageOf(moduleId) ?? -1;
+        const nextStage = firstTry ? Math.min(REVIEW_INTERVALS_DAYS.length - 1, stage + 1) : 0;
+        rhythm.onReviewed(moduleId, firstTry);
+        setRoundOutcome({ kind: 'review', firstTry, nextDays: REVIEW_INTERVALS_DAYS[nextStage] });
+      } else if (firstTry) {
+        if (!isCompleted) {
+          onMarkModuleCompleted(moduleId);
+          rhythm.onSealed(moduleId);
+          setRoundOutcome({ kind: 'seal' });
+        }
+      }
     } else {
       // Cross the distractor out, but never reveal which option is right.
       setEliminated((prev) => new Set(prev).add(selectedOpt));
@@ -459,6 +498,38 @@ export function ModuleWorkspace({
                   ))
                 )}
               </div>
+
+              {(rhythm.streak > 0 || rhythm.due.length > 0) && (
+                <div className="flex flex-wrap items-center gap-1.5 font-hand" data-testid="study-rhythm">
+                  {rhythm.streak > 0 && (
+                    <span
+                      className="text-[var(--ui-success)]"
+                      title={rhythm.activeToday ? 'Ya estudiaste hoy' : 'Resuelve un reto hoy para mantener la racha'}
+                    >
+                      Racha: {rhythm.streak} {rhythm.streak === 1 ? 'día' : 'días'}
+                      {!rhythm.activeToday && ' (sigue hoy)'}
+                    </span>
+                  )}
+                  {rhythm.due.length > 0 && (
+                    <>
+                      {rhythm.streak > 0 && <span className="text-[var(--hairline-strong)]">·</span>}
+                      <span className="text-[var(--ui-warning)]">Para repasar hoy:</span>
+                      {rhythm.due.slice(0, 4).map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => goToReview(id)}
+                          className="underline decoration-wavy decoration-[var(--ui-warning)] underline-offset-[3px] hover:text-[var(--ui-accent)] cursor-pointer"
+                          title={`Repasar ${id}: ${STUDY_MODULES[id].shortLabel}`}
+                        >
+                          {id}
+                        </button>
+                      ))}
+                      {rhythm.due.length > 4 && <span>+{rhythm.due.length - 4}</span>}
+                    </>
+                  )}
+                </div>
+              )}
 
               {dependents.length > 0 && (
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -791,7 +862,7 @@ export function ModuleWorkspace({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1 flex-1 min-w-[240px]">
                   <div className="text-[14px] font-hand text-[var(--ui-accent)]">
-                    Verificación de dominio · Regla R-OM
+                    {reviewMode && !solved ? 'Repaso espaciado · ¿Lo recuerdas sin mirar arriba?' : 'Verificación de dominio · Regla R-OM'}
                   </div>
                   <p className="font-display text-[21px] sm:text-[23px] text-[var(--text-primary)] leading-snug">
                     <GlossaryText text={mod.checkpoint.question} />
@@ -877,8 +948,14 @@ export function ModuleWorkspace({
                     className="font-display text-[17.5px] font-normal"
                     style={{ color: cleanSolve ? 'var(--ui-success)' : 'var(--ui-warning)' }}
                   >
-                    {cleanSolve
-                      ? '✓ Correcto a la primera. Módulo sellado como dominado.'
+                    {roundOutcome?.kind === 'review'
+                      ? roundOutcome.firstTry
+                        ? `✓ Lo recordabas. Próximo repaso en ${roundOutcome.nextDays} ${roundOutcome.nextDays === 1 ? 'día' : 'días'}: cada acierto aleja el siguiente.`
+                        : '✓ Correcto, pero tras dudar: volverá mañana para afianzarlo.'
+                      : cleanSolve
+                      ? isCompleted && roundOutcome?.kind !== 'seal'
+                        ? '✓ Correcto a la primera.'
+                        : '✓ Correcto a la primera. Módulo sellado: volverá en 1 día para un repaso rápido.'
                       : isCorrect
                         ? `✓ Correcto, tras ${wrongTries} ${wrongTries === 1 ? 'intento fallido' : 'intentos fallidos'}. Para sellarlo, acierta una ronda nueva a la primera.`
                         : '✗ Esa opción describe un error conceptual frecuente.'}
@@ -913,7 +990,7 @@ export function ModuleWorkspace({
                   Verificar respuesta
                 </CrayonButton>
 
-                {solved && !cleanSolve && (
+                {solved && !cleanSolve && roundOutcome?.kind !== 'review' && (
                   <button
                     type="button"
                     data-testid="checkpoint-new-round"
