@@ -32,6 +32,7 @@ export function M18Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   const tx = (x: number, y: number) => cx + (a * x + b * y) * sc;
   const ty = (x: number, y: number) => cy - (c * x + d * y) * sc;
 
+  useReportVisualState({ det });
   return (
     <VisualStageCard
       controls={
@@ -231,6 +232,7 @@ export function M20Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
 
   const safeR = Math.min(r, m, n);
 
+  useReportVisualState({ m, n, r: safeR });
   return (
     <VisualStageCard
       controls={
@@ -302,6 +304,7 @@ export function M21Visual({ theme }: ModuleVisualProps) {
   const mapX = (x: number) => 60 + x * 95;
   const mapY = (y: number) => 205 - y * 44;
 
+  useReportVisualState({ sse });
   return (
     <VisualStageCard
       controls={
@@ -391,6 +394,9 @@ export function M22Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   const cy = 120;
   const r = 82;
 
+  // Angle between the iterate and the dominant eigenvector (2, 1)/√5, for the chapter I challenge.
+  const angleToDominant = (Math.acos(Math.min(1, Math.abs(cur[0] * 2 + cur[1]) / Math.sqrt(5) / Math.hypot(cur[0], cur[1]))) * 180) / Math.PI;
+  useReportVisualState({ iter, angle: angleToDominant });
   return (
     <VisualStageCard
       controls={
@@ -464,6 +470,7 @@ export function M23Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
     return Math.max(0, Math.min(1, (val + 8) / 28));
   };
 
+  useReportVisualState({ k: rankK, energy: energyPct });
   return (
     <VisualStageCard
       controls={

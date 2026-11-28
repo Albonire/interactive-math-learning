@@ -115,6 +115,166 @@ export const INTUITION_CHALLENGES: Partial<Record<StudyModuleId, ChallengeStep[]
       check: (s) => s.tab === 'quantifiers' && s.forallXexistsY === false,
     },
   ],
+  M6: [
+    {
+      prompt: 'En el cazador de contraejemplos, refuta "n² + n + 41 siempre es primo".',
+      hint: 'Prueba valores de n hasta que la fórmula deje de dar un primo.',
+      insight: 'De n = 0 a 39 da primos, pero n = 40 da 1681 = 41²: un solo caso tumba el "siempre".',
+      check: (s) => s.tab === 'counter' && s.claim === 'euler' && s.holds === false,
+    },
+    {
+      prompt: 'Ahora refuta "2ⁿ − 1 es primo cuando n es primo" con un n primo.',
+      hint: 'n = 2, 3, 5 y 7 funcionan. Sigue con el siguiente primo… y el otro.',
+      insight: 'Con n = 11, 2¹¹ − 1 = 2047 = 23 · 89: que n sea primo no basta.',
+      check: (s) => s.tab === 'counter' && s.claim === 'mersenne' && [2, 3, 5, 7, 11].includes(n(s.n)) && s.holds === false,
+    },
+  ],
+  M7: [
+    {
+      prompt: 'Con el caso base verdadero, rompe la cadena de fichas.',
+      hint: 'Haz que el paso P(k) → P(k+1) falle en algún k.',
+      insight: 'Una sola brecha en el paso inductivo detiene la cadena: la prueba ya no cubre todo n.',
+      check: (s) => s.tab === 'domino' && s.baseOk === true && s.stepOk === false && s.pushed === true,
+    },
+    {
+      prompt: 'Ahora arregla el paso pero rompe el caso base, y empuja.',
+      hint: 'Paso verdadero, caso base roto, fichas empujadas.',
+      insight: 'Sin la primera ficha no cae ninguna: el paso inductivo solo traslada una verdad que ya exista.',
+      check: (s) => s.tab === 'domino' && s.baseOk === false && s.stepOk === true && s.pushed === true,
+    },
+  ],
+  M9: [
+    {
+      prompt: 'Elige cuántos escalones hacen falta para que la escalera sume 28 bloques.',
+      hint: 'n(n + 1)/2 = 28.',
+      insight: 'n = 7: dos escaleras forman un rectángulo 7 × 8 = 56, y una sola es la mitad.',
+      check: (s) => s.tab === 'stair' && s.nStair === 7,
+    },
+  ],
+  M11: [
+    {
+      prompt: 'Toca en el triángulo una casilla C(n, k) que valga 10.',
+      hint: 'Busca en la fila 5.',
+      insight: 'C(5, 2) = C(5, 3) = 10: elegir 2 de 5 es lo mismo que dejar fuera 3.',
+      check: (s) => s.tab === 'pascal' && s.value === 10,
+    },
+    {
+      prompt: 'En el palomar, garantiza al menos 3 palomas en alguna caja usando las mínimas palomas posibles.',
+      hint: 'Con 2 por caja aún nadie tiene 3. ¿Cuántas hacen falta para forzarlo?',
+      insight: 'Con c cajas hacen falta 2c + 1 palomas: la siguiente siempre cae donde ya hay dos.',
+      check: (s) => s.tab === 'pigeon' && n(s.pigeons) === 2 * n(s.holes) + 1,
+    },
+  ],
+  M14: [
+    {
+      prompt: 'Acerca x₀ + h a x₀ hasta que la secante sea prácticamente la tangente.',
+      hint: 'Reduce h al mínimo.',
+      insight: 'Con h → 0 la pendiente secante tiende a la derivada f′(x₀).',
+      check: (s) => s.tab === 'secant' && n(s.h) <= 0.051,
+    },
+    {
+      prompt: 'Encuentra un punto x₀ donde la tangente sea horizontal.',
+      hint: 'f(x) = x³/3 − x + 1, así que f′(x) = x² − 1.',
+      insight: 'f′(x₀) = 0 en x₀ = ±1: un máximo local en −1 y un mínimo local en 1.',
+      check: (s) => s.tab === 'secant' && Math.abs(n(s.x0) * n(s.x0) - 1) < 0.06,
+    },
+  ],
+  M18: [
+    {
+      prompt: 'Arrastra î y ĵ hasta que la matriz aplaste el plano en una recta.',
+      hint: 'Pon los dos vectores en la misma dirección.',
+      insight: 'det A = 0: el área del cuadrado unidad desaparece y la transformación no se puede deshacer.',
+      check: (s) => Math.abs(n(s.det)) < 0.05,
+    },
+    {
+      prompt: 'Ahora haz que la transformación invierta la orientación del plano.',
+      hint: 'Cruza ĵ al otro lado de î.',
+      insight: 'det A < 0: el plano se refleja, como verlo en un espejo.',
+      check: (s) => n(s.det) < -0.05,
+    },
+  ],
+  M20: [
+    {
+      prompt: 'Configura una matriz de 4 filas y 6 columnas con rango 3.',
+      hint: 'Filas m = 4, columnas n = 6, rango r = 3.',
+      insight: 'dim N(A) = n − r = 3: tres direcciones de ℝ⁶ se aplastan a cero.',
+      check: (s) => s.m === 4 && s.n === 6 && s.r === 3,
+    },
+    {
+      prompt: 'Haz que el espacio nulo sea solo el vector cero.',
+      hint: 'El rango tiene que alcanzar el número de columnas.',
+      insight: 'Rango igual al número de columnas: las columnas son independientes y Ax = 0 solo tiene x = 0.',
+      check: (s) => s.r === s.n,
+    },
+  ],
+  M21: [
+    {
+      prompt: 'Ajusta pendiente e intercepto hasta que la suma de cuadrados baje de 0,12.',
+      hint: 'Mira los cuadrados rojos: hazlos lo más pequeños posible a la vez.',
+      insight: 'El mínimo (0,78x + 0,55, suma ≈ 0,098) es la recta de mínimos cuadrados.',
+      check: (s) => n(s.sse) < 0.12,
+    },
+  ],
+  M23: [
+    {
+      prompt: 'Conserva al menos el 99,5 % de la energía con el menor rango k posible.',
+      hint: 'Cada σᵢ aporta σᵢ² de energía; los primeros aportan casi todo.',
+      insight: 'k = 3 basta (99,7 %): las otras tres componentes son casi ruido.',
+      check: (s) => s.k === 3 && n(s.energy) >= 99.5,
+    },
+  ],
+  M25: [
+    {
+      prompt: 'Haz que la binomial sea simétrica.',
+      hint: 'La simetría depende solo de p.',
+      insight: 'Con p = 0,5 éxito y fracaso pesan igual y la distribución se refleja en n/2.',
+      check: (s) => s.dist === 'binom' && Math.abs(n(s.p) - 0.5) < 1e-3,
+    },
+    {
+      prompt: 'Con n = 16 ensayos, coloca la media exactamente en 12.',
+      hint: 'E[X] = n·p.',
+      insight: 'p = 0,75 da 16 · 0,75 = 12: la esperanza se desplaza con p.',
+      check: (s) => s.dist === 'binom' && s.n === 16 && Math.abs(n(s.n) * n(s.p) - 12) < 0.02,
+    },
+  ],
+  M26: [
+    {
+      prompt: 'Con la población bimodal, sube el tamaño de muestra hasta 25 o más.',
+      hint: 'Elige "Bimodal" y aumenta n.',
+      insight: 'Aunque la población tiene dos jorobas, las medias forman una sola campana: el TCL en acción.',
+      check: (s) => s.source === 'bimodal' && n(s.sampleN) >= 25,
+    },
+  ],
+  M27: [
+    {
+      prompt: 'Haz que el MAP coincida exactamente con el MLE.',
+      hint: 'Busca un prior que no empuje hacia ningún lado.',
+      insight: 'Con prior Beta(1, 1) (uniforme) el MAP es el MLE: solo hablan los datos.',
+      check: (s) => s.tab === 'bayes' && Math.abs(n(s.map) - n(s.mle)) < 1e-9,
+    },
+    {
+      prompt: 'Sin cambiar los datos, haz que el MAP quede por debajo de 0,5.',
+      hint: 'Un prior que crea mucho en la cruz.',
+      insight: 'Un prior fuerte arrastra la estimación: con pocos datos, la creencia previa pesa mucho.',
+      check: (s) => s.tab === 'bayes' && s.heads === 7 && s.tails === 3 && n(s.map) < 0.5,
+    },
+  ],
+  M28: [
+    {
+      prompt: 'Ajusta w y b hasta que la pérdida sea prácticamente cero.',
+      hint: 'L = ½(w·2 + b − 5)²: hace falta w·2 + b = 5.',
+      insight: 'Con L = 0 ambos gradientes se anulan: el descenso ya no tiene hacia dónde moverse.',
+      check: (s) => n(s.loss) < 0.01,
+    },
+  ],
+  M30: [
+    {
+      prompt: 'Sube los logits hasta encontrar el primer valor en que el softmax ingenuo falla.',
+      hint: 'exp(z) desborda en float64 un poco por encima de z = 709.',
+      insight: 'exp(710 + 2) = ∞ y ∞/∞ = NaN; restar el máximo evita el desborde sin cambiar el resultado.',
+      check: (s) => s.tab === 'softmax' && s.naiveBroken === true && n(s.scaleZ) <= 710,
+    },
+  ],
   M10: [
     {
       prompt: 'Encuentra un salto a que NO tenga inverso módulo n.',
@@ -183,6 +343,40 @@ export const INTUITION_CHALLENGES: Partial<Record<StudyModuleId, ChallengeStep[]
       hint: 'Arrastra el punto en la imagen de filas hasta el cruce, o la punta en la de columnas hasta b.',
       insight: 'El cruce de las rectas (filas) y la receta que llega a b (columnas) son la misma solución.',
       check: (s) => s.solved === true,
+    },
+  ],
+  M22: [
+    {
+      prompt: 'Itera el método de potencia el menor número de veces que deje el vector a menos de 1° de la dirección propia dominante.',
+      hint: 'Mira cómo se acerca a la línea verde en cada paso.',
+      insight: 'k = 3 basta: cada paso reduce la desviación por λ₂/λ₁ = 0,6/2,6 ≈ 0,23. Así opera PageRank.',
+      check: (s) => s.iter === 3 && n(s.angle) < 1,
+    },
+  ],
+  M29: [
+    {
+      prompt: 'Sube la tasa de aprendizaje hasta que el descenso simple diverja.',
+      hint: 'En la dirección empinada el gradiente es 12y: cada paso multiplica y por (1 − 12α).',
+      insight: 'Con α > 1/6 ≈ 0,167, |1 − 12α| > 1: cada paso se pasa del valle y la oscilación crece.',
+      check: (s) => n(s.lr) > 1 / 6 && Math.abs(n(s.gdLastY)) > 0.9,
+    },
+  ],
+  M32: [
+    {
+      prompt: 'Aplica solo giros r hasta que el cuadrado vuelva a su posición inicial.',
+      hint: 'Cada r gira 90°.',
+      insight: 'r⁴ = e: cuatro giros de 90° son la identidad, así que r tiene orden 4.',
+      check: (s) => s.tab === 'd4' && s.rot === 0 && s.flip === false && String(s.last4) === 'r,r,r,r',
+    },
+    {
+      prompt: 'Ahora vuelve a la posición inicial mezclando giros y volteos (al menos un s).',
+      hint: 'Prueba r, s, r, s.',
+      insight: 'Toda simetría tiene inversa dentro del grupo; por ejemplo r·s·r·s = e, aunque r·s ≠ s·r.',
+      // The last four moves must be real r/s moves: pressing "Identidad (e)" is not solving it.
+      check: (s) => {
+        const moves = String(s.last4).split(',');
+        return s.tab === 'd4' && s.rot === 0 && s.flip === false && moves.length === 4 && !moves.includes('e') && moves.includes('s') && moves.includes('r');
+      },
     },
   ],
   M24: [

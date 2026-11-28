@@ -1357,7 +1357,7 @@ export function M6Visual({ theme }: ModuleVisualProps) {
   const [method, setMethod] = useState<'direct' | 'contra' | 'absurd'>('absurd');
   const [stepIdx, setStepIdx] = useState(3);
   const [claim, setClaim] = useState<'euler' | 'mersenne' | 'quad'>('euler');
-  const [testN, setTestN] = useState(40);
+  const [testN, setTestN] = useState(1);
 
   const proofs = {
     direct: [
@@ -1398,6 +1398,7 @@ export function M6Visual({ theme }: ModuleVisualProps) {
 
   const res = evalClaim(testN);
 
+  useReportVisualState({ tab, claim, n: testN, holds: res.holds });
   return (
     <div>
       <VisualModeTabs
@@ -1452,7 +1453,7 @@ export function M6Visual({ theme }: ModuleVisualProps) {
           controls={
             <>
               <div className="flex flex-wrap gap-1.5">
-                <ActionBtn active={claim === 'euler'} onClick={() => { setClaim('euler'); setTestN(40); }}>
+                <ActionBtn active={claim === 'euler'} onClick={() => { setClaim('euler'); setTestN(1); }}>
                   n² + n + 41 primo
                 </ActionBtn>
                 <ActionBtn active={claim === 'mersenne'} onClick={() => { setClaim('mersenne'); setTestN(4); }}>

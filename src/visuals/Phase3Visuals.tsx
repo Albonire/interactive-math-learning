@@ -186,6 +186,7 @@ export function M14Visual({ theme }: ModuleVisualProps) {
   const mapX = (x: number) => 280 + x * 95;
   const mapY = (y: number) => 145 - y * 48;
 
+  useReportVisualState({ tab, x0, h });
   return (
     <div>
       <VisualModeTabs

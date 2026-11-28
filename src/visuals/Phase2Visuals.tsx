@@ -43,6 +43,7 @@ export function M7Visual({ theme }: ModuleVisualProps) {
   };
   const treeNodes = buildFibTree(Math.min(fibN, 5), memo);
 
+  useReportVisualState({ tab, baseOk, stepOk, pushed, fibN, memo });
   return (
     <div>
       <VisualModeTabs
@@ -284,6 +285,7 @@ export function M9Visual({ theme }: ModuleVisualProps) {
     { label: '2ⁿ', color: p.vermilion, fn: (n: number) => Math.pow(2, Math.min(n, 16)) },
   ];
 
+  useReportVisualState({ tab, nStair });
   return (
     <div>
       <VisualModeTabs
@@ -566,6 +568,7 @@ export function M11Visual({ theme }: ModuleVisualProps) {
     return Math.round(res);
   };
 
+  useReportVisualState({ tab, value: comb(selN, selK), pigeons, holes });
   return (
     <div>
       <VisualModeTabs
