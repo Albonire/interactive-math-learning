@@ -1,3 +1,4 @@
+import { createSessionSalt, shuffledOptionOrder } from '../core/optionShuffle';
 import { useState } from 'react';
 import {
   DIAGNOSTIC_QUESTIONS,
@@ -107,6 +108,9 @@ export function DiagnosticModal({
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [idx, setIdx] = useState(0);
   const [report, setReport] = useState<DiagnosticReport | null>(existingReport);
+  // Shuffle display order per question (answers stay stored by original index), so the
+  // correct option cannot be inferred from its position. A new salt per run of the test.
+  const [salt, setSalt] = useState(createSessionSalt);
 
   if (!open) return null;
 
@@ -125,6 +129,7 @@ export function DiagnosticModal({
     setAnswers({});
     setIdx(0);
     setReport(null);
+    setSalt(createSessionSalt());
   };
 
   return (
@@ -330,7 +335,8 @@ export function DiagnosticModal({
               )}
 
               <div className="space-y-2.5" role="radiogroup" aria-label="Opciones de respuesta">
-                {q.options.map((opt, oi) => {
+                {shuffledOptionOrder(q.options.length, `${q.id}#${salt}`).map((oi, displayPos) => {
+                  const opt = q.options[oi];
                   const selected = answers[q.id] === oi;
                   return (
                     <button
@@ -338,18 +344,18 @@ export function DiagnosticModal({
                       type="button"
                       role="radio"
                       aria-checked={selected}
-                      data-testid={`diag-opt-${oi}`}
+                      data-testid={`diag-opt-${displayPos}`}
                       data-state={selected ? 'selected' : undefined}
                       onClick={() => setAnswers((prev) => ({ ...prev, [q.id]: oi }))}
                       className="sketch-option w-full text-left px-3.5 py-2.5 flex items-center gap-3 text-[15px] leading-snug text-[var(--text-primary)] cursor-pointer"
                     >
                       <CrayonStepMarker
-                        index={oi}
+                        index={displayPos}
                         active={selected}
                         completed={false}
                         crayon="cobalt"
                         theme={theme}
-                        label={String.fromCharCode(65 + oi)}
+                        label={String.fromCharCode(65 + displayPos)}
                         size={26}
                       />
                       <span className="flex-1">{opt}</span>

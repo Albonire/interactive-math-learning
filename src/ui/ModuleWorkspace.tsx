@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createSessionSalt, shuffledOptionOrder } from '../core/optionShuffle';
 import {
   STUDY_MODULES,
   STUDY_PHASES_MAP,
@@ -76,9 +77,15 @@ export function ModuleWorkspace({
   const isCompleted = completedModuleIds.has(moduleId);
   const totalPercent = Math.round((completedModuleIds.size / 32) * 100);
 
+  // R-OM checkpoint state. Indices are always the ORIGINAL data indices; only the display
+  // order is shuffled, so the correct answer cannot be found by position.
   const [selectedOpt, setSelectedOpt] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const [eliminated, setEliminated] = useState<ReadonlySet<number>>(() => new Set());
+  const [solved, setSolved] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [sessionSalt] = useState(createSessionSalt);
 
   // Scroll-driven state
   const [pageProgress, setPageProgress] = useState(0);
@@ -99,6 +106,9 @@ export function ModuleWorkspace({
   useEffect(() => {
     setSelectedOpt(null);
     setSubmitted(false);
+    setAttempt(0);
+    setEliminated(new Set());
+    setSolved(false);
     setCopied(false);
     setPageProgress(0);
     setStoryProgress(0);
@@ -190,14 +200,33 @@ export function ModuleWorkspace({
   const linkedScene = mod.linked3DSceneId ? SCENES[mod.linked3DSceneId] : null;
   const secondaryScene = mod.secondary3DSceneId ? SCENES[mod.secondary3DSceneId] : null;
 
+  const optionOrder = useMemo(
+    () => shuffledOptionOrder(mod.checkpoint.options.length, `${moduleId}#${attempt}#${sessionSalt}`),
+    [mod.checkpoint.options.length, moduleId, attempt, sessionSalt]
+  );
   const isCorrect = submitted && selectedOpt === mod.checkpoint.correctIndex;
+  const wrongTries = eliminated.size;
+  /** Sealed only when solved with no wrong try in this round (elimination is not mastery). */
+  const cleanSolve = solved && wrongTries === 0;
 
   const handleVerifyCheckpoint = () => {
-    if (selectedOpt === null) return;
+    if (selectedOpt === null || solved) return;
     setSubmitted(true);
     if (selectedOpt === mod.checkpoint.correctIndex) {
-      onMarkModuleCompleted(moduleId);
+      setSolved(true);
+      if (wrongTries === 0) onMarkModuleCompleted(moduleId);
+    } else {
+      // Cross the distractor out, but never reveal which option is right.
+      setEliminated((prev) => new Set(prev).add(selectedOpt));
     }
+  };
+
+  const handleNewRound = () => {
+    setAttempt((a) => a + 1);
+    setEliminated(new Set());
+    setSelectedOpt(null);
+    setSubmitted(false);
+    setSolved(false);
   };
 
   const handleCopyCode = () => {
@@ -784,22 +813,19 @@ export function ModuleWorkspace({
               </div>
 
               <div className="space-y-2.5" role="radiogroup" aria-label="Opciones del reto">
-                {mod.checkpoint.options.map((opt, idx) => {
+                {optionOrder.map((idx, displayPos) => {
+                  const opt = mod.checkpoint.options[idx];
                   const chosen = selectedOpt === idx;
-                  const revealCorrect = submitted && idx === mod.checkpoint.correctIndex;
-                  const revealWrong = submitted && chosen && idx !== mod.checkpoint.correctIndex;
+                  const isEliminated = eliminated.has(idx);
+                  const revealCorrect = solved && idx === mod.checkpoint.correctIndex;
                   const optState = revealCorrect
                     ? 'correct'
-                    : revealWrong
+                    : isEliminated
                       ? 'wrong'
                       : chosen
                         ? 'selected'
                         : undefined;
-                  const markerCrayon = revealCorrect
-                    ? 'sage'
-                    : revealWrong
-                      ? 'vermilion'
-                      : 'cobalt';
+                  const markerCrayon = revealCorrect ? 'sage' : isEliminated ? 'vermilion' : 'cobalt';
 
                   return (
                     <button
@@ -807,24 +833,32 @@ export function ModuleWorkspace({
                       type="button"
                       role="radio"
                       aria-checked={chosen}
-                      data-testid={`checkpoint-opt-${idx}`}
+                      aria-disabled={isEliminated || solved}
+                      data-testid={`checkpoint-opt-${displayPos}`}
                       data-state={optState}
                       onClick={() => {
+                        if (isEliminated || solved) return;
                         setSelectedOpt(idx);
                         setSubmitted(false);
                       }}
-                      className="sketch-option w-full text-left px-3.5 py-2.5 flex items-center gap-3 text-[15.5px] leading-snug text-[var(--text-primary)] cursor-pointer"
+                      className={`sketch-option w-full text-left px-3.5 py-2.5 flex items-center gap-3 text-[15.5px] leading-snug text-[var(--text-primary)] ${
+                        isEliminated ? 'opacity-55 cursor-not-allowed' : solved ? 'cursor-default' : 'cursor-pointer'
+                      }`}
                     >
                       <CrayonStepMarker
-                        index={idx}
-                        active={chosen || revealCorrect || revealWrong}
+                        index={displayPos}
+                        active={chosen || revealCorrect || isEliminated}
                         completed={revealCorrect}
                         crayon={markerCrayon}
                         theme={theme}
-                        label={String.fromCharCode(65 + idx)}
+                        label={String.fromCharCode(65 + displayPos)}
                         size={26}
                       />
-                      <span className="flex-1">{opt}</span>
+                      <span
+                        className={`flex-1 ${isEliminated ? 'line-through decoration-[var(--crayon-vermilion)] decoration-2' : ''}`}
+                      >
+                        {opt}
+                      </span>
                     </button>
                   );
                 })}
@@ -833,20 +867,37 @@ export function ModuleWorkspace({
               {submitted && (
                 <div
                   data-testid="checkpoint-feedback"
+                  role="status"
                   className="pl-4 border-l-3 py-1 text-[15.5px] leading-relaxed"
                   style={{
-                    borderLeftColor: isCorrect ? 'var(--ui-success)' : 'var(--ui-warning)',
+                    borderLeftColor: cleanSolve ? 'var(--ui-success)' : 'var(--ui-warning)',
                   }}
                 >
                   <strong
                     className="font-display text-[17.5px] font-normal"
-                    style={{ color: isCorrect ? 'var(--ui-success)' : 'var(--ui-warning)' }}
+                    style={{ color: cleanSolve ? 'var(--ui-success)' : 'var(--ui-warning)' }}
                   >
-                    {isCorrect
-                      ? '✓ ¡Correcto! Módulo sellado como dominado.'
-                      : '✗ Aún no — revisa el matiz conceptual:'}
+                    {cleanSolve
+                      ? '✓ Correcto a la primera. Módulo sellado como dominado.'
+                      : isCorrect
+                        ? `✓ Correcto, tras ${wrongTries} ${wrongTries === 1 ? 'intento fallido' : 'intentos fallidos'}. Para sellarlo, acierta una ronda nueva a la primera.`
+                        : '✗ Esa opción describe un error conceptual frecuente.'}
                   </strong>{' '}
-                  <GlossaryText text={mod.checkpoint.explanation} />
+                  {isCorrect ? (
+                    <GlossaryText text={mod.checkpoint.explanation} />
+                  ) : (
+                    <span className="text-[var(--text-secondary)]">
+                      No te digo cuál es la buena: vuelve al{' '}
+                      <button
+                        type="button"
+                        onClick={() => scrollToChapter('story3d')}
+                        className="underline decoration-dotted hover:text-[var(--ui-accent)] cursor-pointer"
+                      >
+                        cálculo concreto y la definición formal
+                      </button>
+                      , y elige de nuevo entre las opciones que quedan.
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -856,13 +907,24 @@ export function ModuleWorkspace({
                   theme={theme}
                   seed={131 + mod.number * 7}
                   dataTestId="checkpoint-verify-btn"
-                  disabled={selectedOpt === null}
+                  disabled={selectedOpt === null || solved || eliminated.has(selectedOpt)}
                   onClick={handleVerifyCheckpoint}
                 >
                   Verificar respuesta
                 </CrayonButton>
 
-                {isCorrect && next && (
+                {solved && !cleanSolve && (
+                  <button
+                    type="button"
+                    data-testid="checkpoint-new-round"
+                    onClick={handleNewRound}
+                    className="sketch-btn inline-flex items-center gap-1.5 px-3.5 py-1.5 font-hand text-[15px] text-[var(--text-primary)] cursor-pointer"
+                  >
+                    Nueva ronda (opciones barajadas)
+                  </button>
+                )}
+
+                {cleanSolve && next && (
                   <button
                     type="button"
                     data-tone="success"
