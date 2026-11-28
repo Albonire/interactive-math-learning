@@ -123,6 +123,7 @@ export function M25Visual({ theme }: ModuleVisualProps) {
   }));
   const maxP = Math.max(...bars.map((b) => b.p), 0.05);
 
+  useReportVisualState({ dist, n, p: prob });
   return (
     <VisualStageCard
       controls={
@@ -251,6 +252,7 @@ export function M26Visual({ theme }: ModuleVisualProps) {
   }
   const maxBin = Math.max(...bins, 1);
 
+  useReportVisualState({ source, sampleN });
   return (
     <VisualStageCard
       controls={
@@ -315,6 +317,7 @@ export function M27Visual({ theme }: ModuleVisualProps) {
   const priorPts = betaCurve(alpha0, beta0);
   const postPts = betaCurve(postA, postB);
 
+  useReportVisualState({ tab, heads, tails, mle, map });
   return (
     <div>
       <VisualModeTabs

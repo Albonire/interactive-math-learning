@@ -28,6 +28,7 @@ export function M28Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   const dLdw = dLdz * x;
   const dLdb = dLdz * 1;
 
+  useReportVisualState({ loss });
   return (
     <VisualStageCard
       controls={
@@ -211,7 +212,7 @@ export function M29Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
 export function M30Visual({ theme }: ModuleVisualProps) {
   const p = useVisualPalette(theme);
   const [tab, setTab] = useState<'softmax' | 'ieee'>('softmax');
-  const [scaleZ, setScaleZ] = useState(800);
+  const [scaleZ, setScaleZ] = useState(100);
 
   const logits = [scaleZ, scaleZ + 1, scaleZ + 2];
   const naiveExps = logits.map((v) => Math.exp(v));
@@ -231,6 +232,7 @@ export function M30Visual({ theme }: ModuleVisualProps) {
     }
   }
 
+  useReportVisualState({ tab, scaleZ, naiveBroken: naiveOut.some((v) => !Number.isFinite(v)) });
   return (
     <div>
       <VisualModeTabs

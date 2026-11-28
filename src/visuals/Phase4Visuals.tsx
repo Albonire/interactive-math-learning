@@ -32,6 +32,7 @@ export function M18Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   const tx = (x: number, y: number) => cx + (a * x + b * y) * sc;
   const ty = (x: number, y: number) => cy - (c * x + d * y) * sc;
 
+  useReportVisualState({ det });
   return (
     <VisualStageCard
       controls={
@@ -231,6 +232,7 @@ export function M20Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
 
   const safeR = Math.min(r, m, n);
 
+  useReportVisualState({ m, n, r: safeR });
   return (
     <VisualStageCard
       controls={
@@ -302,6 +304,7 @@ export function M21Visual({ theme }: ModuleVisualProps) {
   const mapX = (x: number) => 60 + x * 95;
   const mapY = (y: number) => 205 - y * 44;
 
+  useReportVisualState({ sse });
   return (
     <VisualStageCard
       controls={
@@ -464,6 +467,7 @@ export function M23Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
     return Math.max(0, Math.min(1, (val + 8) / 28));
   };
 
+  useReportVisualState({ k: rankK, energy: energyPct });
   return (
     <VisualStageCard
       controls={

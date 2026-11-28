@@ -67,3 +67,52 @@ test('phase 1 challenge targets are reachable and correct', () => {
   assert.ok(Math.sin((300 * Math.PI) / 180) < 0 && Math.cos((300 * Math.PI) / 180) > 0);
   assert.equal(step('M5', 0).check({ tab: 'truth', p: true, q: false }), true);
 });
+
+test('the 14 new challenges do not start solved from the visuals initial states', () => {
+  const none = (id: keyof typeof INTUITION_CHALLENGES, st: Record<string, unknown>) =>
+    INTUITION_CHALLENGES[id]!.forEach((c, i) => assert.equal(c.check(st), false, `${id} step ${i}`));
+  none('M6', { tab: 'flow', claim: 'euler', n: 1, holds: true });
+  none('M7', { tab: 'domino', baseOk: true, stepOk: true, pushed: true });
+  none('M9', { tab: 'stair', nStair: 5 });
+  none('M11', { tab: 'pascal', value: 6, pigeons: 7, holes: 5 });
+  none('M14', { tab: 'secant', x0: 0.8, h: 0.9 });
+  none('M18', { det: 1.4 * 1.1 - 0.5 * 0.2 });
+  none('M20', { m: 4, n: 5, r: 2 });
+  none('M21', { sse: 0.58 });
+  none('M23', { k: 2, energy: 97.2 });
+  none('M25', { dist: 'binom', n: 10, p: 0.4 });
+  none('M26', { source: 'skewed', sampleN: 12 });
+  none('M27', { tab: 'bayes', heads: 7, tails: 3, mle: 0.7, map: 9 / 14 });
+  none('M28', { loss: 0.5 * (1.5 * 2 + 0.5 - 5) ** 2 });
+  none('M30', { tab: 'softmax', scaleZ: 100, naiveBroken: false });
+});
+
+test('the 14 new challenge targets are reachable and their insights are right', () => {
+  const isPrime = (v: number) => { if (v < 2) return false; for (let d = 2; d * d <= v; d++) if (v % d === 0) return false; return true; };
+  assert.equal(isPrime(40 * 40 + 40 + 41), false);
+  assert.equal(2 ** 11 - 1, 23 * 89);
+  for (const p of [2, 3, 5, 7]) assert.ok(isPrime(2 ** p - 1));
+  assert.equal(step('M6', 1).check({ tab: 'counter', claim: 'mersenne', n: 11, holds: false }), true);
+  assert.equal(step('M6', 1).check({ tab: 'counter', claim: 'mersenne', n: 4, holds: false }), false, 'n = 4 is not prime');
+  assert.equal((7 * 8) / 2, 28);
+  assert.equal(step('M11', 1).check({ tab: 'pigeon', pigeons: 11, holes: 5 }), true);
+  // M14: f'(x) = x² − 1 vanishes at ±1, reachable with the 0.1 step.
+  assert.equal(step('M14', 1).check({ tab: 'secant', x0: -1, h: 0.5 }), true);
+  // M21: the OLS line for the visual's points has SSE ≈ 0.098 < 0.12.
+  const pts = [[1, 1.4], [2, 1.9], [3, 3.1], [4, 3.6]];
+  const sse = pts.reduce((a, [x, y]) => a + (y - (0.78 * x + 0.55)) ** 2, 0);
+  assert.ok(Math.abs(sse - 0.098) < 1e-9 && sse < 0.12);
+  // M23: energies with σ = 12, 5.2, 2.1, 0.7, 0.2, 0.05.
+  const sig = [12, 5.2, 2.1, 0.7, 0.2, 0.05];
+  const tot = sig.reduce((a, v) => a + v * v, 0);
+  const kept = (k: number) => (sig.slice(0, k).reduce((a, v) => a + v * v, 0) / tot) * 100;
+  assert.ok(kept(2) < 99.5 && kept(3) >= 99.5);
+  // M27: prior Beta(1,1) gives MAP = MLE; Beta(1,8) pulls MAP below 0.5 with the same data.
+  const map = (a0: number, b0: number) => (a0 + 7 - 1) / (a0 + b0 + 10 - 2);
+  assert.equal(map(1, 1), 0.7);
+  assert.ok(map(1, 8) < 0.5);
+  // M30: logits [z, z+1, z+2] overflow first at z = 710 on the 10-step slider.
+  assert.ok(Number.isFinite(Math.exp(702)) && !Number.isFinite(Math.exp(712)));
+  assert.equal(step('M30', 0).check({ tab: 'softmax', scaleZ: 710, naiveBroken: true }), true);
+  assert.equal(step('M25', 1).check({ dist: 'binom', n: 16, p: 0.7500000001 }), true);
+});
