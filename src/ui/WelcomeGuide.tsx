@@ -36,7 +36,7 @@ export function shouldAutoShowWelcome(opts: { seen: boolean; sealed: number; tra
 }
 
 const STEPS = [
-  { verb: 'Toca', text: 'Cada módulo abre con un reto: manipula el dibujo hasta que algo pase.' },
+  { verb: 'Toca', text: 'Casi todos los módulos abren con un reto: manipula el dibujo hasta que algo pase.' },
   { verb: 'Recorre', text: 'Desplázate: la figura 3D cambia con cada idea, de la intuición a la fórmula.' },
   { verb: 'Consulta', text: 'El atlas resume las representaciones, el temario y la bibliografía.' },
   { verb: 'Programa y sella', text: 'Ejecuta el código en el navegador y responde para sellar el módulo.' },
