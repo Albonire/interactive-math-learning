@@ -8,7 +8,7 @@
  * Stored under its own localStorage key so it never collides with the main progress state.
  * All logic is pure (dates are passed in as YYYY-MM-DD strings) so it is unit-testable.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import type { StudyModuleId } from '../core/studyPlanTypes';
 
 export const REVIEW_INTERVALS_DAYS = [1, 3, 7, 14, 30] as const;
@@ -110,24 +110,40 @@ export function dueReviews(state: StudyRhythmState, today: string): StudyModuleI
     .map(([id]) => id);
 }
 
+/** Validates untrusted data (localStorage or an imported backup) into a clean state. */
+export function sanitizeStudyRhythm(raw: unknown): StudyRhythmState {
+  if (!raw || typeof raw !== 'object') return EMPTY_RHYTHM;
+  const parsed = raw as Partial<StudyRhythmState>;
+  const dayRe = /^\d{4}-\d{2}-\d{2}$/;
+  const activeDays = Array.isArray(parsed.activeDays)
+    ? Array.from(new Set(parsed.activeDays.filter((d): d is string => typeof d === 'string' && dayRe.test(d))))
+        .sort()
+        .slice(-MAX_DAYS_KEPT)
+    : [];
+  const reviews: StudyRhythmState['reviews'] = {};
+  if (parsed.reviews && typeof parsed.reviews === 'object') {
+    for (const [k, v] of Object.entries(parsed.reviews)) {
+      const e = v as Partial<ReviewEntry>;
+      if (
+        /^M([1-9]|[12]\d|3[0-2])$/.test(k) &&
+        typeof e?.stage === 'number' &&
+        Number.isInteger(e.stage) &&
+        e.stage >= 0 &&
+        e.stage < REVIEW_INTERVALS_DAYS.length &&
+        typeof e.due === 'string' &&
+        dayRe.test(e.due)
+      ) {
+        reviews[k as StudyModuleId] = { stage: e.stage, due: e.due };
+      }
+    }
+  }
+  return { activeDays, reviews };
+}
+
 export function loadStudyRhythm(): StudyRhythmState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY_RHYTHM;
-    const parsed = JSON.parse(raw) as Partial<StudyRhythmState>;
-    const activeDays = Array.isArray(parsed.activeDays)
-      ? parsed.activeDays.filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))
-      : [];
-    const reviews: StudyRhythmState['reviews'] = {};
-    if (parsed.reviews && typeof parsed.reviews === 'object') {
-      for (const [k, v] of Object.entries(parsed.reviews)) {
-        const e = v as Partial<ReviewEntry>;
-        if (/^M([1-9]|[12]\d|3[0-2])$/.test(k) && typeof e?.stage === 'number' && typeof e.due === 'string') {
-          reviews[k as StudyModuleId] = { stage: e.stage, due: e.due };
-        }
-      }
-    }
-    return { activeDays, reviews };
+    return raw ? sanitizeStudyRhythm(JSON.parse(raw)) : EMPTY_RHYTHM;
   } catch {
     return EMPTY_RHYTHM;
   }
@@ -141,27 +157,56 @@ function save(state: StudyRhythmState): void {
   }
 }
 
+// ── Shared store: every component sees the same rhythm (import/reset update all at once) ──
+let current: StudyRhythmState | null = null;
+const listeners = new Set<() => void>();
+
+function getRhythm(): StudyRhythmState {
+  if (current === null) current = typeof window === 'undefined' ? EMPTY_RHYTHM : loadStudyRhythm();
+  return current;
+}
+
+function setRhythm(update: (s: StudyRhythmState) => StudyRhythmState): void {
+  const prev = getRhythm();
+  const next = update(prev);
+  if (next === prev) return;
+  current = next;
+  save(next);
+  listeners.forEach((l) => l());
+}
+
+/** Replaces the whole rhythm (used by Importar JSON and Reiniciar progreso). */
+export function replaceStudyRhythm(next: StudyRhythmState): void {
+  setRhythm(() => sanitizeStudyRhythm(next));
+}
+
+/** Current rhythm snapshot, for exporting a backup. */
+export function getStudyRhythmSnapshot(): StudyRhythmState {
+  return getRhythm();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
 /** React binding. `today` is recomputed per render so a session crossing midnight stays correct. */
 export function useStudyRhythm(sealed: ReadonlySet<StudyModuleId>) {
-  const [state, setState] = useState<StudyRhythmState>(loadStudyRhythm);
+  const state = useSyncExternalStore(subscribe, getRhythm, () => EMPTY_RHYTHM);
   const today = localDay();
 
   useEffect(() => {
-    setState((s) => ensureScheduled(s, sealed, localDay()));
+    setRhythm((s) => ensureScheduled(s, sealed, localDay()));
   }, [sealed]);
 
-  useEffect(() => {
-    save(state);
-  }, [state]);
-
-  const markActive = useCallback(() => setState((s) => recordActivity(s, localDay())), []);
+  const markActive = useCallback(() => setRhythm((s) => recordActivity(s, localDay())), []);
   const onSealed = useCallback(
-    (id: StudyModuleId) => setState((s) => scheduleFirstReview(recordActivity(s, localDay()), id, localDay())),
+    (id: StudyModuleId) => setRhythm((s) => scheduleFirstReview(recordActivity(s, localDay()), id, localDay())),
     []
   );
   const onReviewed = useCallback(
     (id: StudyModuleId, correctFirstTry: boolean) =>
-      setState((s) => applyReviewResult(recordActivity(s, localDay()), id, localDay(), correctFirstTry)),
+      setRhythm((s) => applyReviewResult(recordActivity(s, localDay()), id, localDay(), correctFirstTry)),
     []
   );
 

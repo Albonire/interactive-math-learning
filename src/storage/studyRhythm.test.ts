@@ -48,3 +48,27 @@ test('due reviews are listed most overdue first, and old seals get scheduled', (
   assert.deepEqual(dueReviews(s, '2026-11-06').slice(-1), ['M9']);
   assert.deepEqual(dueReviews(s, '2026-11-01'), []);
 });
+
+test('backups carry the study rhythm and import it sanitized', async () => {
+  const { exportProgressJson, parseImportedProgressJson, createDefaultPersistedData } = await import('./localTelemetry');
+  const rhythm = { activeDays: ['2026-11-26', '2026-11-27'], reviews: { M3: { stage: 2, due: '2026-12-04' } } };
+  const json = exportProgressJson(createDefaultPersistedData(), ['a'], rhythm);
+  const back = parseImportedProgressJson(json);
+  assert.ok(back.ok);
+  if (back.ok) assert.deepEqual(back.studyRhythm, rhythm);
+
+  // Older backups have no rhythm: null means "keep the local one".
+  const legacy = JSON.parse(json);
+  delete legacy.studyRhythm;
+  const old = parseImportedProgressJson(JSON.stringify(legacy));
+  assert.ok(old.ok && old.studyRhythm === null);
+
+  // Hostile or broken values are dropped, not trusted.
+  legacy.studyRhythm = {
+    activeDays: ['2026-11-27', 'not-a-date', 42],
+    reviews: { M3: { stage: 99, due: '2026-12-04' }, M99: { stage: 0, due: '2026-12-01' }, M5: { stage: 1, due: '2026-12-01' } },
+  };
+  const bad = parseImportedProgressJson(JSON.stringify(legacy));
+  assert.ok(bad.ok);
+  if (bad.ok) assert.deepEqual(bad.studyRhythm, { activeDays: ['2026-11-27'], reviews: { M5: { stage: 1, due: '2026-12-01' } } });
+});

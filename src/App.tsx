@@ -76,6 +76,7 @@ import {
   type ProjectedAnnotation,
 } from './rendering/sceneAnnotations';
 import { TopBar } from './ui/TopBar';
+import { EMPTY_RHYTHM, replaceStudyRhythm } from './storage/studyRhythm';
 import { CoursePipelineDock } from './ui/CoursePipelineDock';
 import { SlideDrawer } from './ui/SlideDrawer';
 import { CurriculumMapModal } from './ui/CurriculumMapModal';
@@ -1486,6 +1487,7 @@ export default function App() {
       const nextSteps = new Set(res.completedStepIds);
       setCompletedStepIds(nextSteps);
       saveCompletedSteps(nextSteps);
+      if (res.studyRhythm) replaceStudyRhythm(res.studyRhythm);
       return { ok: true, message: 'Progreso restaurado en tu cuaderno local.' };
     },
     []
@@ -2138,6 +2140,7 @@ export default function App() {
           const emptySteps = new Set<string>();
           setCompletedStepIds(emptySteps);
           saveCompletedSteps(emptySteps);
+          replaceStudyRhythm(EMPTY_RHYTHM);
           seenIntrosRef.current = new Set();
           setParamValues(defaultParamsFor(sceneId));
           setLayers(SCENES[sceneId].defaultLayers.map((l) => ({ ...l })));

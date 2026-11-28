@@ -1,3 +1,4 @@
+import { getStudyRhythmSnapshot, sanitizeStudyRhythm, type StudyRhythmState } from './studyRhythm';
 import type { BktSkillState, SceneId, SkillId } from '../core/types';
 import type { StudyModuleId } from '../core/studyPlanTypes';
 import { isValidStudyModuleId } from '../core/studyPlan';
@@ -30,6 +31,8 @@ export interface PortableProgressBundle {
   exportedAt: string;
   aiData: PersistedAiData;
   completedStepIds: string[];
+  /** Streak and spaced-review schedule (optional: older backups do not have it). */
+  studyRhythm?: StudyRhythmState;
 }
 
 const VALID_SCENE_IDS: ReadonlySet<string> = new Set<SceneId>([
@@ -176,7 +179,8 @@ export function savePersistedAiData(data: PersistedAiData): void {
 
 export function exportProgressJson(
   aiData: PersistedAiData,
-  completedStepIds: Iterable<string>
+  completedStepIds: Iterable<string>,
+  studyRhythm: StudyRhythmState = getStudyRhythmSnapshot()
 ): string {
   const bundle: PortableProgressBundle = {
     schema: 'bibifold-progress',
@@ -184,6 +188,7 @@ export function exportProgressJson(
     exportedAt: new Date().toISOString(),
     aiData,
     completedStepIds: Array.from(completedStepIds),
+    studyRhythm,
   };
   return JSON.stringify(bundle, null, 2);
 }
@@ -192,6 +197,8 @@ export function parseImportedProgressJson(rawJson: string): {
   ok: true;
   aiData: PersistedAiData;
   completedStepIds: string[];
+  /** null when the backup predates the study rhythm: keep the local one. */
+  studyRhythm: StudyRhythmState | null;
 } | {
   ok: false;
   error: string;
@@ -208,7 +215,8 @@ export function parseImportedProgressJson(rawJson: string): {
     const steps = Array.isArray(parsed.completedStepIds)
       ? parsed.completedStepIds.filter((s): s is string => typeof s === 'string')
       : [];
-    return { ok: true, aiData: migrated, completedStepIds: steps };
+    const studyRhythm = parsed.studyRhythm === undefined ? null : sanitizeStudyRhythm(parsed.studyRhythm);
+    return { ok: true, aiData: migrated, completedStepIds: steps, studyRhythm };
   } catch {
     return { ok: false, error: 'No se pudo leer el JSON. Verifica que no esté dañado.' };
   }
