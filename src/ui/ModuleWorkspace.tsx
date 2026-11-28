@@ -865,7 +865,7 @@ export function ModuleWorkspace({
                   <div className="font-hand text-[14px] text-[var(--ui-accent)]">
                     Peldaño C · Definición formal
                   </div>
-                  <div className="py-2.5 px-3 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto text-[18px] text-[var(--text-primary)]">
+                  <div className="formula-nowrap py-2.5 px-3 border-y border-dashed border-[var(--hairline-strong)] overflow-x-auto text-[18px] text-[var(--text-primary)]">
                     <KatexInline latex={mod.concreteExample.latex} />
                   </div>
                   <p className="text-[16px] text-[var(--text-secondary)] leading-relaxed">

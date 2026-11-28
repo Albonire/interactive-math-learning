@@ -1094,3 +1094,13 @@ select:focus-visible,
   /* Wide Rough.js crayon frame (alpha mask) shared by cards, tiles and the lab sheet. */
   --hand-frame-wide: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%2080%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M3.62%202.38%20C122.04%202.87%2C%20241.46%202.94%2C%20596.67%203.13%20M3.38%203.40%20C142.88%201.85%2C%20282.44%201.73%2C%20596.83%203.12%20M597.99%203.83%20C597.69%2033.73%2C%20597.26%2063.24%2C%20596.22%2075.28%20M596.20%202.12%20C597.37%2029.66%2C%20596.56%2055.47%2C%20597.52%2076.86%20M596.81%2077.72%20C375.50%2079.66%2C%20155.24%2078.79%2C%203.08%2076.80%20M596.83%2077.18%20C397.56%2075.84%2C%20199.30%2075.41%2C%203.14%2077.20%20M3.08%2077.99%20C5.06%2049.84%2C%201.70%2026.65%2C%201.36%201.60%20M3.43%2078.07%20C1.91%2062.98%2C%201.43%2047.29%2C%203.93%203.95%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20vector-effect%3D%22non-scaling-stroke%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
 }
+
+/* Plain-text math converted by renderMathScripts, and formulas that must not break mid-expression. */
+.math-script {
+  font-size: 0.72em;
+  line-height: 0;
+  font-family: inherit;
+}
+.formula-nowrap {
+  white-space: nowrap;
+}

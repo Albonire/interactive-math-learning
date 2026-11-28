@@ -1,4 +1,5 @@
 import {
+  Fragment,
   createContext,
   useCallback,
   useContext,
@@ -16,6 +17,7 @@ import {
   type GlossaryEntry,
 } from '../core/glossary';
 import { getCrayonHex } from '../core/palette';
+import { splitMathScripts } from '../core/mathScripts';
 import { STUDY_MODULES } from '../core/studyPlan';
 import type { StudyModuleId } from '../core/studyPlanTypes';
 import type { ThemeMode } from '../core/types';
@@ -440,7 +442,7 @@ export function GlossaryText({
     <>
       {tokens.map((tok, idx) => {
         if (tok.type === 'text') {
-          return <span key={idx}>{tok.value}</span>;
+          return <span key={idx}>{renderMathScripts(tok.value)}</span>;
         }
         const accent = getCrayonHex(tok.entry.crayon, ctx.theme);
         const isOpen = ctx.activeEntryId === tok.entry.id;
@@ -467,5 +469,20 @@ export function GlossaryText({
         );
       })}
     </>
+  );
+}
+
+/** Renders "b^k" / "d_k" style plain-text math as real superscripts and subscripts. */
+export function renderMathScripts(text: string): ReactNode {
+  const segs = splitMathScripts(text);
+  if (segs.length === 1 && segs[0].kind === 'text') return text;
+  return segs.map((s, i) =>
+    s.kind === 'text' ? (
+      <Fragment key={i}>{s.value}</Fragment>
+    ) : s.kind === 'sup' ? (
+      <sup key={i} className="math-script">{s.value}</sup>
+    ) : (
+      <sub key={i} className="math-script">{s.value}</sub>
+    )
   );
 }
