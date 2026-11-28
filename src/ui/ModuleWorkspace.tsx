@@ -194,6 +194,27 @@ export function ModuleWorkspace({
     };
   }, [moduleId]);
 
+  // Scroll-driven reveal: each chapter rises into place the first time it scrolls into view.
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const els = Object.values(chapterRefs.current).filter((el): el is HTMLElement => !!el);
+    els.forEach((el) => delete el.dataset.inview);
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            (e.target as HTMLElement).dataset.inview = 'true';
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { root, threshold: 0.06 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [moduleId]);
+
   const scrollToChapter = useCallback((id: ChapterId) => {
     const el = chapterRefs.current[id];
     if (el) {
