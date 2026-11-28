@@ -36,6 +36,7 @@ export function M1Visual({ theme }: ModuleVisualProps) {
   const hexByte = decimal.toString(16).toUpperCase().padStart(2, '0');
   const swatchColor = `#${hexByte}6B94`;
 
+  useReportVisualState({ tab, decimal, base });
   return (
     <div>
       <VisualModeTabs
@@ -956,6 +957,7 @@ export function M4Visual({ theme }: ModuleVisualProps) {
   const wRe = scaleR * (zRe * Math.cos(phi) - zIm * Math.sin(phi));
   const wIm = scaleR * (zRe * Math.sin(phi) + zIm * Math.cos(phi));
 
+  useReportVisualState({ tab, deg });
   return (
     <div>
       <VisualModeTabs
@@ -1148,6 +1150,7 @@ export function M5Visual({ theme }: ModuleVisualProps) {
     [false, false],
   ];
 
+  useReportVisualState({ tab, p: propP, q: propQ, forallXexistsY, existsYforallX });
   return (
     <div>
       <VisualModeTabs

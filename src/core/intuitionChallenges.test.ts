@@ -38,3 +38,32 @@ test('challenge targets are reachable with the controls the visuals offer', () =
   // M10 step 2: n − 1 is its own inverse.
   for (const n of [5, 8, 12]) assert.equal(((n - 1) * (n - 1)) % n, 1);
 });
+
+test('phase 1 challenges (M1, M4, M5) do not start solved', () => {
+  const m1 = { tab: 'bases', decimal: 173, base: 2 };
+  INTUITION_CHALLENGES.M1!.forEach((st) => assert.equal(st.check(m1), false));
+  const m4 = { tab: 'trig', deg: 57 };
+  INTUITION_CHALLENGES.M4!.forEach((st) => assert.equal(st.check(m4), false));
+  // M5 initial grid: every x has some y (true) but no single y covers all x (false).
+  const m5 = { tab: 'truth', p: false, q: true, forallXexistsY: true, existsYforallX: false };
+  INTUITION_CHALLENGES.M5!.forEach((st) => assert.equal(st.check(m5), false));
+  assert.equal(step('M5', 1).check({ ...m5, tab: 'quantifiers' }), false);
+  assert.equal(step('M5', 2).check({ ...m5, tab: 'quantifiers' }), false);
+});
+
+test('phase 1 challenge targets are reachable and correct', () => {
+  // 100 is reachable with bits only, and the insight's decomposition is right.
+  assert.equal(64 + 32 + 4, 100);
+  assert.equal((100).toString(2).padStart(8, '0'), '01100100');
+  assert.equal((45).toString(16).toUpperCase(), '2D');
+  assert.equal(step('M1', 2).check({ tab: 'bases', decimal: 45, base: 16 }), true);
+  // sin = cos exactly at 45° and 225°.
+  for (const d of [45, 225]) {
+    const r = (d * Math.PI) / 180;
+    assert.ok(Math.abs(Math.sin(r) - Math.cos(r)) < 1e-12);
+    assert.equal(step('M4', 0).check({ tab: 'trig', deg: d }), true);
+  }
+  assert.equal(step('M4', 2).check({ tab: 'trig', deg: 300 }), true);
+  assert.ok(Math.sin((300 * Math.PI) / 180) < 0 && Math.cos((300 * Math.PI) / 180) > 0);
+  assert.equal(step('M5', 0).check({ tab: 'truth', p: true, q: false }), true);
+});

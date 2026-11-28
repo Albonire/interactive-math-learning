@@ -21,6 +21,26 @@ const n = (v: unknown): number => (typeof v === 'number' ? v : Number.NaN);
 const near = (a: unknown, b: number, tol: number): boolean => Math.abs(n(a) - b) <= tol;
 
 export const INTUITION_CHALLENGES: Partial<Record<StudyModuleId, ChallengeStep[]>> = {
+  M1: [
+    {
+      prompt: 'Toca los bits para encenderlos o apagarlos hasta formar el 100.',
+      hint: 'Busca la mayor potencia de 2 que cabe en 100 y resta: 100 = 64 + …',
+      insight: '100 = 64 + 32 + 4 = 01100100₂: cada bit encendido suma su peso.',
+      check: (s) => s.tab === 'bases' && s.decimal === 100,
+    },
+    {
+      prompt: 'Forma el número más grande que caben en estos 8 bits.',
+      hint: 'Enciéndelos todos.',
+      insight: '11111111₂ = 255 = 2⁸ − 1: un byte guarda 256 valores, del 0 al 255.',
+      check: (s) => s.tab === 'bases' && s.decimal === 255,
+    },
+    {
+      prompt: 'Escribe 45 y míralo en base 16. ¿Cuántas cifras necesita?',
+      hint: 'Ajusta el valor decimal y pulsa "Base 16".',
+      insight: '45 = 2D₁₆: cada cifra hexadecimal resume exactamente 4 bits (0010 1101).',
+      check: (s) => s.tab === 'bases' && s.decimal === 45 && s.base === 16,
+    },
+  ],
   M2: [
     {
       prompt: 'Reparte el cuadrado para que (a + b)² valga 49 con a distinto de b.',
@@ -53,6 +73,46 @@ export const INTUITION_CHALLENGES: Partial<Record<StudyModuleId, ChallengeStep[]
       hint: 'Cada y debe recibir exactamente una flecha.',
       insight: 'Con una biyección puedes invertir todas las flechas y obtener f⁻¹.',
       check: (s) => s.tab === 'mapping' && s.isFunction === true && s.isInjective === true && s.isSurjective === true,
+    },
+  ],
+  M4: [
+    {
+      prompt: 'Gira el punto hasta un ángulo donde seno y coseno valgan exactamente lo mismo.',
+      hint: 'Busca donde el punto está a la misma altura que distancia horizontal al centro.',
+      insight: 'Ocurre en 45° y en 225°: sobre la diagonal y = x del círculo unitario.',
+      check: (s) => s.tab === 'trig' && [45, 225].some((a) => Math.abs(n(s.deg) - a) <= 1),
+    },
+    {
+      prompt: 'Ahora lleva el punto a donde cos θ = −1.',
+      hint: 'El coseno es la sombra horizontal: el punto más a la izquierda del círculo.',
+      insight: 'θ = 180° = π rad: media vuelta deja el punto en (−1, 0).',
+      check: (s) => s.tab === 'trig' && Math.abs(n(s.deg) - 180) <= 1,
+    },
+    {
+      prompt: 'Encuentra un ángulo con seno negativo y coseno positivo.',
+      hint: 'Seno negativo: por debajo del eje. Coseno positivo: a la derecha.',
+      insight: 'Es el cuarto cuadrante, entre 270° y 360°: abajo a la derecha.',
+      check: (s) => s.tab === 'trig' && n(s.deg) > 270 && n(s.deg) < 360,
+    },
+  ],
+  M5: [
+    {
+      prompt: 'En la tabla de verdad, elige P y Q para que P → Q sea falsa.',
+      hint: 'Una promesa "si P entonces Q" solo se rompe de una manera.',
+      insight: 'P → Q solo es falsa con P verdadera y Q falsa: la promesa se rompió.',
+      check: (s) => s.tab === 'truth' && s.p === true && s.q === false,
+    },
+    {
+      prompt: 'En Cuantificadores, consigue que ∃y ∀x sea verdadero: una misma y que sirva para todas las x.',
+      hint: 'Llena por completo una de las columnas.',
+      insight: 'Una sola y que funciona para todas las x: eso pide ∃y ∀x.',
+      check: (s) => s.tab === 'quantifiers' && s.existsYforallX === true,
+    },
+    {
+      prompt: 'Ahora rompe ∀x ∃y: deja a alguna x sin ninguna y.',
+      hint: 'Vacía una fila entera.',
+      insight: 'Basta una x sin pareja para que "para toda x existe y" falle: el orden de los cuantificadores importa.',
+      check: (s) => s.tab === 'quantifiers' && s.forallXexistsY === false,
     },
   ],
   M10: [
