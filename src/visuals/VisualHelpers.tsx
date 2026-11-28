@@ -3,6 +3,7 @@ import { getCrayonHex, THEME_PALETTES } from '../core/palette';
 import type { CrayonToken, ThemeMode } from '../core/types';
 import { CrayonNote } from '../ui/CrayonIcons';
 import { handifySvgTree } from './handDrawnSvg';
+import { useDrawOnEnter } from './useDrawOnEnter';
 import { GlossaryText } from '../ui/CrayonDictionary';
 import { CrayonSlider, CrayonStepMarker, RoughDivider, RoughUnderline } from '../ui/RoughElements';
 export {
@@ -231,6 +232,7 @@ export function VisualStageCard({
   controls?: ReactNode;
   footer?: ReactNode;
 }) {
+  const drawRef = useDrawOnEnter<HTMLDivElement>();
   return (
     <div className="space-y-4">
       {controls && (
@@ -238,7 +240,7 @@ export function VisualStageCard({
           {controls}
         </div>
       )}
-      <div className="sketch-diagram-canvas py-2 sm:py-3 overflow-x-auto">
+      <div ref={drawRef} className="sketch-diagram-canvas py-2 sm:py-3 overflow-x-auto">
         {handifySvgTree(children)}
       </div>
       {(caption || footer) && (

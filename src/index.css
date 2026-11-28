@@ -887,3 +887,15 @@ select:focus-visible,
 .sketch-diagram-canvas svg .hand-ink path {
   filter: none;
 }
+
+/* Draw-on-enter (useDrawOnEnter): blank until visible, labels fade in after the strokes. */
+.sketch-diagram-canvas[data-draw='pending'] svg {
+  opacity: 0;
+}
+.sketch-diagram-canvas[data-draw='drawing'] svg text {
+  animation: hand-label-in 520ms ease-out 650ms both;
+}
+@keyframes hand-label-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
