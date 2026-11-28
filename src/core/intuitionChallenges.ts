@@ -345,6 +345,40 @@ export const INTUITION_CHALLENGES: Partial<Record<StudyModuleId, ChallengeStep[]
       check: (s) => s.solved === true,
     },
   ],
+  M22: [
+    {
+      prompt: 'Itera el método de potencia el menor número de veces que deje el vector a menos de 1° de la dirección propia dominante.',
+      hint: 'Mira cómo se acerca a la línea verde en cada paso.',
+      insight: 'k = 3 basta: cada paso reduce la desviación por λ₂/λ₁ = 0,6/2,6 ≈ 0,23. Así opera PageRank.',
+      check: (s) => s.iter === 3 && n(s.angle) < 1,
+    },
+  ],
+  M29: [
+    {
+      prompt: 'Sube la tasa de aprendizaje hasta que el descenso simple diverja.',
+      hint: 'En la dirección empinada el gradiente es 12y: cada paso multiplica y por (1 − 12α).',
+      insight: 'Con α > 1/6 ≈ 0,167, |1 − 12α| > 1: cada paso se pasa del valle y la oscilación crece.',
+      check: (s) => n(s.lr) > 1 / 6 && Math.abs(n(s.gdLastY)) > 0.9,
+    },
+  ],
+  M32: [
+    {
+      prompt: 'Aplica solo giros r hasta que el cuadrado vuelva a su posición inicial.',
+      hint: 'Cada r gira 90°.',
+      insight: 'r⁴ = e: cuatro giros de 90° son la identidad, así que r tiene orden 4.',
+      check: (s) => s.tab === 'd4' && s.rot === 0 && s.flip === false && String(s.last4) === 'r,r,r,r',
+    },
+    {
+      prompt: 'Ahora vuelve a la posición inicial mezclando giros y volteos (al menos un s).',
+      hint: 'Prueba r, s, r, s.',
+      insight: 'Toda simetría tiene inversa dentro del grupo; por ejemplo r·s·r·s = e, aunque r·s ≠ s·r.',
+      // The last four moves must be real r/s moves: pressing "Identidad (e)" is not solving it.
+      check: (s) => {
+        const moves = String(s.last4).split(',');
+        return s.tab === 'd4' && s.rot === 0 && s.flip === false && moves.length === 4 && !moves.includes('e') && moves.includes('s') && moves.includes('r');
+      },
+    },
+  ],
   M24: [
     {
       prompt: 'Haz que un resultado positivo signifique más de un 50 % de probabilidad de estar enfermo.',

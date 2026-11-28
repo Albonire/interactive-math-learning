@@ -394,6 +394,9 @@ export function M22Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   const cy = 120;
   const r = 82;
 
+  // Angle between the iterate and the dominant eigenvector (2, 1)/√5, for the chapter I challenge.
+  const angleToDominant = (Math.acos(Math.min(1, Math.abs(cur[0] * 2 + cur[1]) / Math.sqrt(5) / Math.hypot(cur[0], cur[1]))) * 180) / Math.PI;
+  useReportVisualState({ iter, angle: angleToDominant });
   return (
     <VisualStageCard
       controls={

@@ -116,3 +116,35 @@ test('the 14 new challenge targets are reachable and their insights are right', 
   assert.equal(step('M30', 0).check({ tab: 'softmax', scaleZ: 710, naiveBroken: true }), true);
   assert.equal(step('M25', 1).check({ dist: 'binom', n: 16, p: 0.7500000001 }), true);
 });
+
+test('M22, M29 and M32 challenges: unsolved at start, reachable, insights right', () => {
+  // M22: power iteration on [[2.2, 0.8], [0.8, 1.0]] from (0.2, 1).
+  let v = [0.2, 1];
+  const angles: number[] = [];
+  for (let k = 0; k <= 7; k++) {
+    angles.push((Math.acos(Math.abs(v[0] * 2 + v[1]) / Math.sqrt(5) / Math.hypot(v[0], v[1])) * 180) / Math.PI);
+    const nx = 2.2 * v[0] + 0.8 * v[1];
+    const ny = 0.8 * v[0] + v[1];
+    const nn = Math.hypot(nx, ny);
+    v = [nx / nn, ny / nn];
+  }
+  assert.ok(angles[2] > 1 && angles[3] < 1, 'k = 3 is the first iterate within 1°');
+  assert.equal(step('M22', 0).check({ iter: 2, angle: angles[2] }), false);
+  assert.equal(step('M22', 0).check({ iter: 3, angle: angles[3] }), true);
+  // Eigenvalues 2.6 and 0.6.
+  const tr = 3.2;
+  const det = 2.2 * 1.0 - 0.8 * 0.8;
+  assert.ok(Math.abs(tr / 2 + Math.sqrt(tr * tr / 4 - det) - 2.6) < 1e-12);
+
+  // M29: plain GD on y with gradient 12y diverges iff |1 − 12α| > 1, i.e. α > 1/6; the pad goes to 0.18.
+  const lastY = (lr: number) => { let y = 0.9; for (let i = 0; i < 18; i++) y -= lr * 12 * y; return y; };
+  assert.equal(step('M29', 0).check({ lr: 0.14, gdLastY: lastY(0.14) }), false);
+  assert.equal(step('M29', 0).check({ lr: 0.18, gdLastY: lastY(0.18) }), true);
+
+  // M32: starts at e; four r's return; r s r s returns.
+  assert.equal(step('M32', 0).check({ tab: 'd4', rot: 0, flip: false, last4: 'e' }), false);
+  assert.equal(step('M32', 0).check({ tab: 'd4', rot: 0, flip: false, last4: 'r,r,r,r' }), true);
+  assert.equal(step('M32', 1).check({ tab: 'd4', rot: 0, flip: false, last4: 'r,r,r,r' }), false);
+  assert.equal(step('M32', 1).check({ tab: 'd4', rot: 0, flip: false, last4: 'r,s,r,s' }), true);
+  assert.equal(step('M32', 1).check({ tab: 'd4', rot: 0, flip: false, last4: 'r,r,s,e' }), false, 'resetting with e does not count');
+});

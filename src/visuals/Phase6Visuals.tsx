@@ -141,6 +141,7 @@ export function M29Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
   const mapX = (x: number) => 270 + x * 95;
   const mapY = (y: number) => 110 - y * 72;
 
+  useReportVisualState({ lr, beta, gdLastY: gdPath[gdPath.length - 1][1] });
   return (
     <VisualStageCard
       controls={
@@ -412,6 +413,7 @@ export function M32Visual({ theme }: ModuleVisualProps) {
     setHistory(['e']);
   };
 
+  useReportVisualState({ tab, rot, flip, last4: history.slice(-4).join(',') });
   return (
     <div>
       <VisualModeTabs
