@@ -131,7 +131,7 @@ export function GameHud({ theme, state, total, todayXp, level, onSetGoal, onShow
                   aria-checked={goal === g}
                   onClick={() => onSetGoal(g)}
                   data-active={goal === g ? 'true' : undefined}
-                  className={`sketch-btn flex-1 px-2 py-1 cursor-pointer text-[14px] ${goal === g ? 'font-display text-[var(--ui-accent)]' : 'font-hand text-[var(--text-secondary)]'}`}
+                  className={`sketch-btn flex-1 px-1.5 py-1 cursor-pointer whitespace-nowrap text-[13px] ${goal === g ? 'font-display text-[var(--ui-accent)]' : 'font-hand text-[var(--text-secondary)]'}`}
                 >
                   {g} {g === 20 ? '· suave' : g === 40 ? '· constante' : '· intensa'}
                 </button>
