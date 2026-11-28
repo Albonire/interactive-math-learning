@@ -30,6 +30,7 @@ interface HudProps {
   todayXp: number;
   level: { index: number; name: string; floor: number; next: number | null; progress: number };
   onSetGoal: (g: DailyGoal) => void;
+  onShowGuide?: () => void;
 }
 
 function GoalRing({ theme, fraction, size = 30 }: { theme: ThemeMode; fraction: number; size?: number }) {
@@ -59,7 +60,7 @@ function GoalRing({ theme, fraction, size = 30 }: { theme: ThemeMode; fraction: 
   );
 }
 
-export function GameHud({ theme, state, total, todayXp, level, onSetGoal }: HudProps) {
+export function GameHud({ theme, state, total, todayXp, level, onSetGoal, onShowGuide }: HudProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -165,6 +166,18 @@ export function GameHud({ theme, state, total, todayXp, level, onSetGoal }: HudP
               })}
             </ul>
           </div>
+          {onShowGuide && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onShowGuide();
+              }}
+              className="font-hand text-[14px] text-[var(--ui-accent)] underline decoration-dotted cursor-pointer"
+            >
+              ¿Cómo funciona el cuaderno?
+            </button>
+          )}
         </div>
       )}
     </div>

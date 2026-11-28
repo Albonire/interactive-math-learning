@@ -106,3 +106,11 @@ test('formatDay shows a short Spanish date without shifting the day', async () =
   assert.match(formatDay('2026-01-01'), /^1 ene/);
   assert.equal(formatDay('roto'), 'roto');
 });
+
+test('the welcome guide only opens by itself for a brand-new learner', async () => {
+  const { shouldAutoShowWelcome } = await import('../ui/WelcomeGuide');
+  assert.equal(shouldAutoShowWelcome({ seen: false, sealed: 0, trazos: 0 }), true);
+  assert.equal(shouldAutoShowWelcome({ seen: true, sealed: 0, trazos: 0 }), false);
+  assert.equal(shouldAutoShowWelcome({ seen: false, sealed: 2, trazos: 0 }), false, 'returning learner from before the guide');
+  assert.equal(shouldAutoShowWelcome({ seen: false, sealed: 0, trazos: 15 }), false);
+});

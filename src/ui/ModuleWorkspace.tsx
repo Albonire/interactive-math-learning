@@ -6,6 +6,7 @@ import { XP, getGameSnapshot, useGameProgress, xpOnDay } from '../storage/gamePr
 import { INTUITION_CHALLENGES } from '../core/intuitionChallenges';
 import { STUDY_PHASES } from '../core/studyPlan';
 import { GameHud, GameToasts, useGameToasts } from './GameHud';
+import { WelcomeGuide, hasSeenWelcome, markWelcomeSeen, shouldAutoShowWelcome } from './WelcomeGuide';
 import {
   STUDY_MODULES,
   STUDY_PHASES_MAP,
@@ -257,6 +258,14 @@ export function ModuleWorkspace({
     },
     [game, pushToast]
   );
+  const [welcomeOpen, setWelcomeOpen] = useState(() =>
+    shouldAutoShowWelcome({ seen: hasSeenWelcome(), sealed: completedModuleIds.size, trazos: game.total })
+  );
+  const closeWelcome = useCallback(() => {
+    markWelcomeSeen();
+    setWelcomeOpen(false);
+  }, []);
+
   const completedPhases = useMemo(
     () => STUDY_PHASES.filter((ph) => ph.moduleIds.length > 0 && ph.moduleIds.every((id) => completedModuleIds.has(id))).length,
     [completedModuleIds]
@@ -445,6 +454,7 @@ export function ModuleWorkspace({
               todayXp={game.todayXp}
               level={game.level}
               onSetGoal={game.setGoal}
+              onShowGuide={() => setWelcomeOpen(true)}
             />
           </div>
 
@@ -1271,6 +1281,22 @@ export function ModuleWorkspace({
         </div>
       </div>
       <GameToasts toasts={toasts} />
+      {welcomeOpen && (
+        <WelcomeGuide
+          theme={theme}
+          goal={game.state.goal}
+          onSetGoal={game.setGoal}
+          onStartDiagnostic={() => {
+            closeWelcome();
+            onOpenDiagnostic();
+          }}
+          onStartHere={() => {
+            closeWelcome();
+            if (moduleId !== 'M1') onSelectModule('M1');
+          }}
+          onClose={closeWelcome}
+        />
+      )}
     </CrayonDictionaryProvider>
   );
 }
