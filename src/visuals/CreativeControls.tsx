@@ -61,6 +61,8 @@ export function DiagramDragHandle({
   label,
   active = false,
   onPointerDown,
+  onKeyStep,
+  valueText,
 }: {
   cx: number;
   cy: number;
@@ -69,14 +71,38 @@ export function DiagramDragHandle({
   label?: string;
   active?: boolean;
   onPointerDown: (e: ReactPointerEvent<SVGGElement>) => void;
+  /** Keyboard nudge: arrow keys call this with (dx, dy) in {-1, 0, 1} (×5 with Shift). */
+  onKeyStep?: (dx: number, dy: number) => void;
+  /** Spoken current value for screen readers, e.g. "x = 1, y = 2". */
+  valueText?: string;
 }) {
+  const keyboardEnabled = Boolean(onKeyStep);
   return (
     <g
       onPointerDown={onPointerDown}
-      style={{ cursor: active ? 'grabbing' : 'grab', touchAction: 'none' }}
+      onKeyDown={
+        onKeyStep
+          ? (e) => {
+              const m = e.shiftKey ? 5 : 1;
+              const map: Record<string, [number, number]> = {
+                ArrowLeft: [-m, 0],
+                ArrowRight: [m, 0],
+                ArrowUp: [0, m],
+                ArrowDown: [0, -m],
+              };
+              const d = map[e.key];
+              if (!d) return;
+              e.preventDefault();
+              onKeyStep(d[0], d[1]);
+            }
+          : undefined
+      }
+      tabIndex={keyboardEnabled ? 0 : undefined}
+      style={{ cursor: active ? 'grabbing' : 'grab', touchAction: 'none', outline: 'none' }}
       className="hand-drag-handle"
       role="slider"
       aria-label={label ?? 'Punto arrastrable'}
+      aria-valuetext={valueText}
     >
       {/* Generous touch target */}
       <circle cx={cx} cy={cy} r={22} fill="transparent" />
@@ -103,6 +129,38 @@ export function DiagramDragHandle({
       <circle cx={cx} cy={cy} r={2.6} fill={color} />
     </g>
   );
+}
+
+/**
+ * Shared pointer plumbing for dragging handles inside an SVG diagram. The SVG captures the
+ * pointer, so a drag keeps working when the finger slides off the small handle.
+ *
+ * Usage: spread `svgProps` on the <svg>, and `bind(key)` on each DiagramDragHandle.
+ * `onMove` receives the pointer position in the SVG's own viewBox coordinates.
+ */
+export function useDiagramDrag<K extends string>(
+  onMove: (key: K, point: { x: number; y: number }) => void
+) {
+  const [active, setActive] = useState<K | null>(null);
+  const bind = (key: K) => ({
+    active: active === key,
+    onPointerDown: (e: ReactPointerEvent<SVGGElement>) => {
+      e.preventDefault();
+      e.currentTarget.ownerSVGElement?.setPointerCapture(e.pointerId);
+      setActive(key);
+    },
+  });
+  const end = () => setActive(null);
+  const svgProps = {
+    onPointerMove: (e: ReactPointerEvent<SVGSVGElement>) => {
+      if (active === null) return;
+      onMove(active, clientToSvgPoint(e.currentTarget, e.clientX, e.clientY));
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+    style: { touchAction: active ? ('none' as const) : ('pan-y' as const) },
+  };
+  return { active, bind, svgProps };
 }
 
 /**
