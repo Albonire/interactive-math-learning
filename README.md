@@ -44,7 +44,14 @@ Test your geometric intuition in `Reto Práctico`: as your parameters approach t
 
 ---
 
-## Curriculum (8 Interactive Lessons)
+## Curriculum
+
+BIBIFOLD has two layers that share the same hand-drawn visual language:
+
+1. **Study plan (32 modules, phases 0 to 6)**: diagnostic, foundations (M1-M6), discrete mathematics (M7-M12), calculus (M13-M17), linear algebra (M18-M23), probability and statistics (M24-M27) and advanced mathematics for ML (M28-M32). Each module follows the five-step ladder (image, small concrete calculation, formal definition, Python, application) and ends with an R-OM multiple-choice checkpoint. The source of truth is `src/core/studyPlan.ts` and `src/core/studyPlanData{A,B}.ts`.
+2. **WebGL 3D Lab (8 guided lessons)**: the deep-dive scenes below, linked from the study modules that use them.
+
+### WebGL 3D Lab lessons
 
 | # | Module | Lesson | Core Geometric Concept |
 | :-: | :--- | :--- | :--- |
@@ -63,7 +70,7 @@ Test your geometric intuition in `Reto Práctico`: as your parameters approach t
 
 - **Frontend**: React 19, TypeScript, Vite, Tailwind CSS v4
 - **3D & Hand-Drawn Rendering**: Three.js (custom GLSL wax-crayon, charcoal hatch, and paper-grain shaders), Rough.js, KaTeX
-- **Audio & Adaptation**: Web Audio API procedural noise synthesizer, Web Worker Edge AI (BKT + LinUCB), IndexedDB / `localStorage` persistence
+- **Audio & Adaptation**: Web Audio API procedural noise synthesizer, Web Worker Edge AI (BKT + LinUCB), `localStorage` persistence
 
 ---
 
@@ -86,5 +93,5 @@ npm run build
 ### Run Unit Tests
 
 ```bash
-npx tsx --test src/**/*.test.ts
+npm test
 ```
