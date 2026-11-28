@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { getCrayonHex, THEME_PALETTES } from '../core/palette';
 import type { StudyModuleId } from '../core/studyPlanTypes';
 import type { ThemeMode } from '../core/types';
@@ -167,7 +167,11 @@ export function HandCrafted3DStage({
       const rect = entries[0]?.contentRect;
       if (!rect) return;
       const w = Math.max(240, Math.round(rect.width));
-      const h = Math.max(260, Math.min(390, Math.round(w * 0.78)));
+      // On phones the stage is pinned while the text scrolls, so it stays compact there.
+      const h =
+        w < 560
+          ? Math.max(190, Math.min(240, Math.round(w * 0.6)))
+          : Math.max(260, Math.min(390, Math.round(w * 0.78)));
       setSize((prev) => (prev.w === w && prev.h === h ? prev : { w, h }));
     });
     ro.observe(el);
@@ -195,8 +199,12 @@ export function HandCrafted3DStage({
     ctx.clearRect(0, 0, size.w, size.h);
 
     const palette = THEME_PALETTES[theme];
-    const baseYaw = 0.56 + effectiveProgress * 1.25 + activeBeat * 0.08;
-    const basePitch = 0.34 + Math.sin(effectiveProgress * Math.PI) * 0.14;
+    const baseYaw = scene.camera
+      ? scene.camera.yaw + (effectiveProgress - 0.5) * 0.3
+      : 0.56 + effectiveProgress * 1.25 + activeBeat * 0.08;
+    const basePitch = scene.camera
+      ? scene.camera.pitch
+      : 0.34 + Math.sin(effectiveProgress * Math.PI) * 0.14;
     const yaw = baseYaw + yawOffset;
     const pitch = clampNumber(basePitch + pitchOffset, -1.15, 1.15);
 
@@ -362,6 +370,20 @@ export function HandCrafted3DStage({
     setDragging(false);
   };
 
+  // Keyboard orbit: arrow keys rotate, Home recenters (the canvas is focusable).
+  const handleKeyDown = (e: KeyboardEvent<HTMLCanvasElement>) => {
+    const step = e.shiftKey ? 0.3 : 0.12;
+    if (e.key === 'ArrowLeft') setYawOffset((v) => v - step);
+    else if (e.key === 'ArrowRight') setYawOffset((v) => v + step);
+    else if (e.key === 'ArrowUp') setPitchOffset((v) => clampNumber(v - step, -1, 1));
+    else if (e.key === 'ArrowDown') setPitchOffset((v) => clampNumber(v + step, -1, 1));
+    else if (e.key === 'Home') {
+      setYawOffset(0);
+      setPitchOffset(0);
+    } else return;
+    e.preventDefault();
+  };
+
   const isModified = Math.abs(yawOffset) > 0.02 || Math.abs(pitchOffset) > 0.02 || manualProgress !== null;
 
   return (
@@ -374,7 +396,7 @@ export function HandCrafted3DStage({
       {/* Header whisper — completely boxless */}
       <div className="flex items-start justify-between gap-2 px-1">
         <div className="min-w-0">
-          <div className="font-hand text-[13.5px] text-[var(--ui-accent)] flex items-center gap-1.5">
+          <div className="hidden sm:flex font-hand text-[13.5px] text-[var(--ui-accent)] items-center gap-1.5">
             <span>Estudio 3D a mano alzada</span>
             <span aria-hidden="true">·</span>
             <span className="font-mono-math text-[11.5px] text-[var(--text-muted)]">
@@ -415,12 +437,15 @@ export function HandCrafted3DStage({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="img"
           style={{ width: size.w, height: size.h, touchAction: 'none' }}
-          className={`block w-full ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
-          aria-label={`Escultura matemática 3D interactiva: ${scene.title}. Arrastra para orbitar.`}
+          className={`block w-full rounded-sm focus-visible:outline-2 focus-visible:outline-dashed focus-visible:outline-[var(--ui-accent)] ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          aria-label={`Escultura matemática 3D: ${scene.title}. ${scene.subtitle} Arrastra o usa las flechas para girar.`}
         />
-        <span className="pointer-events-none absolute bottom-2 right-3 font-hand text-[12.5px] text-[var(--text-muted)] opacity-80">
-          Arrastra para girar · el scroll transforma la escena
+        <span className="hidden sm:block pointer-events-none absolute bottom-2 right-3 font-hand text-[12.5px] text-[var(--text-muted)] opacity-80">
+          <span className="hidden sm:inline">Arrastra o usa las flechas para girar · </span>el scroll transforma la escena
         </span>
       </div>
 

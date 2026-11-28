@@ -528,7 +528,7 @@ export function ModuleWorkspace({
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
               {/* Mobile/Tablet: 3D Stage appears first so touch users inspect immediately; Desktop: Sticky right column */}
-              <div className="lg:col-span-6 lg:order-2 lg:sticky lg:top-16">
+              <div className="sticky top-[46px] z-10 -mx-4 px-4 pb-2 border-b border-dashed border-[var(--hairline)] bg-[var(--bg-paper)] sm:-mx-7 sm:px-7 lg:mx-0 lg:px-0 lg:pb-0 lg:border-0 lg:bg-transparent lg:col-span-6 lg:order-2 lg:top-16">
                 <HandCrafted3DStage
                   moduleId={moduleId}
                   theme={theme}

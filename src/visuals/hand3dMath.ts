@@ -1,5 +1,6 @@
 import type { StudyModuleId } from '../core/studyPlanTypes';
 import type { CrayonToken } from '../core/types';
+import { buildCuratedScene } from './hand3dScenes';
 
 export interface Vec3 {
   x: number;
@@ -43,6 +44,11 @@ export interface Hand3DSceneSpec {
   lines: Hand3DLine[];
   polys: Hand3DPoly[];
   dots: Hand3DDot[];
+  /**
+   * Optional preferred viewing angle (radians). When present the stage keeps this view with only
+   * a gentle drift while scrolling, so scenes that read best from the front are not turned edge-on.
+   */
+  camera?: { yaw: number; pitch: number };
 }
 
 export function clampNumber(v: number, min: number, max: number): number {
@@ -164,6 +170,9 @@ export function buildHand3DScene(
   moduleId: StudyModuleId,
   progress: number
 ): Hand3DSceneSpec {
+  const curated = buildCuratedScene(moduleId, progress);
+  if (curated) return curated;
+
   const t = clampNumber(progress, 0, 1);
   const lines: Hand3DLine[] = [];
   const polys: Hand3DPoly[] = [];
