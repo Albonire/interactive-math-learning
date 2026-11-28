@@ -8,6 +8,7 @@ import {
   VisualModeTabs,
   VisualStageCard,
   clientToSvgPoint,
+  useReportVisualState,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -34,6 +35,7 @@ export function M24Visual({ theme }: ModuleVisualProps) {
   const leftSplitY = 20 + sens * 180;
   const rightSplitY = 20 + fp * 180;
 
+  useReportVisualState({ prevalence, sensitivity, falsePos, posterior });
   return (
     <VisualStageCard
       controls={

@@ -8,6 +8,7 @@ import {
   VisualModeTabs,
   VisualStageCard,
   clientToSvgPoint,
+  useReportVisualState,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -371,7 +372,7 @@ export function M1Visual({ theme }: ModuleVisualProps) {
 export function M2Visual({ theme }: ModuleVisualProps) {
   const p = useVisualPalette(theme);
   const [tab, setTab] = useState<'areas' | 'balance' | 'system'>('areas');
-  const [a, setA] = useState(5);
+  const [a, setA] = useState(3);
   const [b, setB] = useState(2);
   const [dragCorner, setDragCorner] = useState(false);
   const areaSvgRef = useRef<SVGSVGElement | null>(null);
@@ -395,6 +396,7 @@ export function M2Visual({ theme }: ModuleVisualProps) {
   const ix = parallel ? null : (3 - 1) / (1 - slope2); // y = x + 1 vs y = m2*x + 3
   const iy = ix !== null ? ix + 1 : null;
 
+  useReportVisualState({ tab, a, b });
   return (
     <div>
       <VisualModeTabs
@@ -617,8 +619,9 @@ export function M3Visual({ theme }: ModuleVisualProps) {
   const p = useVisualPalette(theme);
   const [tab, setTab] = useState<'mapping' | 'transform' | 'compose'>('mapping');
   const [arrows, setArrows] = useState<Array<[number, number]>>([
+    // Starts broken on purpose (x1 has two arrows, x2 none): chapter I asks to fix it.
+    [0, 0],
     [0, 1],
-    [1, 0],
     [2, 2],
   ]);
   const [hShift, setHShift] = useState(1.5);
@@ -660,6 +663,7 @@ export function M3Visual({ theme }: ModuleVisualProps) {
   const fx = compX * compX;
   const gfx = fx + 1;
 
+  useReportVisualState({ tab, isFunction, isInjective, isSurjective });
   return (
     <div>
       <VisualModeTabs
@@ -680,9 +684,7 @@ export function M3Visual({ theme }: ModuleVisualProps) {
               <span className="font-hand text-[14px] text-[var(--text-secondary)] mr-1">
                 Arrastra desde una x hasta una y para trazar una flecha; toca una flecha para borrarla.
               </span>
-              <ActionBtn onClick={() => setArrows([[0, 0], [1, 1], [2, 2]])}>Biyectiva</ActionBtn>
-              <ActionBtn onClick={() => setArrows([[0, 0], [1, 0], [2, 2]])}>Dos entradas chocan</ActionBtn>
-              <ActionBtn onClick={() => setArrows([[0, 0], [0, 1], [1, 2], [2, 2]])}>Romper función</ActionBtn>
+              <ActionBtn onClick={() => setArrows([[0, 0], [0, 1], [2, 2]])}>Reiniciar</ActionBtn>
             </div>
           }
           caption={mappingCaption}

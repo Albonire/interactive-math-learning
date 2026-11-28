@@ -887,3 +887,65 @@ select:focus-visible,
 .sketch-diagram-canvas svg .hand-ink path {
   filter: none;
 }
+
+/* Draw-on-enter (useDrawOnEnter): blank until visible, labels fade in after the strokes. */
+.sketch-diagram-canvas[data-draw='pending'] svg {
+  opacity: 0;
+}
+.sketch-diagram-canvas[data-draw='drawing'] svg text {
+  animation: hand-label-in 520ms ease-out 650ms both;
+}
+@keyframes hand-label-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+ * Hand-drawn frame for HTML tiles (bit cells, Pascal and Cantor cells, proof steps, cards).
+ * The frame is a Rough.js crayon rectangle used as an alpha mask, painted with the
+ * element's frame colour, so state colours (active, success, warning) keep working. The mask
+ * stretches to any size; the stroke keeps a constant width (non-scaling-stroke).
+ */
+@supports ((mask-image: url('')) or (-webkit-mask-image: url(''))) {
+  .sketch-card::before,
+  .sketch-diagram-canvas .sketch-tile,
+  .sketch-diagram-canvas button:not(.sketch-btn):not([role='radio']) {
+    border-color: transparent !important;
+  }
+  .sketch-card::after,
+  .sketch-diagram-canvas .sketch-tile::after,
+  .sketch-diagram-canvas button:not(.sketch-btn):not([role='radio'])::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    pointer-events: none;
+    background-color: var(--hand-frame-color, var(--ink-frame-border));
+    -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2096%2096%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M-0.19%200.99%20C23.82%204.39%2C%2039.13%203.99%2C%2090.51%200.99%20M2.13%202.76%20C32.97%204.48%2C%2066.87%204.50%2C%2092.89%201.83%20M91.01%202.60%20C94.05%2033.00%2C%2095.40%2061.87%2C%2095.77%2096.06%20M93.13%203.64%20C92.92%2028.05%2C%2094.78%2053.48%2C%2094.35%2093.74%20M91.99%2090.60%20C63.86%2092.70%2C%2037.59%2093.01%2C%204.36%2094.88%20M92.03%2094.59%20C71.19%2094.37%2C%2050.66%2094.52%2C%203.91%2093.46%20M1.32%2089.84%20C6.17%2076.39%2C%205.97%2057.63%2C%203.22%202.29%20M2.24%2094.58%20C3.29%2060.90%2C%202.56%2030.16%2C%201.53%204.46%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20vector-effect%3D%22non-scaling-stroke%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E") center / 100% 100% no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2096%2096%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M-0.19%200.99%20C23.82%204.39%2C%2039.13%203.99%2C%2090.51%200.99%20M2.13%202.76%20C32.97%204.48%2C%2066.87%204.50%2C%2092.89%201.83%20M91.01%202.60%20C94.05%2033.00%2C%2095.40%2061.87%2C%2095.77%2096.06%20M93.13%203.64%20C92.92%2028.05%2C%2094.78%2053.48%2C%2094.35%2093.74%20M91.99%2090.60%20C63.86%2092.70%2C%2037.59%2093.01%2C%204.36%2094.88%20M92.03%2094.59%20C71.19%2094.37%2C%2050.66%2094.52%2C%203.91%2093.46%20M1.32%2089.84%20C6.17%2076.39%2C%205.97%2057.63%2C%203.22%202.29%20M2.24%2094.58%20C3.29%2060.90%2C%202.56%2030.16%2C%201.53%204.46%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20vector-effect%3D%22non-scaling-stroke%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E") center / 100% 100% no-repeat;
+  }
+  .sketch-diagram-canvas .sketch-tile,
+  .sketch-diagram-canvas button:not(.sketch-btn):not([role='radio']) {
+    position: relative;
+  }
+  /* Cards are usually wide: a wide frame only gets compressed, never stretched into bulges. */
+  .sketch-card::after,
+  .sketch-diagram-canvas .sketch-tile::after,
+  .sketch-diagram-canvas button.w-full:not(.sketch-btn):not([role='radio'])::after {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%2080%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M3.62%202.38%20C122.04%202.87%2C%20241.46%202.94%2C%20596.67%203.13%20M3.38%203.40%20C142.88%201.85%2C%20282.44%201.73%2C%20596.83%203.12%20M597.99%203.83%20C597.69%2033.73%2C%20597.26%2063.24%2C%20596.22%2075.28%20M596.20%202.12%20C597.37%2029.66%2C%20596.56%2055.47%2C%20597.52%2076.86%20M596.81%2077.72%20C375.50%2079.66%2C%20155.24%2078.79%2C%203.08%2076.80%20M596.83%2077.18%20C397.56%2075.84%2C%20199.30%2075.41%2C%203.14%2077.20%20M3.08%2077.99%20C5.06%2049.84%2C%201.70%2026.65%2C%201.36%201.60%20M3.43%2078.07%20C1.91%2062.98%2C%201.43%2047.29%2C%203.93%203.95%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20vector-effect%3D%22non-scaling-stroke%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20600%2080%22%20preserveAspectRatio%3D%22none%22%3E%3Cpath%20d%3D%22M3.62%202.38%20C122.04%202.87%2C%20241.46%202.94%2C%20596.67%203.13%20M3.38%203.40%20C142.88%201.85%2C%20282.44%201.73%2C%20596.83%203.12%20M597.99%203.83%20C597.69%2033.73%2C%20597.26%2063.24%2C%20596.22%2075.28%20M596.20%202.12%20C597.37%2029.66%2C%20596.56%2055.47%2C%20597.52%2076.86%20M596.81%2077.72%20C375.50%2079.66%2C%20155.24%2078.79%2C%203.08%2076.80%20M596.83%2077.18%20C397.56%2075.84%2C%20199.30%2075.41%2C%203.14%2077.20%20M3.08%2077.99%20C5.06%2049.84%2C%201.70%2026.65%2C%201.36%201.60%20M3.43%2078.07%20C1.91%2062.98%2C%201.43%2047.29%2C%203.93%203.95%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.7%22%20vector-effect%3D%22non-scaling-stroke%22%20stroke-linecap%3D%22round%22%2F%3E%3C%2Fsvg%3E");
+  }
+  .sketch-card[data-active='true'] { --hand-frame-color: var(--ui-accent); }
+  .sketch-card[data-tone='success'] { --hand-frame-color: var(--ui-success); }
+  .sketch-card[data-tone='warning'] { --hand-frame-color: var(--ui-warning); }
+}
+
+/* Module chapters rise into place as they scroll into view (ModuleWorkspace). */
+@media (prefers-reduced-motion: no-preference) {
+  [data-scroll-chapter] {
+    transition: opacity 620ms cubic-bezier(0.22, 1, 0.36, 1), transform 620ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  [data-scroll-chapter]:not([data-inview]) {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}

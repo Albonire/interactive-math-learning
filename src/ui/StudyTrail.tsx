@@ -11,7 +11,7 @@ import { getCrayonHex } from '../core/palette';
 import { STUDY_MODULES, STUDY_MODULES_LIST, STUDY_PHASES_MAP } from '../core/studyPlan';
 import type { StudyModuleId } from '../core/studyPlanTypes';
 import type { ThemeMode } from '../core/types';
-import { dueReviews, loadStudyRhythm, localDay } from '../storage/studyRhythm';
+import { dueReviews, getStudyRhythmSnapshot, localDay } from '../storage/studyRhythm';
 import { handifySvgTree } from '../visuals/handDrawnSvg';
 
 interface StudyTrailProps {
@@ -45,7 +45,7 @@ export function StudyTrail({ theme, activeModuleId, completedModuleIds, onSelect
     return () => ro.disconnect();
   }, []);
 
-  const due = useMemo(() => new Set(dueReviews(loadStudyRhythm(), localDay())), []);
+  const due = useMemo(() => new Set(dueReviews(getStudyRhythmSnapshot(), localDay())), []);
   const next = recommendedNext(completedModuleIds);
 
   // Logical width shrinks with the column count so labels keep a readable size on phones.

@@ -7,7 +7,7 @@ import type { AnatomyLayerSpec, CrayonToken, SceneId, ThemeMode } from '../core/
 import { CrayonDustPoints } from './CrayonDustPoints';
 import { createCrayonLineMaterial, syncCrayonMaterialsInObject } from './CrayonMaterials';
 import { CrayonNibMarker } from './CrayonNibMarker';
-import { computeExplodedCameraPose, computeExplodeVerticalSpan } from './explodeView';
+import { computeExplodedCameraPose, computeExplodeVerticalSpan, staggeredExplodeFraction } from './explodeView';
 import { refreshCrayonLabelSpritesInObject } from './PaperGrainGenerator';
 import {
   SCENE_ANNOTATIONS,
@@ -92,6 +92,9 @@ export class SceneManager {
   private ecoProfile: EcoRenderProfile;
   private steadyStrokes = false;
   private exploded = false;
+  /** Continuous explode amount driven by scroll (Modo Anatomía); null = classic on/off toggle. */
+  private explodeAmount: number | null = null;
+  private explodeCamBase: { dist: number; targetY: number } | null = null;
   private focusedLayerId: string | null = null;
   private layerSpecs: AnatomyLayerSpec[] = [];
 
@@ -625,6 +628,47 @@ export class SceneManager {
     }
   }
 
+  /**
+   * Scroll-driven Modo Anatomía. `amount` in [0, 1] separates the anatomy layers continuously
+   * (staggered per tier) and dollies the camera back in proportion so every tier stays framed.
+   * Pass null to hand control back to the classic Separar/Unir toggle.
+   */
+  public setExplodeAmount(amount: number | null): void {
+    if (this.disposed) return;
+    if (amount === null) {
+      this.explodeAmount = null;
+      this.explodeCamBase = null;
+      delete this.container.dataset.explodeAmount;
+      return;
+    }
+    const t = Math.max(0, Math.min(1.08, amount));
+    if (this.explodeAmount === null || !this.explodeCamBase) {
+      // Remember the framing at the moment the reader started scrolling, and stop any
+      // pending automatic camera move so the two never fight.
+      this.targetCamPos = null;
+      this.targetCamLook = null;
+      const dist = this.camera.position.distanceTo(this.controls.target);
+      this.explodeCamBase = { dist, targetY: this.controls.target.y };
+    }
+    this.explodeAmount = t;
+    const span = computeExplodeVerticalSpan(this.layerSpecs, true);
+    const centerShiftY = (span.minY + span.maxY) * 0.4;
+    const base = this.explodeCamBase;
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    const eased = Math.min(1, t);
+    this.controls.target.y = base.targetY + centerShiftY * eased;
+    const dist = Math.min(this.controls.maxDistance, base.dist * (1 + 0.42 * eased));
+    this.camera.position.copy(this.controls.target).addScaledVector(dir, dist);
+    this.controls.update();
+    this.container.dataset.explodeAmount = t.toFixed(3);
+    if (this.isSoftwareGl) this.requestSoftwareRender();
+  }
+
+  /** Mouse-wheel zoom on/off (the wheel drives the explode while Modo Anatomía scroll is on). */
+  public setWheelZoomEnabled(enabled: boolean): void {
+    this.controls.enableZoom = enabled;
+  }
+
   public cancelCameraTransition(): void {
     this.targetCamPos = null;
     this.targetCamLook = null;
@@ -855,7 +899,18 @@ export class SceneManager {
       for (const spec of this.layerSpecs) {
         const grp = this.controller.layers[spec.id];
         if (!grp) continue;
-        const targetY = this.exploded ? spec.explodeOffsetY : 0;
+        let targetY = this.exploded ? spec.explodeOffsetY : 0;
+        if (this.explodeAmount !== null) {
+          // Scroll-driven: follow the (already spring-smoothed) amount directly, staggered by tier.
+          const order = [...this.layerSpecs].sort((a, b) => b.explodeOffsetY - a.explodeOffsetY);
+          const rank = order.findIndex((l) => l.id === spec.id);
+          targetY = spec.explodeOffsetY * staggeredExplodeFraction(this.explodeAmount, rank, order.length);
+          if (Math.abs(grp.position.y - targetY) > 0.0001) {
+            grp.position.y = targetY;
+            layersMoved = true;
+          }
+          continue;
+        }
         const diff = Math.abs(grp.position.y - targetY);
         if (diff > 0.002) {
           grp.position.y = THREE.MathUtils.damp(grp.position.y, targetY, 4.2, dt);

@@ -1,8 +1,9 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { getCrayonHex, THEME_PALETTES } from '../core/palette';
 import type { CrayonToken, ThemeMode } from '../core/types';
 import { CrayonNote } from '../ui/CrayonIcons';
 import { handifySvgTree } from './handDrawnSvg';
+import { useDrawOnEnter } from './useDrawOnEnter';
 import { GlossaryText } from '../ui/CrayonDictionary';
 import { CrayonSlider, CrayonStepMarker, RoughDivider, RoughUnderline } from '../ui/RoughElements';
 export {
@@ -13,6 +14,19 @@ export {
   SketchXYPad,
   clientToSvgPoint,
 } from './CreativeControls';
+
+/** Visuals report their live state here so chapter I can check the module's challenge. */
+const VisualStateReportContext = createContext<((state: Record<string, unknown>) => void) | null>(null);
+export const VisualStateReportProvider = VisualStateReportContext.Provider;
+
+/** Call from a visual with a small, serializable snapshot of what the learner is manipulating. */
+export function useReportVisualState(state: Record<string, unknown>): void {
+  const report = useContext(VisualStateReportContext);
+  const key = JSON.stringify(state);
+  useEffect(() => {
+    report?.(JSON.parse(key) as Record<string, unknown>);
+  }, [report, key]);
+}
 
 export interface ModuleVisualProps {
   theme: ThemeMode;
@@ -231,6 +245,7 @@ export function VisualStageCard({
   controls?: ReactNode;
   footer?: ReactNode;
 }) {
+  const drawRef = useDrawOnEnter<HTMLDivElement>();
   return (
     <div className="space-y-4">
       {controls && (
@@ -238,7 +253,7 @@ export function VisualStageCard({
           {controls}
         </div>
       )}
-      <div className="sketch-diagram-canvas py-2 sm:py-3 overflow-x-auto">
+      <div ref={drawRef} className="sketch-diagram-canvas py-2 sm:py-3 overflow-x-auto">
         {handifySvgTree(children)}
       </div>
       {(caption || footer) && (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createSessionSalt, shuffledOptionOrder } from '../core/optionShuffle';
+import { createSessionSalt, hashStringSeed, shuffledOptionOrder } from '../core/optionShuffle';
+import { getModuleQuestions, pickQuestionIndex } from '../core/questionBank';
 import { REVIEW_INTERVALS_DAYS, useStudyRhythm } from '../storage/studyRhythm';
 import {
   STUDY_MODULES,
@@ -14,6 +15,8 @@ import { SCENES } from '../core/curriculum';
 import type { SceneId, ThemeMode } from '../core/types';
 import { HandCrafted3DStage } from '../visuals/HandCrafted3DStage';
 import { ModuleVisualDispatcher } from '../visuals/ModuleVisualDispatcher';
+import { VisualStateReportProvider } from '../visuals/VisualHelpers';
+import { IntuitionChallenge } from './IntuitionChallenge';
 import { CrayonDictionaryProvider, GlossaryText } from './CrayonDictionary';
 import {
   CrayonArrowLeft,
@@ -110,6 +113,7 @@ export function ModuleWorkspace({
     setAttempt(0);
     setEliminated(new Set());
     setSolved(false);
+    setLastWrong(null);
     setCopied(false);
     setPageProgress(0);
     setStoryProgress(0);
@@ -190,6 +194,27 @@ export function ModuleWorkspace({
     };
   }, [moduleId]);
 
+  // Scroll-driven reveal: each chapter rises into place the first time it scrolls into view.
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!root || typeof IntersectionObserver === 'undefined') return;
+    const els = Object.values(chapterRefs.current).filter((el): el is HTMLElement => !!el);
+    els.forEach((el) => delete el.dataset.inview);
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            (e.target as HTMLElement).dataset.inview = 'true';
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { root, threshold: 0.06 }
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [moduleId]);
+
   const scrollToChapter = useCallback((id: ChapterId) => {
     const el = chapterRefs.current[id];
     if (el) {
@@ -199,6 +224,8 @@ export function ModuleWorkspace({
 
   // ── Study rhythm: streak + spaced re-checks of sealed modules ──
   const rhythm = useStudyRhythm(completedModuleIds);
+  const [visualState, setVisualState] = useState<Record<string, unknown> | null>(null);
+  useEffect(() => setVisualState(null), [moduleId]);
   const reviewMode = isCompleted && rhythm.isDue(moduleId);
   const [roundOutcome, setRoundOutcome] = useState<
     { kind: 'review'; firstTry: boolean; nextDays: number } | { kind: 'seal' } | null
@@ -226,11 +253,16 @@ export function ModuleWorkspace({
   const linkedScene = mod.linked3DSceneId ? SCENES[mod.linked3DSceneId] : null;
   const secondaryScene = mod.secondary3DSceneId ? SCENES[mod.secondary3DSceneId] : null;
 
+  // Question bank: each round asks the next question, starting from a per-session offset.
+  const questions = useMemo(() => getModuleQuestions(moduleId), [moduleId]);
+  const qIndex = pickQuestionIndex(questions.length, attempt, hashStringSeed(`${sessionSalt}:${moduleId}`));
+  const q = questions[qIndex];
   const optionOrder = useMemo(
-    () => shuffledOptionOrder(mod.checkpoint.options.length, `${moduleId}#${attempt}#${sessionSalt}`),
-    [mod.checkpoint.options.length, moduleId, attempt, sessionSalt]
+    () => shuffledOptionOrder(q.options.length, `${q.id}#${attempt}#${sessionSalt}`),
+    [q.options.length, q.id, attempt, sessionSalt]
   );
-  const isCorrect = submitted && selectedOpt === mod.checkpoint.correctIndex;
+  const [lastWrong, setLastWrong] = useState<number | null>(null);
+  const isCorrect = submitted && selectedOpt === q.correctIndex;
   const wrongTries = eliminated.size;
   /** Sealed only when solved with no wrong try in this round (elimination is not mastery). */
   const cleanSolve = solved && wrongTries === 0;
@@ -239,7 +271,7 @@ export function ModuleWorkspace({
     if (selectedOpt === null || solved) return;
     setSubmitted(true);
     rhythm.markActive();
-    if (selectedOpt === mod.checkpoint.correctIndex) {
+    if (selectedOpt === q.correctIndex) {
       setSolved(true);
       const firstTry = wrongTries === 0;
       if (reviewMode) {
@@ -257,6 +289,7 @@ export function ModuleWorkspace({
     } else {
       // Cross the distractor out, but never reveal which option is right.
       setEliminated((prev) => new Set(prev).add(selectedOpt));
+      setLastWrong(selectedOpt);
     }
   };
 
@@ -266,6 +299,8 @@ export function ModuleWorkspace({
     setSelectedOpt(null);
     setSubmitted(false);
     setSolved(false);
+    setLastWrong(null);
+    setRoundOutcome(null);
   };
 
   const handleCopyCode = () => {
@@ -570,12 +605,21 @@ export function ModuleWorkspace({
               </span>
             </div>
 
-            <ModuleVisualDispatcher
+            <IntuitionChallenge
               moduleId={moduleId}
               theme={theme}
-              onOpen3DLab={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
-              linked3DLabel={linkedScene ? `Abrir Lab 3D: ${linkedScene.shortLabel}` : undefined}
+              state={visualState}
+              onStepSolved={rhythm.markActive}
             />
+
+            <VisualStateReportProvider value={setVisualState}>
+              <ModuleVisualDispatcher
+                moduleId={moduleId}
+                theme={theme}
+                onOpen3DLab={linkedScene ? () => onOpen3DScene(linkedScene.id) : undefined}
+                linked3DLabel={linkedScene ? `Abrir Lab 3D: ${linkedScene.shortLabel}` : undefined}
+              />
+            </VisualStateReportProvider>
           </section>
 
           <RoughDivider theme={theme} seed={mod.number * 23 + 11} />
@@ -863,9 +907,12 @@ export function ModuleWorkspace({
                 <div className="space-y-1 flex-1 min-w-[240px]">
                   <div className="text-[14px] font-hand text-[var(--ui-accent)]">
                     {reviewMode && !solved ? 'Repaso espaciado · ¿Lo recuerdas sin mirar arriba?' : 'Verificación de dominio · Regla R-OM'}
+                    <span className="ml-2 font-mono-math text-[12px] text-[var(--text-muted)]" data-testid="question-counter">
+                      pregunta {qIndex + 1} de {questions.length}
+                    </span>
                   </div>
                   <p className="font-display text-[21px] sm:text-[23px] text-[var(--text-primary)] leading-snug">
-                    <GlossaryText text={mod.checkpoint.question} />
+                    <GlossaryText text={q.prompt} />
                   </p>
                 </div>
 
@@ -885,10 +932,10 @@ export function ModuleWorkspace({
 
               <div className="space-y-2.5" role="radiogroup" aria-label="Opciones del reto">
                 {optionOrder.map((idx, displayPos) => {
-                  const opt = mod.checkpoint.options[idx];
+                  const opt = q.options[idx];
                   const chosen = selectedOpt === idx;
                   const isEliminated = eliminated.has(idx);
-                  const revealCorrect = solved && idx === mod.checkpoint.correctIndex;
+                  const revealCorrect = solved && idx === q.correctIndex;
                   const optState = revealCorrect
                     ? 'correct'
                     : isEliminated
@@ -961,10 +1008,15 @@ export function ModuleWorkspace({
                         : '✗ Esa opción describe un error conceptual frecuente.'}
                   </strong>{' '}
                   {isCorrect ? (
-                    <GlossaryText text={mod.checkpoint.explanation} />
+                    <GlossaryText text={q.explanation} />
                   ) : (
                     <span className="text-[var(--text-secondary)]">
-                      No te digo cuál es la buena: vuelve al{' '}
+                      {lastWrong !== null && q.feedback[lastWrong] && (
+                        <span className="block text-[var(--text-primary)] my-1" data-testid="distractor-feedback">
+                          <GlossaryText text={q.feedback[lastWrong]} />
+                        </span>
+                      )}
+                      Elige de nuevo entre las que quedan, o vuelve al{' '}
                       <button
                         type="button"
                         onClick={() => scrollToChapter('story3d')}
@@ -972,7 +1024,7 @@ export function ModuleWorkspace({
                       >
                         cálculo concreto y la definición formal
                       </button>
-                      , y elige de nuevo entre las opciones que quedan.
+                      .
                     </span>
                   )}
                 </div>
@@ -997,7 +1049,18 @@ export function ModuleWorkspace({
                     onClick={handleNewRound}
                     className="sketch-btn inline-flex items-center gap-1.5 px-3.5 py-1.5 font-hand text-[15px] text-[var(--text-primary)] cursor-pointer"
                   >
-                    Nueva ronda (opciones barajadas)
+                    Otra pregunta para sellarlo
+                  </button>
+                )}
+
+                {solved && (cleanSolve || roundOutcome?.kind === 'review') && questions.length > 1 && (
+                  <button
+                    type="button"
+                    data-testid="checkpoint-practice-more"
+                    onClick={handleNewRound}
+                    className="sketch-btn inline-flex items-center gap-1.5 px-3.5 py-1.5 font-hand text-[15px] text-[var(--text-secondary)] cursor-pointer"
+                  >
+                    Practicar otra ({qIndex + 1}/{questions.length} → {((qIndex + 1) % questions.length) + 1}/{questions.length})
                   </button>
                 )}
 

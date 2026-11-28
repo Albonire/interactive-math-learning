@@ -100,3 +100,17 @@ export function computeExplodedCameraPose(
     target,
   };
 }
+
+/**
+ * Organic, staggered explode: with a global amount t in [0, 1], each layer separates over its
+ * own window so the stack peels apart like pages lifting one after another, instead of every
+ * layer sliding in lockstep. `rank` 0 starts first. Ends are exact: t = 0 → 0 and t = 1 → 1
+ * for every layer, and the fraction never decreases as t grows.
+ */
+export function staggeredExplodeFraction(t: number, rank: number, count: number, spread = 0.35): number {
+  const clamped = Math.max(0, Math.min(1, t));
+  if (count <= 1) return clamped * clamped * (3 - 2 * clamped);
+  const start = (spread * rank) / (count - 1);
+  const u = Math.max(0, Math.min(1, (clamped - start) / (1 - spread)));
+  return u * u * (3 - 2 * u);
+}

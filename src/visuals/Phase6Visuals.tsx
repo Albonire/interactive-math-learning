@@ -7,6 +7,7 @@ import {
   VisualStageCard,
   DiagramDragHandle,
   useDiagramDrag,
+  useReportVisualState,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -325,6 +326,7 @@ export function M31Visual({ theme }: ModuleVisualProps) {
     { label: 'H(p, q)', note: 'cross-entropy = H(p) + D_KL', val: CE, color: p.sage, y: 210 },
   ];
 
+  useReportVisualState({ p1, q1, kl: KL });
   return (
     <VisualStageCard
       controls={
@@ -332,7 +334,6 @@ export function M31Visual({ theme }: ModuleVisualProps) {
           <span className="font-hand text-[14px] text-[var(--text-secondary)]">
             Arrastra el corte A | B de cada barra para repartir la probabilidad.
           </span>
-          <ActionBtn onClick={() => setQ1(p1)}>Igualar q = p (KL = 0)</ActionBtn>
         </>
       }
       caption={`H(p, q) = H(p) + D_KL(p || q) → ${CE.toFixed(3)} = ${H.toFixed(3)} + ${KL.toFixed(3)} bits. Minimizar cross-entropy equivale a reducir a 0 los bits extra de KL.`}

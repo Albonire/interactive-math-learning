@@ -7,6 +7,7 @@ import {
   VisualStageCard,
   clientToSvgPoint,
   useDiagramDrag,
+  useReportVisualState,
   useVisualPalette,
   type ModuleVisualProps,
 } from './VisualHelpers';
@@ -123,8 +124,8 @@ export function M18Visual({ theme, onOpen3DLab, linked3DLabel }: ModuleVisualPro
 /* ── M19: Sistemas Lineales y Eliminación Gaussiana ───────────────────────── */
 export function M19Visual({ theme }: ModuleVisualProps) {
   const p = useVisualPalette(theme);
-  const [xWeight, setXWeight] = useState(1);
-  const [yWeight, setYWeight] = useState(2);
+  const [xWeight, setXWeight] = useState(0);
+  const [yWeight, setYWeight] = useState(0);
   // System: x*[2, -1] + y*[-1, 2] = [0, 3] => solution x=1, y=2
   const rx = 2 * xWeight - yWeight;
   const ry = -xWeight + 2 * yWeight;
@@ -147,6 +148,7 @@ export function M19Visual({ theme }: ModuleVisualProps) {
     setWeights((2 * tx + ty) / 3, (tx + 2 * ty) / 3);
   });
 
+  useReportVisualState({ x: xWeight, y: yWeight, solved });
   return (
     <VisualStageCard
       controls={
@@ -155,7 +157,7 @@ export function M19Visual({ theme }: ModuleVisualProps) {
             Receta actual: x = <strong style={{ color: p.cobalt }}>{xWeight}</strong>, y ={' '}
             <strong style={{ color: p.sage }}>{yWeight}</strong>. Arrastra el punto en cualquiera de las dos imágenes.
           </span>
-          <ActionBtn onClick={() => { setXWeight(1); setYWeight(2); }}>Solución exacta (1, 2)</ActionBtn>
+          <ActionBtn onClick={() => { setXWeight(0); setYWeight(0); }}>Reiniciar</ActionBtn>
         </>
       }
       caption={
